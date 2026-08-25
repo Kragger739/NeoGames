@@ -1,0 +1,765 @@
+/* Shared page shell */
+.auth-page,
+.dashboard-page,
+.new-room-page,
+.join-page,
+.lobby-page,
+.game-play-page,
+.results-page,
+.profile-page,
+.friends-page {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 40px 20px 64px;
+  text-align: center;
+  box-sizing: border-box;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.game-play-page {
+  max-width: 760px;
+}
+
+/* Links & nav */
+a {
+  color: var(--accent);
+}
+
+.dashboard-page nav {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.dashboard-page nav a,
+.dashboard-page nav button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.dashboard-page nav a:hover,
+.dashboard-page nav button:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  background: var(--code-bg);
+  color: var(--text);
+}
+
+.dashboard-page > button {
+  margin-top: 8px;
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.dashboard-page > button:hover:not(:disabled) {
+  background: var(--code-bg);
+  color: var(--text-h);
+}
+
+.new-room-page > p:first-child,
+.lobby-page > p:first-child {
+  text-align: left;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+/* Forms */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: stretch;
+  margin: 24px 0;
+  text-align: left;
+}
+
+form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+input,
+select {
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--code-bg);
+  color: var(--text-h);
+  box-sizing: border-box;
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+input[type="number"] {
+  width: 100px;
+}
+
+button {
+  font: inherit;
+  font-weight: 500;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--accent);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+button:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form-error {
+  color: #ef4444;
+  font-size: 14px;
+  margin: 0;
+}
+
+.hint {
+  color: var(--text);
+  font-size: 14px;
+  margin: 4px 0 16px;
+}
+
+/* Generic lists (players, misses) */
+.player-list,
+.miss-feed,
+.scoreboard {
+  list-style: none;
+  margin: 16px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.player-list li,
+.miss-feed li,
+.scoreboard li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  font-size: 15px;
+}
+
+.scoreboard li span:last-child {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* Lobby */
+.lobby-page h2 {
+  margin-top: 24px;
+}
+
+.lobby-page button {
+  margin-top: 8px;
+}
+
+.copy-invite-button {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  padding: 8px 14px;
+}
+
+.copy-invite-button:hover:not(:disabled) {
+  background: var(--code-bg);
+  color: var(--text-h);
+}
+
+.room-settings-form {
+  margin: 16px 0 24px;
+}
+
+.save-status {
+  min-height: 1.2em;
+  margin: 8px 0 0;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.mode-picker {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 0;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mode-picker legend {
+  padding: 0 4px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.mode-option {
+  flex: 1 1 200px;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.mode-option:has(input:checked) {
+  border-color: var(--accent-border);
+}
+
+.mode-option input[type="radio"] {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.mode-option strong {
+  display: block;
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+.mode-option .hint {
+  margin: 2px 0 0;
+}
+
+.year-range-inputs {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.year-range-inputs label {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.year-range-inputs input[type="number"] {
+  width: 80px;
+}
+
+/* Game play: two-column on wide viewports */
+.game-play-layout {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.game-play-main {
+  flex: 1 1 380px;
+  min-width: 0;
+  text-align: center;
+}
+
+.game-play-main h1 {
+  font-size: 32px;
+}
+
+.scoreboard-panel {
+  flex: 0 0 200px;
+}
+
+.scoreboard-panel h2 {
+  text-align: left;
+}
+
+@media (max-width: 720px) {
+  .game-play-layout {
+    flex-direction: column;
+  }
+
+  .scoreboard-panel {
+    width: 100%;
+  }
+}
+
+.stage-info {
+  font-size: 15px;
+  color: var(--text);
+}
+
+.countdown {
+  color: var(--accent);
+}
+
+.stage-progress {
+  position: relative;
+  height: 8px;
+  margin: 10px 0;
+}
+
+.stage-progress-segment {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 6px;
+  background: var(--border);
+  margin: 0 2px;
+}
+
+.stage-progress-segment-filled {
+  background: var(--accent-bg);
+}
+
+.stage-progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background: var(--accent);
+  border-radius: 6px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform linear;
+}
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 8px 0 16px;
+}
+
+.volume-control input[type="range"] {
+  width: 140px;
+  height: 4px;
+  border-radius: 6px;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+  cursor: pointer;
+}
+
+/* The filled portion comes from the inline `background` gradient set on
+   the input itself (computed from the actual value) - both track
+   pseudo-elements stay transparent so that gradient shows through. Native
+   thumb geometry otherwise insets the thumb's *visible* position from the
+   track edges by half its own width, so at value 0 the thumb reads as
+   already a fair way in from the left - this makes the fill (and thus
+   what "empty" looks like) always match the real value exactly. */
+.volume-control input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.volume-control input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.volume-control input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.play-clip-button {
+  display: block;
+  margin: 4px auto 20px;
+  font-size: 16px;
+  padding: 12px 28px;
+}
+
+.guess-autocomplete {
+  position: relative;
+}
+
+.guess-autocomplete form {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.guess-autocomplete form input {
+  flex: 1;
+}
+
+.guess-suggestions {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.guess-suggestions li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.suggestion-label {
+  flex: 1;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text-h);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-weight: 400;
+}
+
+.suggestion-label:hover {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.round-reveal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--scrim);
+  box-sizing: border-box;
+}
+
+/* A single decay from a red-tinted flood down to the normal scrim - not a
+   repeating pulse, so it reads as "the room went red" rather than a
+   strobe (repeated full-screen flashing is a photosensitivity risk). */
+.round-reveal-overlay.is-failed {
+  animation: red-screen-glow 1.8s ease-out both;
+}
+
+.round-reveal-card {
+  width: 100%;
+  max-width: 360px;
+  padding: 32px 28px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  text-align: center;
+  animation: reveal-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.round-reveal-card.is-won {
+  border-color: var(--success-glow);
+  animation:
+    reveal-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1) both,
+    green-pulse 1.6s ease-out 0.4s 2;
+}
+
+.round-reveal-card.is-failed {
+  border-color: var(--danger-glow);
+  box-shadow: var(--shadow), 0 0 0 3px var(--danger-glow);
+  animation:
+    reveal-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1) both,
+    red-shake 0.5s ease-in-out 0.4s 1;
+}
+
+.round-reveal-title {
+  margin: 4px 0 0;
+}
+
+.round-reveal-artist {
+  margin: 4px 0 0;
+  color: var(--text);
+}
+
+.round-reveal-stats {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.round-reveal-outcome {
+  margin: 16px 0 0;
+  font-size: 16px;
+}
+
+.round-reveal-outcome-won {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.round-reveal-outcome-failed {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+@keyframes reveal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes green-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--success-glow);
+  }
+  70% {
+    box-shadow: 0 0 0 24px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes red-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes red-screen-glow {
+  0% {
+    background: var(--danger-glow);
+  }
+  100% {
+    background: var(--scrim);
+  }
+}
+
+/* Album art thumbnails - the null-safe placeholder keeps row/card height
+   consistent instead of a broken-image icon or a layout jump. */
+.art-placeholder {
+  background: var(--code-bg);
+  display: block;
+}
+
+.suggestion-art {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.round-reveal-art-large {
+  width: 220px;
+  height: 220px;
+  max-width: 100%;
+  border-radius: 10px;
+  object-fit: cover;
+  box-shadow: var(--shadow);
+}
+
+/* Results */
+.results-page ol.scoreboard {
+  counter-reset: rank;
+}
+
+.results-page ol.scoreboard li {
+  counter-increment: rank;
+}
+
+.results-page ol.scoreboard li::before {
+  content: counter(rank) ".";
+  color: var(--text);
+  margin-right: 8px;
+}
+
+/* Reusable secondary/ghost button - transparent at rest, fills with Booth
+   Seat on hover. Same treatment as .dashboard-page > button and
+   .copy-invite-button; a shared class so new UI (profile, friends) doesn't
+   redefine it per page. */
+.button-secondary {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.button-secondary:hover:not(:disabled) {
+  background: var(--code-bg);
+  color: var(--text-h);
+}
+
+/* Profile */
+.profile-username {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text-h);
+  margin: 24px 0;
+}
+
+.profile-edit-button {
+  font-size: 13px;
+  padding: 4px 12px;
+}
+
+.profile-edit-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.level-card {
+  margin-top: 24px;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.level-label {
+  font-weight: 500;
+  color: var(--text-h);
+  margin-bottom: 8px;
+}
+
+.level-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.level-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transform-origin: left;
+  transition: transform 0.2s;
+}
+
+.level-card .hint {
+  margin: 8px 0 0;
+}
+
+/* Friends */
+.friend-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.friend-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.online-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  flex: 0 0 auto;
+}
+
+.online-dot-on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Room invite toast - the system's second legitimate use of the Overlay
+   Lift shadow (see .guess-suggestions), a genuinely floating element. */
+.room-invite-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 100;
+  max-width: 320px;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  text-align: left;
+}
+
+.room-invite-toast p {
+  color: var(--text-h);
+  margin: 0 0 12px;
+}
+
+.room-invite-toast-actions {
+  display: flex;
+  gap: 8px;
+}

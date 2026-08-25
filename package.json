@@ -1,0 +1,10 @@
+{
+  "name": "neogames",
+  "private": true,
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "scripts": {
+    "dev": "concurrently -n API,REVERB,QUEUE,WEB -c blue,magenta,yellow,green \"php backend/artisan serve\" \"php backend/artisan reverb:start\" \"php backend/artisan queue:listen --tries=1\" \"npm --prefix frontend run dev\""
+  }
+}
