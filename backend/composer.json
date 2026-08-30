@@ -12,6 +12,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.30",
         "laravel/tinker": "^3.0",
+        "resend/resend-php": "^1.12",
         "socialiteproviders/discord": "^4.2"
     },
     "require-dev": {

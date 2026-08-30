@@ -98,12 +98,17 @@ services:
       REVERB_SCHEME: http
 
       # --- mail (verification codes, password resets) ---
-      MAIL_MAILER: ${MAIL_MAILER:-smtp}
+      # Most hosts block outbound SMTP (25/465/587). If MAIL_MAILER=smtp
+      # times out, set MAIL_MAILER=resend + RESEND_API_KEY (HTTPS, port 443),
+      # or MAIL_MAILER=log to dump the code into the container logs.
+      MAIL_MAILER: ${MAIL_MAILER:-log}
       MAIL_SCHEME: ${MAIL_SCHEME:-tls}
       MAIL_HOST: ${MAIL_HOST:-}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_TIMEOUT: ${MAIL_TIMEOUT:-15}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-no-reply@${APP_DOMAIN}}
       MAIL_FROM_NAME: ${APP_NAME:-NeoGames}
 
