@@ -76,4 +76,28 @@ class AvatarPayloadTest extends TestCase
         $response->assertJsonPath('players.0.avatar.cosmetics.frame.key', 'frame_soft');
         $response->assertJsonPath('players.0.avatar.level', 1);
     }
+
+    public function test_avatar_payload_includes_the_admin_flag(): void
+    {
+        $admin = User::factory()->create();
+        $admin->forceFill(['is_admin' => true])->save();
+        $plain = User::factory()->create();
+
+        $this->actingAs($admin)->getJson('/api/user')
+            ->assertOk()
+            ->assertJsonPath('avatar.is_admin', true);
+
+        $this->actingAs($plain)->getJson('/api/user')
+            ->assertOk()
+            ->assertJsonPath('avatar.is_admin', false);
+    }
+
+    public function test_is_banned_reflects_the_column(): void
+    {
+        $user = User::factory()->create();
+        $this->assertFalse($user->isBanned());
+
+        $user->forceFill(['banned_at' => now()])->save();
+        $this->assertTrue($user->fresh()->isBanned());
+    }
 }

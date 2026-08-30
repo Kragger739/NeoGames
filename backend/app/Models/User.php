@@ -43,6 +43,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'password' => 'hashed',
             'xp' => 'integer',
             'equipped_cosmetics' => 'array',
+            'is_admin' => 'boolean',
+            'banned_at' => 'datetime',
         ];
     }
 
@@ -99,7 +101,7 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * @return array{avatar_url: string|null, level: int, cosmetics: array<string, array{key: string, rarity: string}>}
+     * @return array{avatar_url: string|null, level: int, cosmetics: array<string, array{key: string, rarity: string}>, is_admin: bool}
      */
     public function avatarPayload(): array
     {
@@ -107,6 +109,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'avatar_url' => $this->avatar_url,
             'level' => $this->level,
             'cosmetics' => $this->resolveEquippedCosmetics(),
+            'is_admin' => (bool) $this->is_admin,
         ];
     }
 
@@ -137,6 +140,12 @@ class User extends Authenticatable implements MustVerifyEmail
         }
 
         return $out;
+    }
+
+    /** An account with a non-null banned_at cannot authenticate or use the API. */
+    public function isBanned(): bool
+    {
+        return $this->banned_at !== null;
     }
 
     public function rooms(): HasMany
