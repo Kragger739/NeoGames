@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\RoomInviteController;
 use App\Http\Controllers\Api\RoomPlayerController;
 use App\Http\Controllers\Api\RoundController;
 use App\Http\Controllers\Api\SongSearchController;
+use App\Http\Middleware\EnsureUserNotBanned;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
@@ -112,13 +113,17 @@ Route::middleware('auth:player')->group(function () {
     Route::get('/songs/search', [SongSearchController::class, 'search']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
+Route::middleware(['auth:sanctum', 'not-banned'])->group(function () {
+    // A banned user must still be able to log out and to delete their own
+    // account, so both are exempted from the `not-banned` gate.
+    Route::post('/logout', [AuthController::class, 'logout'])
+        ->withoutMiddleware(EnsureUserNotBanned::class);
     Route::get('/user', [AuthController::class, 'user']);
 
     // Account deletion stays outside the `verified` group: a user who can't
     // verify their email must still be able to delete the account.
-    Route::delete('/user', [ProfileController::class, 'destroy']);
+    Route::delete('/user', [ProfileController::class, 'destroy'])
+        ->withoutMiddleware(EnsureUserNotBanned::class);
 
     Route::get('/ping', function (Request $request) {
         return response()->json([
@@ -174,7 +179,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // Admin dashboard. `admin` alias -> EnsureUserIsAdmin (bootstrap/app.php).
-Route::middleware(['auth:sanctum', 'verified', 'admin'])
+Route::middleware(['auth:sanctum', 'not-banned', 'verified', 'admin'])
     ->prefix('admin')
     ->group(function () {
         Route::get('/users', [AdminUserController::class, 'index']);

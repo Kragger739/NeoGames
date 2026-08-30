@@ -46,6 +46,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Route-level guards. Task 8 extends this same array.
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
+            'not-banned' => \App\Http\Middleware\EnsureUserNotBanned::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

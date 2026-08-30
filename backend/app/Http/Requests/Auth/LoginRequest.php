@@ -43,6 +43,16 @@ class LoginRequest extends FormRequest
         }
 
         RateLimiter::clear($this->throttleKey());
+
+        if (Auth::user()->isBanned()) {
+            $reason = Auth::user()->ban_reason ?: 'This account has been suspended.';
+
+            Auth::guard('web')->logout();
+
+            throw ValidationException::withMessages([
+                'email' => [$reason],
+            ]);
+        }
     }
 
     /**
