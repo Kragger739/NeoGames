@@ -42,7 +42,7 @@ class SongleDatasetImportTest extends TestCase
         ]], $tracks);
 
         Http::fake([
-            'api.spotify.com/v1/playlists/*/tracks*' => Http::response(['items' => $items, 'next' => null], 200),
+            'api.spotify.com/v1/playlists/*/items*' => Http::response(['items' => $items, 'next' => null], 200),
             'api.spotify.com/v1/artists*' => Http::response(['artists' => [['id' => 'art-1', 'followers' => ['total' => 1000]]]], 200),
             'itunes.apple.com/search*' => function ($request) {
                 parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $q);
@@ -103,7 +103,7 @@ class SongleDatasetImportTest extends TestCase
         $owner = User::factory()->create();
         $dataset = $this->songleDataset($owner);
         $this->fakeSpotifyToken();
-        Http::fake(['api.spotify.com/v1/playlists/*/tracks*' => Http::response(['items' => [], 'next' => null], 200)]);
+        Http::fake(['api.spotify.com/v1/playlists/*/items*' => Http::response(['items' => [], 'next' => null], 200)]);
 
         $this->actingAs($owner)->postJson("/api/datasets/{$dataset->id}/import", [
             'playlist' => self::PLAYLIST_ID,

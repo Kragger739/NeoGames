@@ -42,7 +42,7 @@ class SpotifyClientTest extends TestCase
 
     public function test_playlist_tracks_skips_removed_and_local_entries(): void
     {
-        Http::fake(['api.spotify.com/v1/playlists/*/tracks*' => Http::response([
+        Http::fake(['api.spotify.com/v1/playlists/*/items*' => Http::response([
             'next' => null,
             'items' => [
                 ['track' => null],

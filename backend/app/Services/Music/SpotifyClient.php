@@ -62,11 +62,14 @@ class SpotifyClient
         $offset = 0;
 
         do {
-            $body = $this->get("/playlists/{$playlistId}/tracks", [
+            // GET /playlists/{id}/tracks is deprecated and now edge-blocked
+            // (GFE 403) for app tokens - /items is the current endpoint,
+            // same response shape. No `fields` filter (it has been flaky and
+            // we drop most of the payload here anyway).
+            $body = $this->get("/playlists/{$playlistId}/items", [
                 'limit' => 100,
                 'offset' => $offset,
                 'market' => config('music.spotify_market', 'US'),
-                'fields' => 'next,items(track(id,name,popularity,is_local,external_ids,artists(id,name),album(release_date,images)))',
             ]);
 
             foreach ($body['items'] ?? [] as $item) {
@@ -305,6 +308,14 @@ class SpotifyClient
             throw new RuntimeException("Spotify rate limit hit (Retry-After: {$retryAfter}s).");
         }
 
-        throw new RuntimeException("Spotify request failed ({$response->status()}): ".$response->body());
+        // A 403 with an HTML body is Google's edge (GFE) rejecting the
+        // request before Spotify sees it - usually a deprecated/blocked
+        // endpoint or an app-level restriction, not a bad playlist.
+        $body = $response->json('error.message')
+            ?? (str_contains((string) $response->header('Content-Type'), 'html')
+                ? 'blocked at the Spotify edge (deprecated endpoint or app restriction)'
+                : \Illuminate\Support\Str::limit($response->body(), 200));
+
+        throw new RuntimeException("Spotify request failed ({$response->status()}): {$body}");
     }
 }

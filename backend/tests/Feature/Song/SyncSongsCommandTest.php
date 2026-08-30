@@ -34,7 +34,7 @@ class SyncSongsCommandTest extends TestCase
 
         Http::fake([
             'audio-ssl.itunes.apple.com/*' => Http::response('fake-m4a-bytes', 200),
-            'api.spotify.com/v1/playlists/*/tracks*' => Http::response(['next' => null, 'items' => [
+            'api.spotify.com/v1/playlists/*/items*' => Http::response(['next' => null, 'items' => [
                 ['track' => [
                     'id' => 'sp-hit', 'name' => 'Hit Song', 'popularity' => 78,
                     'external_ids' => ['isrc' => 'X'],

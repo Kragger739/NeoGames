@@ -103,6 +103,13 @@ export function AdminSongPlaylistsPage() {
           {progress.phase === "error" && `Sync failed: ${progress.error}`}
         </p>
       )}
+      {progress && progress.failed_playlists.length > 0 && progress.phase !== "error" && (
+        <p className="form-error">
+          Couldn&rsquo;t read {progress.failed_playlists.length} playlist
+          {progress.failed_playlists.length > 1 ? "s" : ""} (private, or a Spotify-made editorial
+          playlist): {progress.failed_playlists.join(", ")}
+        </p>
+      )}
       {!progress && lastSync && (
         <p className="hint">
           {lastSync.state === "done"

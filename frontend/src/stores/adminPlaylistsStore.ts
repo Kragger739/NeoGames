@@ -17,6 +17,7 @@ export interface SyncProgress {
   seeded: number;
   skipped: number;
   total_items: number;
+  failed_playlists: string[];
   error: string | null;
   summary: string | null;
   pool_size: number;

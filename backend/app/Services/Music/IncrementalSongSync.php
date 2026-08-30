@@ -62,6 +62,7 @@ class IncrementalSongSync
             'playlists' => $playlists,
             'prepared_count' => 0,
             'total_playlists' => count($playlists),
+            'failed_playlists' => [],
             'items' => [],
             'seen_ids' => [],
             'total_items' => 0,
@@ -104,6 +105,11 @@ class IncrementalSongSync
 
         if ($state['phase'] === 'done') {
             $summary = "{$state['seeded']} seeded, {$state['skipped']} skipped for no preview";
+
+            if (($state['failed_playlists'] ?? []) !== []) {
+                $summary .= '; '.count($state['failed_playlists']).' playlist(s) unreadable';
+            }
+
             $state['summary'] = $summary;
             SyncSongsCommand::putStatus('done', $summary);
         } elseif ($state['phase'] === 'error') {
@@ -133,22 +139,29 @@ class IncrementalSongSync
         $next = array_shift($state['playlists']);
 
         if ($next !== null) {
-            $tracks = $this->spotify->playlistTracks($next['playlist_id']);
-            $followers = $this->spotify->artistFollowerCounts(array_column($tracks, 'artist_provider_id'));
+            try {
+                $tracks = $this->spotify->playlistTracks($next['playlist_id']);
+                $followers = $this->spotify->artistFollowerCounts(array_column($tracks, 'artist_provider_id'));
 
-            foreach ($tracks as $track) {
-                $id = $track['provider_track_id'];
+                foreach ($tracks as $track) {
+                    $id = $track['provider_track_id'];
 
-                if (in_array($id, $state['seen_ids'], true)) {
-                    continue;
+                    if (in_array($id, $state['seen_ids'], true)) {
+                        continue;
+                    }
+
+                    $state['seen_ids'][] = $id;
+                    $state['items'][] = [
+                        'genre_tag' => $next['genre_tag'],
+                        'track' => $track,
+                        'follower' => $followers[$track['artist_provider_id'] ?? ''] ?? null,
+                    ];
                 }
-
-                $state['seen_ids'][] = $id;
-                $state['items'][] = [
-                    'genre_tag' => $next['genre_tag'],
-                    'track' => $track,
-                    'follower' => $followers[$track['artist_provider_id'] ?? ''] ?? null,
-                ];
+            } catch (Throwable $e) {
+                // One unreadable playlist (private, Spotify-editorial, or
+                // an API hiccup) must not sink the whole run - note it and
+                // carry on with the rest.
+                $state['failed_playlists'][] = $next['playlist_id'];
             }
 
             $state['prepared_count']++;
@@ -156,10 +169,17 @@ class IncrementalSongSync
 
         if ($state['playlists'] === []) {
             $state['total_items'] = count($state['items']);
-            $state['phase'] = $state['items'] === [] ? 'error' : 'seed';
+            $failed = $state['failed_playlists'];
 
-            if ($state['phase'] === 'error') {
-                $state['error'] = 'None of the configured playlists returned any tracks (are they public?).';
+            if ($state['items'] === []) {
+                $state['phase'] = 'error';
+                $state['error'] = $failed === []
+                    ? 'None of the configured playlists returned any tracks.'
+                    : count($failed).' playlist(s) could not be read (private, or a Spotify-made '
+                        .'editorial playlist - use a public playlist created by a normal user): '
+                        .implode(', ', $failed);
+            } else {
+                $state['phase'] = 'seed';
             }
         }
     }
@@ -206,6 +226,7 @@ class IncrementalSongSync
             'seeded' => $state['seeded'] ?? 0,
             'skipped' => $state['skipped'] ?? 0,
             'total_items' => $state['total_items'] ?? 0,
+            'failed_playlists' => array_values($state['failed_playlists'] ?? []),
             'error' => $state['error'] ?? null,
             'summary' => $state['summary'] ?? null,
             'pool_size' => Song::count(),
