@@ -35,8 +35,8 @@ class GameRoomController extends Controller
         $isClassic = $mode === GameMode::Classic->value;
         $genre = $isClassic ? SongGenre::Iconic->value : $request->validated('genre', SongGenre::Normal->value);
 
-        // Iconic is Classic-exclusive branding tied to its one curated
-        // playlists (see SongGenre::deezerPlaylistIds()) - never persist it
+        // Iconic is Classic-exclusive branding tied to its own curated
+        // playlists (see SongGenre::spotifyPlaylistIds()) - never persist it
         // for any other mode, even if a request explicitly submits it.
         if (! $isClassic && $genre === SongGenre::Iconic->value) {
             $genre = SongGenre::Normal->value;
@@ -160,7 +160,7 @@ class GameRoomController extends Controller
                         'title' => $round->song->title,
                         'artist' => $round->song->artist,
                         'album_art_url' => $round->song->album_art_url,
-                        'deezer_track_id' => $round->song->deezer_track_id,
+                        'provider_track_id' => $round->song->provider_track_id,
                     ],
                     'guessers' => $guesses->map(fn (Guess $guess) => [
                         'nickname' => $guess->player->nickname,

@@ -1,0 +1,126 @@
+<?php
+
+namespace App\Services\Music;
+
+use App\Models\Song;
+
+/**
+ * Turns a Spotify track (metadata + popularity) into a playable row in the
+ * `songs` pool by resolving its 30-second preview + artwork through Apple's
+ * iTunes Search API. Shared by the `songs:sync` command (bulk playlist
+ * seeding) and SongDiscoveryService's Artist-genre pool priming.
+ *
+ * The iTunes Search API rate-limits around 20 req/min, so every path that
+ * loops over tracks sleeps `throttleMs` between preview lookups. `songs:sync`
+ * passes the full config value; the interactive Artist path passes a small
+ * one (a handful of calls in a burst is fine).
+ */
+class SongPoolSeeder
+{
+    public function __construct(
+        private SpotifyClient $spotify,
+        private AppleMusicClient $apple,
+    ) {}
+
+    /**
+     * Resolve + upsert one normalized Spotify track (see
+     * SpotifyClient::normalizeTrack). Returns the Song, or null when iTunes
+     * has no confident preview for it.
+     *
+     * @param  array<string, mixed>  $spotifyTrack
+     */
+    public function persist(array $spotifyTrack, ?string $genreTag, ?int $followerCount): ?Song
+    {
+        $preview = $this->apple->findPreview($spotifyTrack['artist'], $spotifyTrack['title']);
+
+        if ($preview === null) {
+            return null;
+        }
+
+        $attributes = [
+            'title' => $spotifyTrack['title'],
+            'artist' => $spotifyTrack['artist'],
+            'artist_provider_id' => $spotifyTrack['artist_provider_id'] ?? null,
+            'artist_follower_count' => $followerCount,
+            'preview_url' => $preview['preview_url'],
+            'album_art_url' => $spotifyTrack['album_art_url'] ?? $preview['album_art_url'],
+            'popularity' => (int) ($spotifyTrack['popularity'] ?? 0),
+            'release_year' => $spotifyTrack['release_year'] ?? $preview['release_year'],
+        ];
+
+        // Monotonic genre tag - only ever set it, never clear it back to null
+        // on a later untagged pass (a track can be on both a Pop and an
+        // Iconic playlist).
+        if ($genreTag !== null) {
+            $attributes['genre'] = $genreTag;
+        }
+
+        return Song::updateOrCreate(
+            ['provider_track_id' => $spotifyTrack['provider_track_id']],
+            $attributes,
+        );
+    }
+
+    /**
+     * Seed one genre's pool from a Spotify playlist reference (id or URL).
+     *
+     * @param  (callable(string $line): void)|null  $log
+     * @return array{seeded: int, skipped: int}
+     */
+    public function seedPlaylist(string $playlistRef, ?string $genreTag, ?int $throttleMs = null, ?callable $log = null): array
+    {
+        $throttleMs ??= (int) config('music.itunes_throttle_ms', 3200);
+        $tracks = $this->spotify->playlistTracks($playlistRef);
+        $followers = $this->spotify->artistFollowerCounts(
+            array_column($tracks, 'artist_provider_id'),
+        );
+
+        $seeded = 0;
+        $skipped = 0;
+
+        foreach ($tracks as $i => $track) {
+            $song = $this->persist(
+                $track,
+                $genreTag,
+                $followers[$track['artist_provider_id'] ?? ''] ?? null,
+            );
+
+            if ($song) {
+                $seeded++;
+            } else {
+                $skipped++;
+                $log && $log("  no preview: {$track['artist']} - {$track['title']}");
+            }
+
+            if ($throttleMs > 0 && $i < count($tracks) - 1) {
+                usleep($throttleMs * 1000);
+            }
+        }
+
+        return ['seeded' => $seeded, 'skipped' => $skipped];
+    }
+
+    /**
+     * Seed an artist's Spotify top tracks into the pool. `$genreTag` is null
+     * for the Artist / MultiArtist genres (matched on the songs.artist
+     * column), but set for German Rap, which seeds from a fixed artist list.
+     */
+    public function seedArtistTopTracks(string $artistId, int $throttleMs = 250, ?string $genreTag = null): int
+    {
+        $tracks = $this->spotify->artistTopTracks($artistId);
+        $follower = $this->spotify->artistFollowerCount($artistId);
+        $seeded = 0;
+
+        foreach ($tracks as $i => $track) {
+            if ($this->persist($track, $genreTag, $follower)) {
+                $seeded++;
+            }
+
+            if ($throttleMs > 0 && $i < count($tracks) - 1) {
+                usleep($throttleMs * 1000);
+            }
+        }
+
+        return $seeded;
+    }
+}

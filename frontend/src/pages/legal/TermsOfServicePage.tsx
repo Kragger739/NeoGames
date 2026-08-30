@@ -55,8 +55,9 @@ export function TermsOfServicePage() {
 
       <LegalSection heading="Third-party music previews and trademarks">
         <p>
-          Song previews and cover art are provided through the Deezer API and
-          remain the property of their respective rights holders. They are made
+          Song previews are provided through Apple&rsquo;s iTunes Search API,
+          and track data and cover art through the Spotify Web API; all of it
+          remains the property of the respective rights holders. It is made
           available for personal, non-commercial gameplay only. Artist, album,
           and service names and logos are the trademarks of their owners. If you
           hold rights in content shown in NeoGames and want it removed, see our{" "}

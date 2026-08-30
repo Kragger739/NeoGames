@@ -47,4 +47,14 @@ return [
         'redirect' => env('DISCORD_REDIRECT_URI'),
     ],
 
+    // Spotify Web API (app-only client-credentials) - supplies song search,
+    // metadata, and the popularity signal that drives difficulty tiers.
+    // Register an app at https://developer.spotify.com/dashboard; no redirect
+    // URI is needed for the client-credentials flow. Audio previews come from
+    // Apple's iTunes Search API instead (no credentials), see config/music.php.
+    'spotify' => [
+        'client_id' => env('SPOTIFY_CLIENT_ID'),
+        'client_secret' => env('SPOTIFY_CLIENT_SECRET'),
+    ],
+
 ];

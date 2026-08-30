@@ -34,7 +34,7 @@ class SongleDatasetGameTest extends TestCase
 
         for ($i = 0; $i < $tracks; $i++) {
             $dataset->tracks()->create([
-                'deezer_track_id' => "trk-{$i}", 'title' => "Song {$i}", 'artist' => 'Artist',
+                'provider_track_id' => "trk-{$i}", 'title' => "Song {$i}", 'artist' => 'Artist',
                 'preview_url' => "https://example.com/{$i}.mp3", 'position' => $i,
             ]);
         }
@@ -79,8 +79,8 @@ class SongleDatasetGameTest extends TestCase
 
         $round = app(RoundService::class)->start($room);
 
-        $this->assertContains($round->song->deezer_track_id, ['trk-0', 'trk-1', 'trk-2', 'trk-3']);
-        $this->assertDatabaseHas('songs', ['deezer_track_id' => $round->song->deezer_track_id]);
+        $this->assertContains($round->song->provider_track_id, ['trk-0', 'trk-1', 'trk-2', 'trk-3']);
+        $this->assertDatabaseHas('songs', ['provider_track_id' => $round->song->provider_track_id]);
     }
 
     public function test_a_room_with_no_dataset_selects_songs_the_normal_way(): void

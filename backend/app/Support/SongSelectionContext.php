@@ -14,13 +14,13 @@ use App\Enums\SongEra;
 final class SongSelectionContext
 {
     /**
-     * @param  array<int, string>  $excludeTrackIds  deezer_track_ids already used this game
-     * @param  array<int, string>  $usedArtistDeezerIds  artist deezer ids already used this game
+     * @param  array<int, string>  $excludeTrackIds  provider_track_ids already used this game
+     * @param  array<int, string>  $usedArtistProviderIds  artist provider ids already used this game
      * @param  array<string, int>  $eraCounts  SongEra::value => count so far this game
      */
     public function __construct(
         public readonly array $excludeTrackIds = [],
-        public readonly array $usedArtistDeezerIds = [],
+        public readonly array $usedArtistProviderIds = [],
         public readonly array $eraCounts = [],
     ) {}
 
@@ -30,11 +30,11 @@ final class SongSelectionContext
     }
 
     /** Immutable - used when a candidate turns out to be unplayable and a fresh pick is needed without it. */
-    public function withExcludedTrack(string $deezerTrackId): self
+    public function withExcludedTrack(string $providerTrackId): self
     {
         return new self(
-            [...$this->excludeTrackIds, $deezerTrackId],
-            $this->usedArtistDeezerIds,
+            [...$this->excludeTrackIds, $providerTrackId],
+            $this->usedArtistProviderIds,
             $this->eraCounts,
         );
     }

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\Deezer\DeezerClient;
+use App\Services\Music\SpotifyClient;
 use Illuminate\Http\Request;
 
 /**
@@ -13,13 +13,13 @@ use Illuminate\Http\Request;
  */
 class ArtistSearchController extends Controller
 {
-    public function search(Request $request, DeezerClient $deezer)
+    public function search(Request $request, SpotifyClient $spotify)
     {
         $request->validate([
             'q' => ['required', 'string', 'min:2', 'max:100'],
         ]);
 
-        $results = $deezer->searchArtists($request->string('q')->toString(), limit: 8);
+        $results = $spotify->searchArtists($request->string('q')->toString(), limit: 8);
 
         return response()->json(['results' => $results]);
     }

@@ -38,7 +38,7 @@ class Dataset extends Model
         return $this->hasMany(DdfQuestion::class)->orderBy('position');
     }
 
-    /** Imported Deezer tracks (songle type). */
+    /** Imported Spotify tracks (songle type). */
     public function tracks(): HasMany
     {
         return $this->hasMany(DatasetTrack::class)->orderBy('position');

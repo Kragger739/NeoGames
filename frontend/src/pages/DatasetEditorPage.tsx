@@ -380,11 +380,11 @@ function TrackEditor({ datasetId }: { datasetId: number }) {
     <>
       <form className="wk-import" onSubmit={handleImport}>
         <label>
-          Deezer playlist link or id
+          Spotify playlist link or id
           <input
             value={playlist}
             onChange={(e) => setPlaylist(e.target.value)}
-            placeholder="https://www.deezer.com/playlist/1234567"
+            placeholder="https://open.spotify.com/playlist/…"
             required
           />
         </label>
@@ -397,7 +397,7 @@ function TrackEditor({ datasetId }: { datasetId: number }) {
 
       <h2>Tracks ({tracks.length})</h2>
       {tracks.length === 0 ? (
-        <p className="hint">No tracks yet — import a Deezer playlist above.</p>
+        <p className="hint">No tracks yet — import a Spotify playlist above.</p>
       ) : (
         <ul className="wk-track-list">
           {tracks.map((t) => (

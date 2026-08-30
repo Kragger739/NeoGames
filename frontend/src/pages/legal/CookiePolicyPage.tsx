@@ -63,8 +63,8 @@ export function CookiePolicyPage() {
           <code>fonts.gstatic.com</code>) for typefaces, and — while playing
           &ldquo;Der Dümmste fliegt&rdquo; — a Google STUN server to set up the
           video connection. These receive your IP address but set no cookies of
-          their own through NeoGames. Song previews and artwork are loaded
-          directly from Deezer.
+          their own through NeoGames. Song previews are loaded directly from
+          Apple, and cover art from Spotify.
         </p>
       </LegalSection>
 

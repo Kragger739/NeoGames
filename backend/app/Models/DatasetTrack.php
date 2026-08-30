@@ -9,7 +9,7 @@ class DatasetTrack extends Model
 {
     protected $fillable = [
         'dataset_id',
-        'deezer_track_id',
+        'provider_track_id',
         'title',
         'artist',
         'album_art_url',

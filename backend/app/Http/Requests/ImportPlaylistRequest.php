@@ -16,8 +16,8 @@ class ImportPlaylistRequest extends FormRequest
      */
     public function rules(): array
     {
-        // A Deezer playlist URL or a bare numeric id - the exact shape is
-        // parsed/validated in SongleDatasetService::parsePlaylistId().
+        // A Spotify playlist URL or a bare base-62 id - the exact shape is
+        // parsed/validated in SpotifyClient::parsePlaylistId().
         return [
             'playlist' => ['required', 'string', 'max:255'],
         ];

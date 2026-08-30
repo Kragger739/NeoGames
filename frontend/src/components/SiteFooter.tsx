@@ -23,7 +23,7 @@ export function SiteFooter() {
       </nav>
       <p className="hint">
         NeoGames is operated by Neocodes, Switzerland. © {new Date().getFullYear()}{" "}
-        Neocodes. Music previews and cover art via Deezer.
+        Neocodes. Song previews via Apple; song data via Spotify.
       </p>
     </footer>
   );

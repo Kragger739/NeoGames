@@ -39,7 +39,7 @@ class SongSelectionVarietyTest extends TestCase
             for ($i = 0; $i < 10; $i++) {
                 Song::factory()->forTier(DifficultyTier::Easy)->create([
                     'release_year' => $year,
-                    'artist_deezer_id' => "{$era}-artist-{$i}",
+                    'artist_provider_id' => "{$era}-artist-{$i}",
                 ]);
             }
         }
@@ -57,13 +57,13 @@ class SongSelectionVarietyTest extends TestCase
 
             $this->assertNotNull($song);
             $this->assertNotContains(
-                $song->artist_deezer_id,
+                $song->artist_provider_id,
                 $usedArtistIds,
-                "artist {$song->artist_deezer_id} repeated before the pool of unique artists was exhausted",
+                "artist {$song->artist_provider_id} repeated before the pool of unique artists was exhausted",
             );
 
-            $excludeTrackIds[] = $song->deezer_track_id;
-            $usedArtistIds[] = $song->artist_deezer_id;
+            $excludeTrackIds[] = $song->provider_track_id;
+            $usedArtistIds[] = $song->artist_provider_id;
             $era = $song->eraBucket()->value;
             $eraCounts[$era] = ($eraCounts[$era] ?? 0) + 1;
         }

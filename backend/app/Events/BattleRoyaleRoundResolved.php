@@ -49,8 +49,8 @@ class BattleRoyaleRoundResolved implements ShouldBroadcastNow
                 'title' => $this->round->song->title,
                 'artist' => $this->round->song->artist,
                 'album_art_url' => $this->round->song->album_art_url,
-                'artist_fan_count' => $this->round->song->artist_fan_count,
-                'deezer_track_id' => $this->round->song->deezer_track_id,
+                'artist_follower_count' => $this->round->song->artist_follower_count,
+                'provider_track_id' => $this->round->song->provider_track_id,
             ],
             'scoreboard' => $this->round->room->players()
                 ->orderByDesc('score')

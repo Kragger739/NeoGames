@@ -13,12 +13,13 @@ class ArtistSearchTest extends TestCase
 
     public function test_a_host_can_search_for_artists(): void
     {
+        $this->fakeSpotifyToken();
         Http::fake([
-            'api.deezer.com/search/artist*' => Http::response([
-                'data' => [
-                    ['id' => 1, 'name' => 'Small Fan Count', 'picture_medium' => 'https://example.com/a.jpg', 'nb_fan' => 100],
-                    ['id' => 2, 'name' => 'Real Artist', 'picture_medium' => 'https://example.com/b.jpg', 'nb_fan' => 5_000_000],
-                ],
+            'api.spotify.com/v1/search*' => Http::response([
+                'artists' => ['items' => [
+                    ['id' => 'sp-1', 'name' => 'Small Following', 'images' => [['url' => 'https://example.com/a.jpg']], 'followers' => ['total' => 100]],
+                    ['id' => 'sp-2', 'name' => 'Real Artist', 'images' => [['url' => 'https://example.com/b.jpg']], 'followers' => ['total' => 5_000_000]],
+                ]],
             ], 200),
         ]);
 
@@ -28,13 +29,13 @@ class ArtistSearchTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonCount(2, 'results');
-        // Sorted by fan count, not Deezer's own result order.
+        // Sorted by follower count, not Spotify's own result order.
         $response->assertJsonPath('results.0.name', 'Real Artist');
-        $response->assertJsonPath('results.0.deezer_artist_id', '2');
-        $response->assertJsonPath('results.0.fan_count', 5_000_000);
+        $response->assertJsonPath('results.0.provider_artist_id', 'sp-2');
+        $response->assertJsonPath('results.0.follower_count', 5_000_000);
         $response->assertJsonStructure([
             'results' => [
-                ['deezer_artist_id', 'name', 'picture_url', 'fan_count'],
+                ['provider_artist_id', 'name', 'picture_url', 'follower_count'],
             ],
         ]);
     }

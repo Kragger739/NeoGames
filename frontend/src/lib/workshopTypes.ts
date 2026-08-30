@@ -56,7 +56,7 @@ export interface DatasetQuestion {
 
 export interface DatasetTrack {
   id: number;
-  deezer_track_id: string;
+  provider_track_id: string;
   title: string;
   artist: string;
   album_art_url: string | null;

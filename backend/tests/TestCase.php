@@ -8,27 +8,36 @@ use Illuminate\Support\Facades\Http;
 abstract class TestCase extends BaseTestCase
 {
     /**
-     * Starting a round now re-confirms its song's preview is still live
-     * (RoundService::pickPlayableSong() -> SongDiscoveryService::
-     * ensurePlayable(), since Deezer's preview URLs are short-lived signed
-     * links) - any test that starts a round therefore makes one real
-     * GET /track/{id} call unless faked. This gives every game-flow test a
-     * trivially-successful fake for that call, independent of whatever
-     * else the test fakes (Http::fake() calls accumulate, matched in
-     * registration order, so this is safe to call before or after a test's
-     * own unrelated fakes as long as they don't also target /track/*).
+     * Configure Spotify credentials and stub the client-credentials token
+     * endpoint. Http::fake() accumulates, so a test can call this and then
+     * add its own api.spotify.com endpoint fakes.
+     */
+    protected function fakeSpotifyToken(): void
+    {
+        config([
+            'services.spotify.client_id' => 'test-id',
+            'services.spotify.client_secret' => 'test-secret',
+        ]);
+
+        Http::fake([
+            'accounts.spotify.com/api/token' => Http::response([
+                'access_token' => 'test-token',
+                'token_type' => 'Bearer',
+                'expires_in' => 3600,
+            ], 200),
+        ]);
+    }
+
+    /**
+     * Starting a round used to re-fetch its preview from Deezer (whose URLs
+     * expired every ~15 min). The pool is now seeded from iTunes, whose
+     * preview URLs are stable, so SongDiscoveryService::ensurePlayable() is
+     * just a "row has a preview_url" check with no HTTP call. Kept as a
+     * harmless no-op so existing game-flow tests that call it still read
+     * clearly; new tests don't need it.
      */
     protected function fakeDeezerTrackRefresh(): void
     {
-        Http::fake([
-            'api.deezer.com/track/*' => Http::response([
-                'id' => 'refreshed',
-                'title' => 'Refreshed Track',
-                'artist' => ['name' => 'Some Artist'],
-                'album' => ['cover_medium' => null],
-                'preview' => 'https://example.com/refreshed-preview.mp3',
-                'rank' => 500_000,
-            ], 200),
-        ]);
+        // Intentionally empty - see docblock.
     }
 }

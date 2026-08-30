@@ -50,16 +50,16 @@ class RoundService
 
     public function start(GameRoom $room): Round
     {
-        if ($room->dataset_id === null && in_array($room->genre, [SongGenre::Artist, SongGenre::MultiArtist], true)) {
+        if ($room->dataset_id === null && $room->genre->isArtistSourced()) {
             // Synchronous safety net in case Start is clicked before
             // PrimeArtistSongPool's background job (dispatched from
             // GameRoomController::update()) has finished warming the pool.
-            // Deliberately BEFORE the status flip below: a Deezer failure
-            // here (rate limit, timeout) must leave the room untouched in
-            // "lobby" rather than stuck in "active" with no round ever
-            // created - findRandomSongForRelativeTier() also self-heals via
-            // its own call to this same method, so skipping it here on
-            // failure costs nothing but a retry.
+            // Deliberately BEFORE the status flip below: a Spotify/iTunes
+            // failure here (rate limit, timeout) must leave the room
+            // untouched in "lobby" rather than stuck in "active" with no
+            // round ever created - findRandomSongForRelativeTier() also
+            // self-heals via its own call to this same method, so skipping
+            // it here on failure costs nothing but a retry.
             $this->songDiscovery->ensureArtistPoolReady(SongFilter::fromRoom($room));
         }
 
@@ -111,16 +111,17 @@ class RoundService
             'song_id' => $song->id,
             'title' => $song->title,
             'artist' => $song->artist,
-            'deezer_track_id' => $song->deezer_track_id,
+            'provider_track_id' => $song->provider_track_id,
             'genre' => $room->genre->value,
             'tier' => $room->current_tier->value,
         ]);
 
         broadcast(new RoundStarted($round));
 
-        // Fire-and-forget background pool growth for this filter - never
-        // blocks this round's own start, and no-ops almost instantly once
-        // the pool is already healthy (see ExpandSongPool::handle). A custom
+        // Fire-and-forget: for an Artist / MultiArtist room this warms the
+        // per-room pool from the named act's Spotify top tracks; for every
+        // other genre the pool is owned by `php artisan songs:sync` and this
+        // is a near-instant no-op (see ExpandSongPool::handle). A custom
         // dataset IS the pool, so there is nothing to grow.
         if ($room->dataset_id === null) {
             ExpandSongPool::dispatch($filter);
@@ -144,12 +145,11 @@ class RoundService
     }
 
     /**
-     * Picks a song and confirms Deezer will still actually serve its
-     * preview right now (see SongDiscoveryService::ensurePlayable() - a
-     * cached preview_url is a short-lived signed link that can easily be
-     * stale by the time it's picked). A dead candidate is excluded and a
-     * new one drawn, bounded to MAX_PLAYABILITY_ATTEMPTS so one dead track
-     * can't block a round indefinitely.
+     * Picks a song and confirms it actually has a preview URL on the row
+     * (see SongDiscoveryService::ensurePlayable() - seeded iTunes URLs don't
+     * expire, so this is just a guard against a genuinely blank row). A dead
+     * candidate is excluded and a new one drawn, bounded to
+     * MAX_PLAYABILITY_ATTEMPTS so one bad row can't block a round.
      */
     private function pickPlayableSong(SongFilter $filter, SongSelectionContext $context): ?Song
     {
@@ -164,7 +164,7 @@ class RoundService
                 return $song;
             }
 
-            $context = $context->withExcludedTrack($song->deezer_track_id);
+            $context = $context->withExcludedTrack($song->provider_track_id);
         }
 
         return null;
@@ -192,7 +192,7 @@ class RoundService
             }
         }
 
-        $excludeTrackIds = $usedSongs->pluck('deezer_track_id')->all();
+        $excludeTrackIds = $usedSongs->pluck('provider_track_id')->all();
 
         // Host-scoped cross-game no-repeat preference (see User::songPlays()),
         // applied in every mode - merged in on top of this game's own used
@@ -204,27 +204,25 @@ class RoundService
         // once its history covers every track.
         $excludeTrackIds = array_unique(array_merge(
             $excludeTrackIds,
-            $room->host->songPlays()->pluck('deezer_track_id')->all(),
+            $room->host->songPlays()->pluck('provider_track_id')->all(),
         ));
 
         return new SongSelectionContext(
             excludeTrackIds: $excludeTrackIds,
-            usedArtistDeezerIds: $usedSongs->pluck('artist_deezer_id')->filter()->values()->all(),
+            usedArtistProviderIds: $usedSongs->pluck('artist_provider_id')->filter()->values()->all(),
             eraCounts: $eraCounts,
         );
     }
 
     /**
-     * Populates the reveal screen's "how popular is this" stat before a
-     * round's outcome broadcasts - cheap/no-op once a song's fan count is
-     * already cached (see SongDiscoveryService::ensureFanCount()), and
+     * Populates the reveal screen's artist-follower stat before a round's
+     * outcome broadcasts - a no-op once the seeded count is on the row, and
      * deliberately not blocking the round itself (unlike ensurePlayable()),
-     * since this is purely cosmetic and a round should never fail to start
-     * or resolve just because Deezer's artist lookup is slow or down.
+     * since it's purely cosmetic.
      */
     public function ensureRevealStats(Round $round): void
     {
-        $this->songDiscovery->ensureFanCount($round->song);
+        $this->songDiscovery->ensureFollowerCount($round->song);
     }
 
     /**

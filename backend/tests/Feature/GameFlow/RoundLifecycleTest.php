@@ -102,68 +102,23 @@ class RoundLifecycleTest extends TestCase
     }
 
     /**
-     * Deezer's preview URL is a short-lived signed link - a cached song's
-     * preview_url can easily be stale by the time it's actually picked for
-     * a round, so starting a round must re-fetch and persist a fresh one
-     * rather than trusting whatever's sitting in the cache.
+     * A pool row with a blank preview_url (a bad `songs:sync` resolve that
+     * still landed a row) must be skipped for the next candidate rather than
+     * failing the round outright while a playable alternative is sitting
+     * right there. iTunes preview URLs don't expire, so there is no live
+     * re-fetch any more - the row is trusted as-is.
      */
-    public function test_starting_a_round_refreshes_a_stale_preview_url_before_broadcasting(): void
+    public function test_a_song_with_a_blank_preview_url_is_skipped_for_the_next_candidate(): void
     {
         Event::fake([RoundStarted::class]);
 
-        $stale = Song::factory()->forTier(DifficultyTier::Easy)->create([
-            'preview_url' => 'https://example.com/stale-expired.mp3',
+        $blank = Song::factory()->forTier(DifficultyTier::Easy)->create([
+            'preview_url' => '',
+            'last_used_at' => now()->subDay(),
         ]);
-
-        Http::fake([
-            "api.deezer.com/track/{$stale->deezer_track_id}" => Http::response([
-                'id' => $stale->deezer_track_id,
-                'title' => $stale->title,
-                'artist' => ['name' => $stale->artist],
-                'album' => ['cover_medium' => null],
-                'preview' => 'https://example.com/freshly-refreshed.mp3',
-                'rank' => 50_000,
-            ], 200),
-        ]);
-
-        $host = User::factory()->create();
-        $room = GameRoom::factory()->for($host, 'host')->create(['songs_per_tier' => 1]);
-
-        app(RoundService::class)->start($room);
-
-        $this->assertSame('https://example.com/freshly-refreshed.mp3', $stale->fresh()->preview_url);
-
-        Event::assertDispatched(
-            RoundStarted::class,
-            fn (RoundStarted $event) => $event->broadcastWith()['audio_url'] === 'https://example.com/freshly-refreshed.mp3',
-        );
-    }
-
-    /**
-     * A cached song can fail its preview refresh entirely (removed from
-     * Deezer, newly region-blocked, etc.) - the round must skip it and try
-     * the next candidate instead of failing outright while a perfectly
-     * playable alternative is sitting right there in the cache.
-     */
-    public function test_a_song_whose_preview_refresh_fails_is_skipped_for_the_next_candidate(): void
-    {
-        Event::fake([RoundStarted::class]);
-
-        $dead = Song::factory()->forTier(DifficultyTier::Easy)->create();
-        $alive = Song::factory()->forTier(DifficultyTier::Easy)->create();
-
-        Http::fake([
-            "api.deezer.com/track/{$dead->deezer_track_id}" => Http::response([
-                'error' => ['type' => 'DataException', 'message' => 'no data', 'code' => 800],
-            ], 200),
-            "api.deezer.com/track/{$alive->deezer_track_id}" => Http::response([
-                'id' => $alive->deezer_track_id,
-                'title' => $alive->title,
-                'artist' => ['name' => $alive->artist],
-                'album' => ['cover_medium' => null],
-                'preview' => 'https://example.com/alive-fresh.mp3',
-                'rank' => 50_000,
-            ], 200),
+        $playable = Song::factory()->forTier(DifficultyTier::Easy)->create([
+            'preview_url' => 'https://audio-ssl.itunes.apple.com/playable.m4a',
+            'last_used_at' => null,
         ]);
 
         $host = User::factory()->create();
@@ -171,8 +126,8 @@ class RoundLifecycleTest extends TestCase
 
         $round = app(RoundService::class)->start($room);
 
-        $this->assertSame($alive->id, $round->song_id);
-        $this->assertSame('https://example.com/alive-fresh.mp3', $alive->fresh()->preview_url);
+        $this->assertSame($playable->id, $round->song_id);
+        $this->assertNotSame($blank->id, $round->song_id);
     }
 
     public function test_a_non_host_cannot_start_someone_elses_room(): void
@@ -274,7 +229,7 @@ class RoundLifecycleTest extends TestCase
      * count, only a per-artist fan count, fetched and cached the moment a
      * round actually resolves (see RoundService::ensureRevealStats()).
      */
-    public function test_round_won_broadcasts_the_artists_fan_count(): void
+    public function test_round_won_broadcasts_the_artists_follower_count(): void
     {
         // See test_round_won_broadcasts_the_songs_album_art() above for why
         // TierAdvanced needs its own explicit fake here too.
@@ -284,8 +239,8 @@ class RoundLifecycleTest extends TestCase
         $host = User::factory()->create();
         $room = GameRoom::factory()->for($host, 'host')->create(['songs_per_tier' => 1]);
         $song = Song::factory()->forTier(DifficultyTier::Easy)->create([
-            'artist_deezer_id' => '27',
-            'artist_fan_count' => null,
+            'artist_provider_id' => 'sp-27',
+            'artist_follower_count' => 5_194_479,
         ]);
         $room->update(['current_tier' => DifficultyTier::Easy->value]);
         $round = $room->rounds()->create([
@@ -295,10 +250,6 @@ class RoundLifecycleTest extends TestCase
             'stage_started_at' => now(),
             'status' => 'playing',
             'stage_version' => 1,
-        ]);
-
-        Http::fake([
-            'api.deezer.com/artist/27' => Http::response(['id' => 27, 'name' => 'Daft Punk', 'nb_fan' => 5_194_479], 200),
         ]);
 
         $player = $room->players()->create([
@@ -312,12 +263,11 @@ class RoundLifecycleTest extends TestCase
 
         Event::assertDispatched(
             RoundWon::class,
-            fn (RoundWon $event) => $event->broadcastWith()['answer']['artist_fan_count'] === 5_194_479,
+            fn (RoundWon $event) => $event->broadcastWith()['answer']['artist_follower_count'] === 5_194_479,
         );
-        $this->assertSame(5_194_479, $song->fresh()->artist_fan_count);
     }
 
-    public function test_round_won_broadcasts_the_songs_deezer_track_id(): void
+    public function test_round_won_broadcasts_the_songs_provider_track_id(): void
     {
         // See test_round_won_broadcasts_the_songs_album_art() above for why
         // TierAdvanced needs its own explicit fake here too.
@@ -327,7 +277,7 @@ class RoundLifecycleTest extends TestCase
         $host = User::factory()->create();
         $room = GameRoom::factory()->for($host, 'host')->create(['songs_per_tier' => 1]);
         $song = Song::factory()->forTier(DifficultyTier::Easy)->create([
-            'deezer_track_id' => '123456789',
+            'provider_track_id' => '123456789',
         ]);
         $room->update(['current_tier' => DifficultyTier::Easy->value]);
         $round = $room->rounds()->create([
@@ -350,7 +300,7 @@ class RoundLifecycleTest extends TestCase
 
         Event::assertDispatched(
             RoundWon::class,
-            fn (RoundWon $event) => $event->broadcastWith()['answer']['deezer_track_id'] === '123456789',
+            fn (RoundWon $event) => $event->broadcastWith()['answer']['provider_track_id'] === '123456789',
         );
     }
 

@@ -10,10 +10,10 @@ import type { GameMode, PlayerMode, SongGenre } from "../lib/roomTypes";
 import type { DatasetsIndex, DatasetSummary } from "../lib/workshopTypes";
 
 interface ArtistSuggestion {
-  deezer_artist_id: string;
+  provider_artist_id: string;
   name: string;
   picture_url: string | null;
-  fan_count: number;
+  follower_count: number;
 }
 
 interface RoomSettingsFormProps {
@@ -55,7 +55,7 @@ const DATASET_MIN_ROUNDS = 1;
 const DATASET_MAX_ROUNDS = 30;
 
 /**
- * Debounced Deezer artist-name search, shared by the single-artist (Artist
+ * Debounced Spotify artist-name search, shared by the single-artist (Artist
  * genre) and multi-select (Multi-artist genre) pickers - each call gets its
  * own independent query/enabled state, so the two pickers never interfere.
  */
@@ -515,7 +515,7 @@ export function RoomSettingsForm({
                   {artistDropdownOpen && artistResults.length > 0 && (
                     <ul className="guess-suggestions">
                       {artistResults.map((artist) => (
-                        <li key={artist.deezer_artist_id}>
+                        <li key={artist.provider_artist_id}>
                           {artist.picture_url ? (
                             <img
                               className="suggestion-art"
@@ -563,7 +563,7 @@ export function RoomSettingsForm({
                     {multiArtistDropdownOpen && multiArtistResults.length > 0 && (
                       <ul className="guess-suggestions">
                         {multiArtistResults.map((artist) => (
-                          <li key={artist.deezer_artist_id}>
+                          <li key={artist.provider_artist_id}>
                             {artist.picture_url ? (
                               <img
                                 className="suggestion-art"

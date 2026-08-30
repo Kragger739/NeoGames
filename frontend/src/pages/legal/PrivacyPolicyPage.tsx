@@ -109,9 +109,14 @@ export function PrivacyPolicyPage() {
             password-reset emails; receives your email address.
           </li>
           <li>
-            <strong>Deezer</strong> — supplies 30-second song previews and cover
-            art. Your browser loads media directly from Deezer&rsquo;s servers,
+            <strong>Apple (iTunes)</strong> — supplies 30-second song previews.
+            Your browser loads the audio directly from Apple&rsquo;s servers,
             which receive your IP address.
+          </li>
+          <li>
+            <strong>Spotify</strong> — supplies track and artist data and cover
+            art. Your browser loads cover images directly from Spotify&rsquo;s
+            servers, which receive your IP address.
           </li>
           <li>
             <strong>Google and Discord</strong> — only if you choose social

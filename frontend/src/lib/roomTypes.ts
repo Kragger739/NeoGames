@@ -21,7 +21,7 @@ export interface SongHistoryEntry {
     title: string;
     artist: string;
     album_art_url: string | null;
-    deezer_track_id: string;
+    provider_track_id: string;
   };
   guessers: SongHistoryGuesser[];
 }

@@ -92,7 +92,7 @@ class GameRoom extends Model
     }
 
     /**
-     * A custom Songle dataset (imported Deezer playlist) driving song
+     * A custom Songle dataset (imported Spotify playlist) driving song
      * selection, or null for normal genre/year/artist selection.
      */
     public function dataset(): BelongsTo

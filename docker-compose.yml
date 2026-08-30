@@ -122,6 +122,18 @@ services:
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
       DISCORD_REDIRECT_URI: https://${APP_DOMAIN}/api/auth/discord/callback
+
+      # --- music (Songle song pool: Spotify metadata/popularity, iTunes
+      # previews). Seed the pool with `php artisan songs:sync`. ---
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+      MUSIC_PLAYLISTS_NORMAL: ${MUSIC_PLAYLISTS_NORMAL:-}
+      MUSIC_PLAYLISTS_POP: ${MUSIC_PLAYLISTS_POP:-}
+      MUSIC_PLAYLISTS_HIP_HOP: ${MUSIC_PLAYLISTS_HIP_HOP:-}
+      MUSIC_PLAYLISTS_GERMAN_RAP: ${MUSIC_PLAYLISTS_GERMAN_RAP:-}
+      MUSIC_PLAYLISTS_CLASSICS: ${MUSIC_PLAYLISTS_CLASSICS:-}
+      MUSIC_PLAYLISTS_ICONIC: ${MUSIC_PLAYLISTS_ICONIC:-}
+      MUSIC_PLAYLISTS_YEAR: ${MUSIC_PLAYLISTS_YEAR:-}
     volumes:
       # Uploaded avatars etc. `storage/app` only - keeps the image's
       # storage/framework (compiled views, etc.) intact.

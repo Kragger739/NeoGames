@@ -48,7 +48,7 @@ class SongSelectionContextTest extends TestCase
     {
         $original = new SongSelectionContext(
             excludeTrackIds: ['a'],
-            usedArtistDeezerIds: ['artist-1'],
+            usedArtistProviderIds: ['artist-1'],
             eraCounts: ['mainstream' => 1],
         );
 
@@ -56,7 +56,7 @@ class SongSelectionContextTest extends TestCase
 
         $this->assertSame(['a'], $original->excludeTrackIds);
         $this->assertSame(['a', 'b'], $updated->excludeTrackIds);
-        $this->assertSame($original->usedArtistDeezerIds, $updated->usedArtistDeezerIds);
+        $this->assertSame($original->usedArtistProviderIds, $updated->usedArtistProviderIds);
         $this->assertSame($original->eraCounts, $updated->eraCounts);
     }
 }

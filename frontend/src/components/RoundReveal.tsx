@@ -16,11 +16,10 @@ interface RoundRevealProps {
 
 const CONFETTI_COLORS = ["#FF5C7A", "#17C3B2", "#FFC93C", "#8B5CF6", "#FF6FB5"];
 
-// Deezer has no per-song play/fan count - this is the artist's overall fan
-// count instead (the closest real, non-fabricated "how popular is this"
-// number available), so it's framed as belonging to the artist, not the
-// song specifically.
-function formatFanCount(count: number): string {
+// Spotify has no per-song count - this is the artist's overall follower
+// count (the closest real, non-fabricated "how well known is this" number
+// available), so it's framed as belonging to the artist, not the song.
+function formatFollowerCount(count: number): string {
   if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
   if (count >= 1_000) return `${(count / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
   return count.toLocaleString();
@@ -115,19 +114,19 @@ export function RoundReveal({ outcome, audioUrl, roundId, volume }: RoundRevealP
         )}
         <h2 className="round-reveal-title">{answer.title}</h2>
         <p className="round-reveal-artist">{answer.artist}</p>
-        {answer.artist_fan_count !== null && (
+        {answer.artist_follower_count !== null && (
           <p className="round-reveal-stats">
             <Users size={15} strokeWidth={2.5} />
-            {formatFanCount(answer.artist_fan_count)} fans
+            {formatFollowerCount(answer.artist_follower_count)} followers
           </p>
         )}
         <p className="round-reveal-links">
           <a
-            href={`https://www.deezer.com/track/${answer.deezer_track_id}`}
+            href={`https://open.spotify.com/track/${answer.provider_track_id}`}
             target="_blank"
             rel="noopener noreferrer"
           >
-            Deezer
+            Spotify
           </a>
           <a
             href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${answer.title} ${answer.artist}`)}`}
@@ -137,11 +136,11 @@ export function RoundReveal({ outcome, audioUrl, roundId, volume }: RoundRevealP
             YouTube
           </a>
           <a
-            href={`https://open.spotify.com/search/${encodeURIComponent(`${answer.title} ${answer.artist}`)}`}
+            href={`https://music.apple.com/search?term=${encodeURIComponent(`${answer.title} ${answer.artist}`)}`}
             target="_blank"
             rel="noopener noreferrer"
           >
-            Spotify
+            Apple Music
           </a>
         </p>
         {outcome.type === "won" && (

@@ -18,7 +18,7 @@ class SongFactory extends Factory
     public function definition(): array
     {
         return [
-            'deezer_track_id' => fake()->unique()->numerify('##########'),
+            'provider_track_id' => fake()->unique()->bothify('????????????????????##'),
             'title' => fake()->sentence(3),
             'artist' => fake()->name(),
             'preview_url' => 'https://example.com/preview/'.fake()->uuid().'.mp3',

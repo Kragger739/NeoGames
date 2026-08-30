@@ -51,28 +51,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Recognizability score
+    | Popularity
     |--------------------------------------------------------------------------
     |
-    | songs.popularity is a blend of Deezer's live rank (how big is this
-    | right now) and the artist's overall fan count (how famous is the act
-    | behind it, log-scaled since fan counts span many orders of magnitude -
-    | a real, if niche, artist ~10K, global superstars 15-24M, confirmed via
-    | live sampling). Rank is weighted higher since it's the most direct
-    | "is this actually charting" signal; fan count is a secondary boost so
-    | a legendary act's song doesn't get buried by a momentary viral blip
-    | from an unknown one. Same spirit as MAX_RANK/REGION_CHART_DEPTH in
-    | DeezerClient - a reasonable starting calibration, not final.
+    | songs.popularity is Spotify's own 0-100 popularity score, stored as-is
+    | by `songs:sync` (no blending). DifficultyTier::popularityRange()'s
+    | bands gate on it directly. Spotify's scale is compressed - most catalog
+    | tracks sit well under 60 and only current mega-hits reach the 80s+ - so
+    | after the first sync, check the actual distribution and re-tune the
+    | tier bands if a tier ends up starved.
     |
     */
-
-    'recognizability_rank_weight' => 0.7,
-
-    'recognizability_fan_weight' => 0.3,
-
-    'fan_score_floor' => 1_000,
-
-    'fan_score_ceiling' => 20_000_000,
 
     /*
     |--------------------------------------------------------------------------

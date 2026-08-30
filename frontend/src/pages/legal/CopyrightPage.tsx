@@ -11,12 +11,12 @@ export function CopyrightPage() {
 
       <LegalSection heading="Where music and artwork come from">
         <p>
-          Song previews (about 30 seconds) and cover art shown in NeoGames are
-          retrieved at play time through the Deezer API and remain the property
-          of their respective rights holders. They are used for personal,
-          non-commercial gameplay. NeoGames does not host full tracks or offer
-          downloads. Users can also import Deezer playlists into their own
-          Workshop content.
+          Song previews (about 30 seconds) come from Apple&rsquo;s iTunes
+          Search API; track and artist data and cover art come from the Spotify
+          Web API. All of it remains the property of the respective rights
+          holders and is used for personal, non-commercial gameplay. NeoGames
+          does not host full tracks or offer downloads. Users can also import
+          public Spotify playlists into their own Workshop content.
         </p>
       </LegalSection>
 

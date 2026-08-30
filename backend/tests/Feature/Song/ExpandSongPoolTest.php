@@ -17,6 +17,11 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
+/**
+ * The fixed-playlist genres' pool is owned by `songs:sync` now, so
+ * ExpandSongPool only does real work for Artist / MultiArtist rooms (warming
+ * the per-room pool from the named act's Spotify top tracks).
+ */
 class ExpandSongPoolTest extends TestCase
 {
     use RefreshDatabase;
@@ -25,7 +30,6 @@ class ExpandSongPoolTest extends TestCase
     {
         Event::fake();
         Queue::fake([ExpandSongPool::class]);
-        $this->fakeDeezerTrackRefresh();
 
         foreach (DifficultyTier::ordered() as $tier) {
             Song::factory()->forTier($tier)->create();
@@ -38,155 +42,48 @@ class ExpandSongPoolTest extends TestCase
         Queue::assertPushed(ExpandSongPool::class, fn (ExpandSongPool $job) => $job->filter->tier === DifficultyTier::Easy);
     }
 
-    public function test_it_no_ops_when_the_pool_is_already_healthy(): void
+    public function test_it_is_a_no_op_for_a_fixed_playlist_genre(): void
     {
         Http::fake(); // any call at all fails the test via assertNothingSent below.
 
-        Song::factory()->forTier(DifficultyTier::Easy)->count(25)->create();
+        Song::factory()->forTier(DifficultyTier::Easy)->count(3)->create();
 
         (new ExpandSongPool(new SongFilter(DifficultyTier::Easy)))->handle(app(SongDiscoveryService::class));
+        (new ExpandSongPool(new SongFilter(DifficultyTier::Easy, SongGenre::Pop)))->handle(app(SongDiscoveryService::class));
 
         Http::assertNothingSent();
     }
 
-    public function test_it_tops_up_the_pool_when_below_the_threshold(): void
+    public function test_artist_genre_warms_the_pool_from_spotify_top_tracks(): void
     {
+        $this->fakeSpotifyToken();
         Http::fake([
-            'api.deezer.com/chart/0/tracks*' => Http::response([
-                // ~950,000 rank -> popularity ~95, inside Easy's [85,100] range.
-                'data' => [$this->fakeDeezerTrack('new-track', 'New Track', rank: 95_000)],
+            'api.spotify.com/v1/search*' => Http::response([
+                'artists' => ['items' => [
+                    ['id' => 'sp-real', 'name' => 'Real Artist', 'images' => [], 'followers' => ['total' => 1_000_000]],
+                ]],
             ], 200),
-            'api.deezer.com/track/new-track' => Http::response(
-                $this->fakeDeezerTrackDetails('new-track', 'New Track'),
-                200,
-            ),
-        ]);
-
-        Song::factory()->forTier(DifficultyTier::Easy)->count(3)->create();
-
-        (new ExpandSongPool(new SongFilter(DifficultyTier::Easy)))->handle(app(SongDiscoveryService::class));
-
-        $this->assertDatabaseHas('songs', ['deezer_track_id' => 'new-track']);
-        Http::assertSentCount(8); // MAX_DISCOVERY_ATTEMPTS (4) x 2 calls (chart + trackDetails) each attempt
-    }
-
-    public function test_a_second_rapid_run_makes_no_further_http_calls_because_of_the_lock_cooldown(): void
-    {
-        Http::fake([
-            'api.deezer.com/chart/0/tracks*' => Http::response([
-                'data' => [$this->fakeDeezerTrack('new-track', 'New Track', rank: 95_000)],
+            'api.spotify.com/v1/artists/sp-real/top-tracks*' => Http::response([
+                'tracks' => [[
+                    'id' => 'sp-song',
+                    'name' => 'Some Song',
+                    'popularity' => 55,
+                    'external_ids' => ['isrc' => 'X'],
+                    'artists' => [['id' => 'sp-real', 'name' => 'Real Artist']],
+                    'album' => ['release_date' => '2015-06-09', 'images' => []],
+                ]],
             ], 200),
-            'api.deezer.com/track/new-track' => Http::response(
-                $this->fakeDeezerTrackDetails('new-track', 'New Track'),
-                200,
-            ),
-        ]);
-
-        Song::factory()->forTier(DifficultyTier::Easy)->count(3)->create();
-
-        $songDiscovery = app(SongDiscoveryService::class);
-        (new ExpandSongPool(new SongFilter(DifficultyTier::Easy)))->handle($songDiscovery);
-        $firstRunCalls = count(Http::recorded());
-
-        $this->assertGreaterThan(0, $firstRunCalls);
-
-        (new ExpandSongPool(new SongFilter(DifficultyTier::Easy)))->handle($songDiscovery);
-
-        $this->assertSame($firstRunCalls, count(Http::recorded()));
-    }
-
-    public function test_a_pop_filtered_run_does_not_share_a_lock_with_a_same_tier_normal_run(): void
-    {
-        Http::fake([
-            'api.deezer.com/chart/0/tracks*' => Http::response([
-                'data' => [$this->fakeDeezerTrack('normal-track', 'Normal Track', rank: 95_000)],
-            ], 200),
-            'api.deezer.com/chart/132/tracks*' => Http::response([
-                'data' => [$this->fakeDeezerTrack('pop-track', 'Pop Track', rank: 95_000)],
-            ], 200),
-            'api.deezer.com/track/normal-track' => Http::response(
-                $this->fakeDeezerTrackDetails('normal-track', 'Normal Track'),
-                200,
-            ),
-            'api.deezer.com/track/pop-track' => Http::response(
-                $this->fakeDeezerTrackDetails('pop-track', 'Pop Track'),
-                200,
-            ),
-        ]);
-
-        Song::factory()->forTier(DifficultyTier::Easy)->count(3)->create();
-
-        $songDiscovery = app(SongDiscoveryService::class);
-        (new ExpandSongPool(new SongFilter(DifficultyTier::Easy)))->handle($songDiscovery);
-        $callsAfterNormalRun = count(Http::recorded());
-
-        $this->assertGreaterThan(0, $callsAfterNormalRun);
-
-        // A Pop-filtered run for the same tier must not be blocked by the
-        // Normal run's cooldown - it's a genuinely different pool/lock key.
-        (new ExpandSongPool(new SongFilter(DifficultyTier::Easy, SongGenre::Pop)))->handle($songDiscovery);
-
-        $this->assertGreaterThan($callsAfterNormalRun, count(Http::recorded()));
-    }
-
-    /**
-     * matchingFilter()'s global popularity band is meaningless for Artist/
-     * MultiArtist (they rank relatively - see SongDiscoveryService::
-     * relativeTierBucket()), so the health check must be skipped for them
-     * and ensureArtistPoolReady() called directly instead of the chart/
-     * word-search discoverAndCache() loop.
-     */
-    public function test_artist_genre_bypasses_the_global_band_health_check_and_uses_artist_top_tracks(): void
-    {
-        Http::fake([
-            'api.deezer.com/search/artist*' => Http::response([
-                'data' => [['id' => 555, 'name' => 'Real Artist', 'nb_fan' => 1_000_000]],
-            ], 200),
-            'api.deezer.com/artist/555/top*' => Http::response([
-                'data' => [$this->fakeDeezerTrack('artist-song', 'Some Song', rank: 40_000)],
-            ], 200),
-            'api.deezer.com/track/artist-song' => Http::response(
-                $this->fakeDeezerTrackDetails('artist-song', 'Some Song'),
-                200,
-            ),
+            'api.spotify.com/v1/artists/sp-real' => Http::response(['id' => 'sp-real', 'followers' => ['total' => 1_000_000]], 200),
+            'itunes.apple.com/search*' => Http::response(['results' => [[
+                'kind' => 'song', 'trackId' => 42, 'trackName' => 'Some Song', 'artistName' => 'Real Artist',
+                'previewUrl' => 'https://audio-ssl.itunes.apple.com/x.m4a', 'artworkUrl100' => 'https://is1.mzstatic.com/100x100bb.jpg',
+                'releaseDate' => '2015-06-09T00:00:00Z',
+            ]]], 200),
         ]);
 
         (new ExpandSongPool(new SongFilter(DifficultyTier::Easy, SongGenre::Artist, artistName: 'Real Artist')))
             ->handle(app(SongDiscoveryService::class));
 
-        $this->assertDatabaseHas('songs', ['deezer_track_id' => 'artist-song']);
-        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/chart/'));
-        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/search?'));
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function fakeDeezerTrack(string $id, string $name, int $rank = 500_000): array
-    {
-        return [
-            'id' => $id,
-            'title' => $name,
-            'artist' => ['name' => 'Some Artist'],
-            'album' => ['cover_medium' => 'https://example.com/art.jpg'],
-            'preview' => 'https://example.com/preview.mp3',
-            'rank' => $rank,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function fakeDeezerTrackDetails(string $id, string $name, int $rank = 500_000): array
-    {
-        return [
-            'id' => $id,
-            'title' => $name,
-            'artist' => ['name' => 'Some Artist'],
-            'album' => ['cover_medium' => 'https://example.com/art.jpg'],
-            'preview' => 'https://example.com/preview.mp3',
-            'rank' => $rank,
-            'release_date' => '2015-06-09',
-        ];
+        $this->assertDatabaseHas('songs', ['provider_track_id' => 'sp-song', 'artist' => 'Real Artist']);
     }
 }

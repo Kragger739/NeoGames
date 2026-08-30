@@ -3,7 +3,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { api } from "../lib/api";
 
 interface SongSuggestion {
-  deezer_track_id: string;
+  provider_track_id: string;
   title: string;
   artist: string;
   album_art_url: string | null;
@@ -126,7 +126,7 @@ export function GuessAutocomplete({
       {open && results.length > 0 && (
         <ul className="guess-suggestions">
           {results.map((suggestion) => (
-            <li key={suggestion.deezer_track_id}>
+            <li key={suggestion.provider_track_id}>
               {suggestion.album_art_url ? (
                 <img
                   className="suggestion-art"

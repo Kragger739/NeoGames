@@ -14,8 +14,8 @@ export interface RevealedAnswer {
   title: string;
   artist: string;
   album_art_url: string | null;
-  artist_fan_count: number | null;
-  deezer_track_id: string;
+  artist_follower_count: number | null;
+  provider_track_id: string;
 }
 
 export interface RoundWonPayload {

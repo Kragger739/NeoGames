@@ -12,9 +12,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A shared cache of Deezer tracks discovered to have a playable preview,
- * not owned by any host. Populated automatically by SongDiscoveryService.
- * Popularity is derived from Deezer's own rank/chart-position signal.
+ * A shared pool of tracks known to have a playable preview, not owned by any
+ * host. Populated by `php artisan songs:sync` from curated Spotify playlists
+ * (metadata + popularity) with the 30-second preview resolved via Apple's
+ * iTunes Search API. `provider_track_id` is the Spotify track id.
  */
 class Song extends Model
 {
@@ -22,11 +23,11 @@ class Song extends Model
     use HasFactory;
 
     protected $fillable = [
-        'deezer_track_id',
+        'provider_track_id',
         'title',
         'artist',
-        'artist_deezer_id',
-        'artist_fan_count',
+        'artist_provider_id',
+        'artist_follower_count',
         'preview_url',
         'album_art_url',
         'popularity',
@@ -41,7 +42,7 @@ class Song extends Model
         return [
             'popularity' => 'integer',
             'release_year' => 'integer',
-            'artist_fan_count' => 'integer',
+            'artist_follower_count' => 'integer',
             'excluded' => 'boolean',
             'last_used_at' => 'datetime',
         ];

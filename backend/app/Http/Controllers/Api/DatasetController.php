@@ -106,7 +106,7 @@ class DatasetController extends Controller
         } else {
             foreach ($dataset->tracks as $track) {
                 $copy->tracks()->create($track->only([
-                    'deezer_track_id', 'title', 'artist', 'album_art_url', 'preview_url', 'position',
+                    'provider_track_id', 'title', 'artist', 'album_art_url', 'preview_url', 'position',
                 ]));
             }
         }
@@ -264,7 +264,7 @@ class DatasetController extends Controller
         } else {
             $out['tracks'] = $dataset->tracks()->get()->map(fn (DatasetTrack $t) => [
                 'id' => $t->id,
-                'deezer_track_id' => $t->deezer_track_id,
+                'provider_track_id' => $t->provider_track_id,
                 'title' => $t->title,
                 'artist' => $t->artist,
                 'album_art_url' => $t->album_art_url,

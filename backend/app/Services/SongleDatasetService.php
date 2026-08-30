@@ -3,50 +3,47 @@
 namespace App\Services;
 
 use App\Models\Dataset;
-use App\Services\Deezer\DeezerClient;
+use App\Services\Music\AppleMusicClient;
+use App\Services\Music\SpotifyClient;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 /**
- * Imports a Deezer playlist into a Songle dataset's track list. Reuses the
- * existing DeezerClient::playlistTracks() (the same call the `iconic` genre
- * uses); the imported rows live in `dataset_tracks`, not the regenerable
- * `songs` cache.
+ * Imports a public Spotify playlist into a Songle dataset's track list. The
+ * track list + metadata come from Spotify; each track's 30-second preview is
+ * resolved through Apple's iTunes Search API (Spotify no longer serves
+ * preview audio). Rows live in `dataset_tracks`, not the regenerable `songs`
+ * pool. A track with no confident iTunes match is dropped from the import.
  */
 class SongleDatasetService
 {
-    /** Deezer's per-request cap; a few pages covers most user playlists. */
-    private const PAGE_SIZE = 100;
-
     private const MAX_TRACKS = 300;
 
-    public function __construct(private DeezerClient $deezer) {}
+    public function __construct(
+        private SpotifyClient $spotify,
+        private AppleMusicClient $apple,
+    ) {}
 
     /**
      * Replaces the dataset's tracks with the playlist's. Returns the count.
      */
     public function importPlaylist(Dataset $dataset, string $reference): int
     {
-        $playlistId = $this->parsePlaylistId($reference);
-
-        if ($playlistId === null) {
+        try {
+            $playlistId = $this->spotify->parsePlaylistId($reference);
+        } catch (RuntimeException) {
             throw ValidationException::withMessages([
-                'playlist' => ['That doesn’t look like a Deezer playlist link or id.'],
+                'playlist' => ['That doesn’t look like a Spotify playlist link or id.'],
             ]);
         }
 
-        $tracks = [];
-
-        for ($index = 0; $index < self::MAX_TRACKS; $index += self::PAGE_SIZE) {
-            $page = $this->deezer->playlistTracks($playlistId, self::PAGE_SIZE, $index);
-
-            if ($page === []) {
-                break;
-            }
-
-            foreach ($page as $track) {
-                $tracks[$track['deezer_track_id']] = $track;
-            }
+        try {
+            $tracks = array_slice($this->spotify->playlistTracks($playlistId), 0, self::MAX_TRACKS);
+        } catch (RuntimeException $e) {
+            throw ValidationException::withMessages([
+                'playlist' => ['Couldn’t read that playlist - make sure it’s public. ('.$e->getMessage().')'],
+            ]);
         }
 
         if ($tracks === []) {
@@ -57,15 +54,31 @@ class SongleDatasetService
 
         $rows = [];
         $position = 0;
-        foreach ($tracks as $track) {
-            $rows[] = [
-                'deezer_track_id' => $track['deezer_track_id'],
-                'title' => $track['title'],
-                'artist' => $track['artist'],
-                'album_art_url' => $track['album_art_url'],
-                'preview_url' => $track['preview_url'],
-                'position' => $position++,
-            ];
+        $throttleMs = (int) config('music.itunes_throttle_ms', 3200);
+
+        foreach ($tracks as $i => $track) {
+            $preview = $this->apple->findPreview($track['artist'], $track['title']);
+
+            if ($preview !== null) {
+                $rows[] = [
+                    'provider_track_id' => $track['provider_track_id'],
+                    'title' => $track['title'],
+                    'artist' => $track['artist'],
+                    'album_art_url' => $track['album_art_url'] ?? $preview['album_art_url'],
+                    'preview_url' => $preview['preview_url'],
+                    'position' => $position++,
+                ];
+            }
+
+            if ($throttleMs > 0 && $i < count($tracks) - 1) {
+                usleep($throttleMs * 1000);
+            }
+        }
+
+        if ($rows === []) {
+            throw ValidationException::withMessages([
+                'playlist' => ['None of that playlist’s tracks had a playable preview available.'],
+            ]);
         }
 
         DB::transaction(function () use ($dataset, $rows) {
@@ -74,24 +87,5 @@ class SongleDatasetService
         });
 
         return count($rows);
-    }
-
-    /**
-     * Accepts a bare numeric id or any deezer.com URL containing
-     * /playlist/{id} (e.g. https://www.deezer.com/en/playlist/1234567).
-     */
-    public function parsePlaylistId(string $reference): ?string
-    {
-        $reference = trim($reference);
-
-        if (preg_match('/^\d{3,}$/', $reference)) {
-            return $reference;
-        }
-
-        if (preg_match('#playlist/(\d{3,})#', $reference, $matches)) {
-            return $matches[1];
-        }
-
-        return null;
     }
 }

@@ -24,26 +24,19 @@ class SongSearchTest extends TestCase
 
     public function test_a_player_can_search_for_songs_by_title(): void
     {
+        $this->fakeSpotifyToken();
         Http::fake([
-            'api.deezer.com/search*' => Http::response([
-                'data' => [
+            'api.spotify.com/v1/search*' => Http::response([
+                'tracks' => ['items' => [
                     [
-                        'id' => 123,
-                        'title' => 'Blinding Lights',
-                        'artist' => ['name' => 'The Weeknd'],
-                        'album' => ['cover_medium' => 'https://example.com/art.jpg'],
-                        'preview' => 'https://example.com/preview.mp3',
-                        'rank' => 900_000,
+                        'id' => 'sp-123',
+                        'name' => 'Blinding Lights',
+                        'popularity' => 92,
+                        'external_ids' => ['isrc' => 'USUG11904206'],
+                        'artists' => [['id' => 'sp-w', 'name' => 'The Weeknd']],
+                        'album' => ['release_date' => '2019-11-29', 'images' => [['url' => 'https://example.com/art.jpg']]],
                     ],
-                    [
-                        'id' => 456,
-                        'title' => 'No Preview Track',
-                        'artist' => ['name' => 'Someone'],
-                        'album' => ['cover_medium' => null],
-                        'preview' => null,
-                        'rank' => 100_000,
-                    ],
-                ],
+                ]],
             ], 200),
         ]);
 
@@ -56,12 +49,12 @@ class SongSearchTest extends TestCase
         $response->assertJsonCount(1, 'results');
         $response->assertJsonPath('results.0.title', 'Blinding Lights');
         $response->assertJsonPath('results.0.artist', 'The Weeknd');
+        $response->assertJsonPath('results.0.provider_track_id', 'sp-123');
         $response->assertJsonStructure([
             'results' => [
-                ['deezer_track_id', 'title', 'artist', 'album_art_url', 'preview_url'],
+                ['provider_track_id', 'title', 'artist', 'album_art_url'],
             ],
         ]);
-        $response->assertJsonPath('results.0.preview_url', 'https://example.com/preview.mp3');
     }
 
     public function test_search_requires_authentication(): void
