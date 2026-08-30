@@ -16,10 +16,10 @@ const GENRE_LABELS: Record<string, string> = {
 };
 
 export function AdminSongPlaylistsPage() {
-  const { genres, playlists, poolSize, lastSync, status, syncError, fetch, add, remove, sync } =
+  const { genres, playlists, poolSize, lastSync, status, syncError, pollNote, fetch, add, remove, sync, stopPolling } =
     useAdminPlaylistsStore();
 
-  const syncing = lastSync?.state === "queued" || lastSync?.state === "running";
+  const syncing = (lastSync?.state === "queued" || lastSync?.state === "running") && !pollNote;
 
   const [genre, setGenre] = useState("");
   const [playlist, setPlaylist] = useState("");
@@ -29,7 +29,8 @@ export function AdminSongPlaylistsPage() {
 
   useEffect(() => {
     void fetch();
-  }, [fetch]);
+    return () => stopPolling();
+  }, [fetch, stopPolling]);
 
   useEffect(() => {
     if (!genre && genres.length > 0) setGenre(genres[0]);
@@ -76,12 +77,16 @@ export function AdminSongPlaylistsPage() {
         <Button onClick={() => void sync()} disabled={syncing}>
           {syncing ? "Syncing…" : "Sync now"}
         </Button>
+        <Button variant="ghost" onClick={() => void fetch()}>
+          Refresh
+        </Button>
         <span className="hint">Pool: {poolSize} songs</span>
       </div>
       {syncError && <p className="form-error">{syncError}</p>}
-      {lastSync && (
+      {pollNote && <p className="form-error">{pollNote}</p>}
+      {lastSync && !pollNote && (
         <p className="hint">
-          {lastSync.state === "queued" && "Sync queued — waiting for the worker…"}
+          {lastSync.state === "queued" && "Sync queued — waiting for the worker to pick it up…"}
           {lastSync.state === "running" &&
             `Sync running${lastSync.started_at ? ` (started ${new Date(lastSync.started_at).toLocaleTimeString()})` : ""} — this takes a few minutes for a large pool.`}
           {lastSync.state === "done" &&

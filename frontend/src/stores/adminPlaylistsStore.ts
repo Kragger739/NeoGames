@@ -26,26 +26,70 @@ interface AdminPlaylistsState {
   lastSync: SyncStatus | null;
   status: "idle" | "loading" | "ready";
   syncError: string | null;
+  /** Set when polling gives up, e.g. the queue worker never picked the job up. */
+  pollNote: string | null;
   fetch: () => Promise<void>;
   add: (genre: string, playlist: string, label: string) => Promise<void>;
   remove: (id: number) => Promise<void>;
   sync: () => Promise<void>;
+  stopPolling: () => void;
 }
 
+const POLL_MS = 6000;
+// Give up watching after this long overall (a big pool can genuinely take a
+// while, but we shouldn't poll forever).
+const MAX_POLLS = 150; // ~15 min
+// If it never leaves "queued", the worker isn't consuming the job.
+const QUEUED_STALL_POLLS = 6; // ~36 s
+
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
+let pollCount = 0;
+let sawRunning = false;
 
 export const useAdminPlaylistsStore = create<AdminPlaylistsState>((set, get) => {
-  function schedulePoll() {
+  function stop() {
     if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+
+  function schedulePoll() {
+    stop();
     pollTimer = setTimeout(() => {
       pollTimer = null;
+      pollCount += 1;
       void get()
         .fetch()
         .then(() => {
           const s = get().lastSync?.state;
-          if (s === "queued" || s === "running") schedulePoll();
+
+          if (s === "running") sawRunning = true;
+
+          if (s !== "queued" && s !== "running") return; // done / error - settled
+
+          if (!sawRunning && pollCount >= QUEUED_STALL_POLLS) {
+            set({
+              pollNote:
+                "The sync was queued but hasn't started — the background queue worker may be down. " +
+                "Run `php artisan songs:sync` in the backend container, or check `supervisorctl status`.",
+            });
+            return;
+          }
+
+          if (pollCount >= MAX_POLLS) {
+            set({ pollNote: "Still running — reload the page later to see the result." });
+            return;
+          }
+
+          schedulePoll();
         });
-    }, 4000);
+    }, POLL_MS);
+  }
+
+  function beginPolling() {
+    pollCount = 0;
+    sawRunning = false;
+    set({ pollNote: null });
+    schedulePoll();
   }
 
   return {
@@ -55,6 +99,9 @@ export const useAdminPlaylistsStore = create<AdminPlaylistsState>((set, get) => 
     lastSync: null,
     status: "idle",
     syncError: null,
+    pollNote: null,
+
+    stopPolling: stop,
 
     fetch: async () => {
       if (get().status === "idle") set({ status: "loading" });
@@ -66,10 +113,12 @@ export const useAdminPlaylistsStore = create<AdminPlaylistsState>((set, get) => 
         lastSync: data.last_sync ?? null,
         status: "ready",
       });
-      // Resume polling if a sync is still in flight (e.g. after navigating
-      // back to the page).
+      // Resume a bounded watch if a sync is still in flight (e.g. after
+      // navigating back to the page) and we're not already watching.
       const s = data.last_sync?.state;
-      if ((s === "queued" || s === "running") && !pollTimer) schedulePoll();
+      if ((s === "queued" || s === "running") && !pollTimer && !get().pollNote) {
+        beginPolling();
+      }
     },
 
     add: async (genre, playlist, label) => {
@@ -83,11 +132,11 @@ export const useAdminPlaylistsStore = create<AdminPlaylistsState>((set, get) => 
     },
 
     sync: async () => {
-      set({ syncError: null });
+      set({ syncError: null, pollNote: null });
       try {
         const { data } = await api.post("/api/admin/song-playlists/sync");
         if (data.last_sync) set({ lastSync: data.last_sync });
-        schedulePoll();
+        beginPolling();
       } catch (err) {
         set({ syncError: firstValidationError(err) });
       }
