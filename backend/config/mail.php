@@ -39,16 +39,18 @@ return [
 
         'smtp' => [
             'transport' => 'smtp',
-            'scheme' => env('MAIL_SCHEME'),
-            'url' => env('MAIL_URL'),
             'host' => env('MAIL_HOST', '127.0.0.1'),
-            'port' => env('MAIL_PORT', 2525),
+            'port' => env('MAIL_PORT', 587),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
+            // Plain SMTP by default: no opportunistic STARTTLS upgrade, and
+            // no implicit TLS (that path only exists on port 465). Set
+            // MAIL_AUTO_TLS=true to allow STARTTLS when the server offers it.
+            'auto_tls' => env('MAIL_AUTO_TLS', false),
             // Finite so a blocked outbound SMTP port fails the queued job
             // fast instead of pinning the worker for the OS socket timeout.
             'timeout' => env('MAIL_TIMEOUT', 15),
-            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+            'local_domain' => parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST),
         ],
 
         'ses' => [
