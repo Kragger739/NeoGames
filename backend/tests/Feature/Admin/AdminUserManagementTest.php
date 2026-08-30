@@ -174,4 +174,25 @@ class AdminUserManagementTest extends TestCase
 
         $this->assertTrue($admin->refresh()->is_admin);
     }
+
+    public function test_admin_can_delete_a_user(): void
+    {
+        $admin = $this->admin();
+        $target = User::factory()->create();
+
+        $this->actingAs($admin)->deleteJson("/api/admin/users/{$target->id}")
+            ->assertNoContent();
+
+        $this->assertDatabaseMissing('users', ['id' => $target->id]);
+    }
+
+    public function test_admin_cannot_delete_their_own_account_via_admin_api(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->deleteJson("/api/admin/users/{$admin->id}")
+            ->assertStatus(422);
+
+        $this->assertDatabaseHas('users', ['id' => $admin->id]);
+    }
 }

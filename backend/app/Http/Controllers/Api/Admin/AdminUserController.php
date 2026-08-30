@@ -60,6 +60,15 @@ class AdminUserController extends Controller
         return response()->json($this->toAdminArray($user));
     }
 
+    public function destroy(Request $request, User $user)
+    {
+        abort_if($user->is($request->user()), 422, 'You cannot delete your own account here.');
+
+        $user->delete();
+
+        return response()->noContent();
+    }
+
     /**
      * @return array<string, mixed>
      */
