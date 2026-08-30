@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Check, Copy, LogOut, Rocket } from "lucide-react";
 
 import { RoomSettingsForm } from "../components/RoomSettingsForm";
@@ -292,30 +292,41 @@ export function LobbyPage() {
         </>
       )}
 
-      {isSeated && onlineFriends.length > 0 && (
+      {isSeated && host && (
         <>
           <h2>Invite a friend</h2>
-          <ul className="player-list">
-            {onlineFriends.map((friend) => (
-              <li key={friend.id}>
-                <span>{friend.username}</span>
-                <Button
-                  variant="turquoise"
-                  disabled={invitedIds.includes(friend.id)}
-                  onClick={() => void handleInvite(friend.id)}
-                >
-                  {invitedIds.includes(friend.id) ? (
-                    <>
-                      <Check size={16} strokeWidth={2.5} />
-                      Invited
-                    </>
-                  ) : (
-                    "Invite"
-                  )}
-                </Button>
-              </li>
-            ))}
-          </ul>
+          {friendsStatus !== "ready" ? (
+            <p className="hint">Loading your friends…</p>
+          ) : friends.length === 0 ? (
+            <p className="hint">
+              Add friends on the <Link to="/friends">Friends</Link> page to invite
+              them into your room.
+            </p>
+          ) : onlineFriends.length === 0 ? (
+            <p className="hint">None of your friends are online right now.</p>
+          ) : (
+            <ul className="player-list">
+              {onlineFriends.map((friend) => (
+                <li key={friend.id}>
+                  <span>{friend.username}</span>
+                  <Button
+                    variant="turquoise"
+                    disabled={invitedIds.includes(friend.id)}
+                    onClick={() => void handleInvite(friend.id)}
+                  >
+                    {invitedIds.includes(friend.id) ? (
+                      <>
+                        <Check size={16} strokeWidth={2.5} />
+                        Invited
+                      </>
+                    ) : (
+                      "Invite"
+                    )}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
         </>
       )}
 
