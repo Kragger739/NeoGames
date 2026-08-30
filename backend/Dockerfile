@@ -9,7 +9,10 @@ WORKDIR /app
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist --optimize-autoloader
 
-FROM php:8.3-fpm-alpine
+# 8.4, not 8.3: laravel/framework v13.26 and many of its deps lock to
+# "php >=8.4.1", and the composer:2 vendor stage above (PHP 8.4) bakes that
+# requirement into vendor/composer/platform_check.php.
+FROM php:8.4-fpm-alpine
 
 RUN apk add --no-cache nginx supervisor postgresql-dev libzip-dev oniguruma-dev icu-dev bash \
     && docker-php-ext-install pdo pdo_pgsql pdo_mysql mbstring bcmath pcntl zip intl
