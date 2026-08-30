@@ -3,17 +3,19 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Not ShouldQueue on purpose - dev runs no queue worker, so registration
- * sends this synchronously. Cheap to make it queued later if the SMTP round
- * trip starts to matter.
+ * Queued: the SMTP round trip must never block the HTTP request that
+ * triggers it (registration, "resend code"). Both the local `php artisan
+ * dev` setup and the production container run a queue worker; with
+ * QUEUE_CONNECTION=sync (bare `artisan serve`) it still sends inline.
  */
-class EmailVerificationCodeMail extends Mailable
+class EmailVerificationCodeMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
