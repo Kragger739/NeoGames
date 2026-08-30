@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\AdminUserController;
 use App\Http\Controllers\Api\ArtistSearchController;
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\EmailVerificationController;
@@ -171,3 +172,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/rooms/{code}/invite', [RoomInviteController::class, 'store']);
     });
 });
+
+// Admin dashboard. `admin` alias -> EnsureUserIsAdmin (bootstrap/app.php).
+Route::middleware(['auth:sanctum', 'verified', 'admin'])
+    ->prefix('admin')
+    ->group(function () {
+        Route::get('/users', [AdminUserController::class, 'index']);
+    });

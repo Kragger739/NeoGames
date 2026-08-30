@@ -42,6 +42,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // (login, register, password reset, email verification) set their
         // own tighter throttles on top of this in routes/api.php.
         $middleware->throttleApi();
+
+        // Route-level guards. Task 8 extends this same array.
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
