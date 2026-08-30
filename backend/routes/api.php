@@ -183,4 +183,5 @@ Route::middleware(['auth:sanctum', 'verified', 'admin'])
         Route::delete('/users/{user}', [AdminUserController::class, 'destroy']);
         Route::post('/users/{user}/ban', [AdminUserController::class, 'ban']);
         Route::post('/users/{user}/unban', [AdminUserController::class, 'unban']);
+        Route::post('/users/{user}/reset-xp', [AdminUserController::class, 'resetXp']);
     });

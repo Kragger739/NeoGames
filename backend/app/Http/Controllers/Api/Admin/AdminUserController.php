@@ -96,6 +96,14 @@ class AdminUserController extends Controller
         return response()->json($this->toAdminArray($user));
     }
 
+    public function resetXp(User $user)
+    {
+        $user->forceFill(['xp' => 0])->save();
+        $user->seasonProgress()->delete();
+
+        return response()->json($this->toAdminArray($user));
+    }
+
     /**
      * @return array<string, mixed>
      */

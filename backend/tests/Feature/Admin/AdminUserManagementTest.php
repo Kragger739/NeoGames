@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Models\Season;
+use App\Models\SeasonProgress;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -239,5 +241,25 @@ class AdminUserManagementTest extends TestCase
             ->assertStatus(422);
 
         $this->assertNull($admin->refresh()->banned_at);
+    }
+
+    public function test_admin_can_reset_a_users_xp(): void
+    {
+        $admin = $this->admin();
+        $target = User::factory()->create(['xp' => 5000]);
+        $season = Season::create([
+            'name' => 'Test Season',
+            'slug' => 'test-season',
+            'starts_at' => now()->subDay(),
+            'ends_at' => now()->addMonth(),
+        ]);
+        SeasonProgress::create(['season_id' => $season->id, 'user_id' => $target->id, 'xp' => 4200]);
+
+        $this->actingAs($admin)->postJson("/api/admin/users/{$target->id}/reset-xp")
+            ->assertOk()
+            ->assertJsonPath('xp', 0);
+
+        $this->assertSame(0, (int) $target->refresh()->xp);
+        $this->assertDatabaseMissing('season_progress', ['user_id' => $target->id]);
     }
 }
