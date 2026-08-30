@@ -102,7 +102,9 @@ services:
       # times out, set MAIL_MAILER=resend + RESEND_API_KEY (HTTPS, port 443),
       # or MAIL_MAILER=log to dump the code into the container logs.
       MAIL_MAILER: ${MAIL_MAILER:-log}
-      MAIL_SCHEME: ${MAIL_SCHEME:-tls}
+      # Symfony SMTP schemes: "smtp" (STARTTLS, port 587) or "smtps"
+      # (implicit TLS, port 465). Not "tls".
+      MAIL_SCHEME: ${MAIL_SCHEME:-smtp}
       MAIL_HOST: ${MAIL_HOST:-}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
