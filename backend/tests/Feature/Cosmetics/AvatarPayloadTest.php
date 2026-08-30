@@ -5,6 +5,8 @@ namespace Tests\Feature\Cosmetics;
 use App\Models\Cosmetic;
 use App\Models\GameRoom;
 use App\Models\RoomPlayer;
+use App\Models\Season;
+use App\Models\SeasonProgress;
 use App\Models\User;
 use Database\Seeders\SeasonSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -75,6 +77,38 @@ class AvatarPayloadTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('players.0.avatar.cosmetics.frame.key', 'frame_soft');
         $response->assertJsonPath('players.0.avatar.level', 1);
+    }
+
+    public function test_leaderboard_entry_avatar_carries_the_admin_flag(): void
+    {
+        $season = Season::create([
+            'name' => 'Season 1', 'slug' => 's1',
+            'starts_at' => now()->subDay(), 'ends_at' => now()->addDays(30),
+        ]);
+        $admin = User::factory()->create(['username' => 'adminuser']);
+        $admin->forceFill(['is_admin' => true])->save();
+        SeasonProgress::create(['season_id' => $season->id, 'user_id' => $admin->id, 'xp' => 500]);
+
+        $this->actingAs($admin)->getJson('/api/leaderboard')
+            ->assertOk()
+            ->assertJsonPath('entries.0.avatar.is_admin', true);
+    }
+
+    public function test_room_player_avatar_carries_the_admin_flag(): void
+    {
+        $host = User::factory()->create();
+        $host->forceFill(['is_admin' => true])->save();
+
+        $room = GameRoom::factory()->for($host, 'host')->create();
+        $room->players()->create([
+            'user_id' => $host->id,
+            'nickname' => 'Host',
+            'connection_token' => RoomPlayer::generateConnectionToken(),
+        ]);
+
+        $this->getJson("/api/rooms/{$room->code}")
+            ->assertOk()
+            ->assertJsonPath('players.0.avatar.is_admin', true);
     }
 
     public function test_avatar_payload_includes_the_admin_flag(): void

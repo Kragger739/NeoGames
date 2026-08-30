@@ -30,7 +30,7 @@ class LeaderboardController extends Controller
                 ->where('season_id', $season->id)
                 ->orderByDesc('xp')
                 ->orderBy('id')
-                ->with('user:id,name,username,xp,avatar_path,equipped_cosmetics')
+                ->with('user:id,name,username,xp,avatar_path,equipped_cosmetics,is_admin')
                 ->limit((int) config('seasons.leaderboard_top_n'))
                 ->get()
                 ->values()

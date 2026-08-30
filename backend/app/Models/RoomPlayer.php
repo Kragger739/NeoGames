@@ -82,7 +82,7 @@ class RoomPlayer extends AuthenticatableModel
      */
     public function scopeSelectForSummary(Builder $query): Builder
     {
-        return $query->with('user:id,xp,avatar_path,equipped_cosmetics')
+        return $query->with('user:id,xp,avatar_path,equipped_cosmetics,is_admin')
             ->select(['id', 'nickname', 'score', 'is_eliminated', 'user_id']);
     }
 
@@ -93,7 +93,7 @@ class RoomPlayer extends AuthenticatableModel
      */
     public function scopeSelectForDdfSummary(Builder $query): Builder
     {
-        return $query->with(['ddfState', 'user:id,xp,avatar_path,equipped_cosmetics'])
+        return $query->with(['ddfState', 'user:id,xp,avatar_path,equipped_cosmetics,is_admin'])
             ->select(['id', 'nickname', 'user_id']);
     }
 
