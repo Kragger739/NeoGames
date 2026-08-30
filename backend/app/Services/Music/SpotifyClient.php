@@ -60,17 +60,37 @@ class SpotifyClient
         $playlistId = $this->parsePlaylistId($playlistRef);
         $out = [];
         $offset = 0;
+        $market = config('music.spotify_market', 'US');
+
+        // Spotify has been inconsistent about playlist reads for app tokens:
+        // /tracks is deprecated and often edge-blocked, and the `market`
+        // param sometimes triggers a 403 by itself. Try the variants in
+        // order and stick with the first that works.
+        $variants = [
+            ['path' => 'items', 'market' => $market],
+            ['path' => 'items', 'market' => null],
+            ['path' => 'tracks', 'market' => null],
+        ];
 
         do {
-            // GET /playlists/{id}/tracks is deprecated and now edge-blocked
-            // (GFE 403) for app tokens - /items is the current endpoint,
-            // same response shape. No `fields` filter (it has been flaky and
-            // we drop most of the payload here anyway).
-            $body = $this->get("/playlists/{$playlistId}/items", [
-                'limit' => 100,
-                'offset' => $offset,
-                'market' => config('music.spotify_market', 'US'),
-            ]);
+            $body = null;
+
+            foreach ($variants as $i => $v) {
+                try {
+                    $body = $this->get("/playlists/{$playlistId}/{$v['path']}", array_filter([
+                        'limit' => 100,
+                        'offset' => $offset,
+                        'market' => $v['market'],
+                    ], fn ($x) => $x !== null));
+                    // Pin the working variant for the remaining pages.
+                    $variants = [$v];
+                    break;
+                } catch (RuntimeException $e) {
+                    if ($i === count($variants) - 1) {
+                        throw $e;
+                    }
+                }
+            }
 
             foreach ($body['items'] ?? [] as $item) {
                 $track = $item['track'] ?? null;
