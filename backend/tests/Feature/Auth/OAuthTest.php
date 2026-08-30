@@ -4,6 +4,8 @@ namespace Tests\Feature\Auth;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use Mockery;
@@ -13,13 +15,13 @@ class OAuthTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function fakeSocialiteUser(string $id, string $email, string $name = 'Test Player'): SocialiteUser
+    private function fakeSocialiteUser(string $id, string $email, string $name = 'Test Player', ?string $avatar = null): SocialiteUser
     {
         return (new SocialiteUser)->setRaw([])->map([
             'id' => $id,
             'name' => $name,
             'email' => $email,
-            'avatar' => null,
+            'avatar' => $avatar,
         ]);
     }
 
@@ -97,6 +99,79 @@ class OAuthTest extends TestCase
             'provider' => 'discord',
             'provider_id' => 'discord-789',
         ]);
+    }
+
+    public function test_a_new_oauth_user_gets_the_provider_avatar_saved_locally(): void
+    {
+        Storage::fake('public');
+        Http::fake([
+            'cdn.example.com/*' => Http::response('fake-png-bytes', 200, ['Content-Type' => 'image/png']),
+        ]);
+
+        Socialite::shouldReceive('driver->redirectUrl->user')
+            ->once()
+            ->andReturn($this->fakeSocialiteUser(
+                'google-av-1', 'withavatar@example.com', 'Av Player', 'https://cdn.example.com/a/1.png'
+            ));
+
+        $this->get('/api/auth/google/callback')->assertRedirect('http://localhost:5173/');
+
+        $user = User::where('email', 'withavatar@example.com')->first();
+        $this->assertNotNull($user->avatar_path);
+        $this->assertStringStartsWith('avatars/', $user->avatar_path);
+        Storage::disk('public')->assertExists($user->avatar_path);
+    }
+
+    public function test_a_provider_with_no_avatar_leaves_the_account_on_the_default(): void
+    {
+        Storage::fake('public');
+
+        Socialite::shouldReceive('driver->redirectUrl->user')
+            ->once()
+            ->andReturn($this->fakeSocialiteUser('google-av-2', 'noavatar@example.com'));
+
+        $this->get('/api/auth/google/callback')->assertRedirect('http://localhost:5173/');
+
+        $this->assertNull(User::where('email', 'noavatar@example.com')->first()->avatar_path);
+    }
+
+    public function test_a_failed_or_non_image_avatar_download_does_not_block_signup(): void
+    {
+        Storage::fake('public');
+        Http::fake([
+            'cdn.example.com/*' => Http::response('<html>nope</html>', 200, ['Content-Type' => 'text/html']),
+        ]);
+
+        Socialite::shouldReceive('driver->redirectUrl->user')
+            ->once()
+            ->andReturn($this->fakeSocialiteUser(
+                'google-av-3', 'badavatar@example.com', 'Bad Av', 'https://cdn.example.com/a/3.png'
+            ));
+
+        $this->get('/api/auth/google/callback')->assertRedirect('http://localhost:5173/');
+
+        $user = User::where('email', 'badavatar@example.com')->first();
+        $this->assertAuthenticatedAs($user);
+        $this->assertNull($user->avatar_path);
+    }
+
+    public function test_an_existing_account_linking_a_provider_keeps_its_current_picture(): void
+    {
+        Storage::fake('public');
+        Http::fake([
+            'cdn.example.com/*' => Http::response('fake-png-bytes', 200, ['Content-Type' => 'image/png']),
+        ]);
+        $existing = User::factory()->create(['email' => 'haspic@example.com', 'avatar_path' => 'avatars/mine.png']);
+
+        Socialite::shouldReceive('driver->redirectUrl->user')
+            ->once()
+            ->andReturn($this->fakeSocialiteUser(
+                'google-av-4', 'haspic@example.com', 'Has Pic', 'https://cdn.example.com/a/4.png'
+            ));
+
+        $this->get('/api/auth/google/callback')->assertRedirect('http://localhost:5173/');
+
+        $this->assertSame('avatars/mine.png', $existing->fresh()->avatar_path);
     }
 
     public function test_a_provider_failure_redirects_to_login_with_an_error_and_creates_no_user(): void
