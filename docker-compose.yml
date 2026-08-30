@@ -89,7 +89,7 @@ services:
 
       # --- Reverb: shared app credentials (must match the frontend build
       #     args) + the loopback target Laravel uses to publish events ---
-      REVERB_APP_ID: ${REVERB_APP_ID:?set REVERB_APP_ID}
+      REVERB_APP_ID: ${REVERB_APP_ID:-neogames}
       REVERB_APP_KEY: ${REVERB_APP_KEY:?set REVERB_APP_KEY}
       REVERB_APP_SECRET: ${REVERB_APP_SECRET:?set REVERB_APP_SECRET}
       REVERB_HOST: "127.0.0.1"
@@ -99,11 +99,11 @@ services:
       # --- mail (verification codes, password resets) ---
       MAIL_MAILER: ${MAIL_MAILER:-smtp}
       MAIL_SCHEME: ${MAIL_SCHEME:-tls}
-      MAIL_HOST: ${MAIL_HOST:?set MAIL_HOST}
+      MAIL_HOST: ${MAIL_HOST:-}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
-      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:?set MAIL_FROM_ADDRESS}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-no-reply@${API_DOMAIN}}
       MAIL_FROM_NAME: ${APP_NAME:-NeoGames}
 
       # --- social login (optional - leave blank to disable a provider) ---
