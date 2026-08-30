@@ -3,3 +3,6 @@ node_modules/
 .impeccable/
 .DS_Store
 Thumbs.db
+
+# Local env (compose reads root .env for `docker compose up`)
+.env

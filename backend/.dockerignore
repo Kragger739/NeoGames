@@ -4,8 +4,6 @@
 
 .env
 .env.*
-!.env.example
-!.env.production.example
 
 # Local dev database - real users, password hashes, sessions.
 database/*.sqlite
