@@ -39,7 +39,9 @@ class SongleDatasetService
         }
 
         try {
-            $tracks = array_slice($this->spotify->playlistTracks($playlistId), 0, self::MAX_TRACKS);
+            // Track list from the public playlist page - the Web API
+            // playlist endpoints are 403-blocked for app tokens.
+            $tracks = array_slice($this->spotify->scrapePlaylistItems($playlistId), 0, self::MAX_TRACKS);
         } catch (RuntimeException $e) {
             throw ValidationException::withMessages([
                 'playlist' => ['Couldn’t read that playlist - make sure it’s public. ('.$e->getMessage().')'],
@@ -61,10 +63,10 @@ class SongleDatasetService
 
             if ($preview !== null) {
                 $rows[] = [
-                    'provider_track_id' => $track['provider_track_id'],
+                    'provider_track_id' => 'scraped:'.substr(md5(mb_strtolower($track['artist'].'|'.$track['title'])), 0, 22),
                     'title' => $track['title'],
                     'artist' => $track['artist'],
-                    'album_art_url' => $track['album_art_url'] ?? $preview['album_art_url'],
+                    'album_art_url' => $preview['album_art_url'],
                     'preview_url' => $preview['preview_url'],
                     'position' => $position++,
                 ];

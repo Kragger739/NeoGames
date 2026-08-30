@@ -28,26 +28,18 @@ class SongleDatasetImportTest extends TestCase
     }
 
     /**
-     * @param  array<int, array{0: string, 1: string, 2?: string}>  $tracks  [id, title, artist?]
+     * @param  array<int, string>  $titles  song titles (artist is always "Some Artist")
      */
-    private function fakePlaylist(array $tracks): void
+    private function fakePlaylist(array $titles): void
     {
         $this->fakeSpotifyToken();
-
-        $items = array_map(fn (array $t) => ['track' => [
-            'id' => $t[0], 'name' => $t[1], 'popularity' => 50, 'is_local' => false,
-            'external_ids' => ['isrc' => 'X'],
-            'artists' => [['id' => 'art-1', 'name' => $t[2] ?? 'Some Artist']],
-            'album' => ['release_date' => '2015-06-09', 'images' => [['url' => 'https://example.com/art.jpg']]],
-        ]], $tracks);
+        $this->fakeSpotifyPlaylistPage(array_map(fn ($t) => [$t, 'Some Artist'], $titles));
 
         Http::fake([
-            'api.spotify.com/v1/playlists/*/items*' => Http::response(['items' => $items, 'next' => null], 200),
-            'api.spotify.com/v1/artists*' => Http::response(['artists' => [['id' => 'art-1', 'followers' => ['total' => 1000]]]], 200),
             'itunes.apple.com/search*' => function ($request) {
-                parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $q);
-                // term is "<artist> <title>"; the fixture artist is always "Some Artist".
-                $title = trim(str_replace('Some Artist', '', $q['term'] ?? ''));
+                $title = trim(str_replace('Some Artist', '', urldecode($request->url())));
+                $title = trim(preg_replace('#.*/search\?term=#', '', $title));
+                $title = trim(explode('&', $title)[0]);
 
                 return Http::response(['results' => [[
                     'kind' => 'song', 'trackId' => 1, 'trackName' => $title, 'artistName' => 'Some Artist',
@@ -62,7 +54,7 @@ class SongleDatasetImportTest extends TestCase
     {
         $owner = User::factory()->create();
         $dataset = $this->songleDataset($owner);
-        $this->fakePlaylist([['101', 'One'], ['102', 'Two'], ['103', 'Three']]);
+        $this->fakePlaylist(['One', 'Two', 'Three']);
 
         $response = $this->actingAs($owner)->postJson("/api/datasets/{$dataset->id}/import", [
             'playlist' => 'https://open.spotify.com/playlist/'.self::PLAYLIST_ID,
@@ -70,7 +62,7 @@ class SongleDatasetImportTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('item_count', 3);
-        $this->assertDatabaseHas('dataset_tracks', ['dataset_id' => $dataset->id, 'provider_track_id' => '102', 'position' => 1]);
+        $this->assertDatabaseHas('dataset_tracks', ['dataset_id' => $dataset->id, 'title' => 'Two', 'position' => 1]);
     }
 
     public function test_import_accepts_a_bare_id_and_replaces_existing_tracks(): void
@@ -79,12 +71,12 @@ class SongleDatasetImportTest extends TestCase
         $dataset = $this->songleDataset($owner);
         $dataset->tracks()->create(['provider_track_id' => '999', 'title' => 'Old', 'artist' => 'Old', 'position' => 0]);
 
-        $this->fakePlaylist([['201', 'New One']]);
+        $this->fakePlaylist(['New One']);
 
         $this->actingAs($owner)->postJson("/api/datasets/{$dataset->id}/import", ['playlist' => self::PLAYLIST_ID])->assertOk();
 
         $this->assertDatabaseMissing('dataset_tracks', ['provider_track_id' => '999']);
-        $this->assertDatabaseHas('dataset_tracks', ['dataset_id' => $dataset->id, 'provider_track_id' => '201']);
+        $this->assertDatabaseHas('dataset_tracks', ['dataset_id' => $dataset->id, 'title' => 'New One']);
         $this->assertSame(1, $dataset->tracks()->count());
     }
 
@@ -103,7 +95,9 @@ class SongleDatasetImportTest extends TestCase
         $owner = User::factory()->create();
         $dataset = $this->songleDataset($owner);
         $this->fakeSpotifyToken();
-        Http::fake(['api.spotify.com/v1/playlists/*/items*' => Http::response(['items' => [], 'next' => null], 200)]);
+        Http::fake(['open.spotify.com/embed/playlist/*' => Http::response(
+            '<html><script id="__NEXT_DATA__" type="application/json">{"props":{}}</script></html>', 200,
+        )]);
 
         $this->actingAs($owner)->postJson("/api/datasets/{$dataset->id}/import", [
             'playlist' => self::PLAYLIST_ID,

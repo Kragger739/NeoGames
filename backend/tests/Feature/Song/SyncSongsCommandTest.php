@@ -26,37 +26,28 @@ class SyncSongsCommandTest extends TestCase
         $this->artisan('songs:sync')->assertExitCode(1);
     }
 
-    public function test_it_seeds_the_pool_from_a_playlist_with_spotify_popularity_and_a_cached_preview(): void
+    public function test_it_seeds_the_pool_from_a_scraped_playlist_with_search_popularity_and_a_cached_preview(): void
     {
         Storage::fake('public');
         SeedPlaylist::create(['genre' => 'pop', 'spotify_playlist_id' => 'abcdefghijABCDEFGHIJ12']);
         $this->fakeSpotifyToken();
+        $this->fakeSpotifyPlaylistPage([['Hit Song', 'Famous Act'], ['Obscure', 'Nobody']]);
 
         Http::fake([
             'audio-ssl.itunes.apple.com/*' => Http::response('fake-m4a-bytes', 200),
-            'api.spotify.com/v1/playlists/*/items*' => Http::response(['next' => null, 'items' => [
-                ['track' => [
-                    'id' => 'sp-hit', 'name' => 'Hit Song', 'popularity' => 78,
-                    'external_ids' => ['isrc' => 'X'],
+            'api.spotify.com/v1/search*' => function ($request) {
+                if (! str_contains($request->url(), 'Hit%20Song') && ! str_contains(urldecode($request->url()), 'Hit Song')) {
+                    return Http::response(['tracks' => ['items' => []]], 200);
+                }
+
+                return Http::response(['tracks' => ['items' => [[
+                    'id' => 'sp-hit', 'name' => 'Hit Song', 'popularity' => 78, 'external_ids' => ['isrc' => 'X'],
                     'artists' => [['id' => 'art-1', 'name' => 'Famous Act']],
                     'album' => ['release_date' => '2012-03-04', 'images' => [['url' => 'https://img/a.jpg']]],
-                ]],
-                ['track' => [
-                    'id' => 'sp-nopreview', 'name' => 'Obscure', 'popularity' => 12,
-                    'external_ids' => ['isrc' => 'Y'],
-                    'artists' => [['id' => 'art-2', 'name' => 'Nobody']],
-                    'album' => ['release_date' => '2012', 'images' => []],
-                ]],
-            ]], 200),
-            'api.spotify.com/v1/artists*' => Http::response(['artists' => [
-                ['id' => 'art-1', 'followers' => ['total' => 3_000_000]],
-                ['id' => 'art-2', 'followers' => ['total' => 40]],
-            ]], 200),
+                ]]]], 200);
+            },
             'itunes.apple.com/search*' => function ($request) {
-                parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $q);
-
-                // Only "Famous Act" resolves to a preview; "Nobody" doesn't.
-                if (! str_contains((string) ($q['term'] ?? ''), 'Famous Act')) {
+                if (! str_contains(urldecode($request->url()), 'Famous Act')) {
                     return Http::response(['results' => []], 200);
                 }
 
@@ -76,11 +67,10 @@ class SyncSongsCommandTest extends TestCase
             'genre' => 'pop',
             'popularity' => 78,
             'preview_url' => '/storage/song-previews/sp-hit.m4a',
-            'artist_follower_count' => 3_000_000,
             'release_year' => 2012,
         ]);
         Storage::disk('public')->assertExists('song-previews/sp-hit.m4a');
-        $this->assertDatabaseMissing('songs', ['provider_track_id' => 'sp-nopreview']);
+        $this->assertDatabaseMissing('songs', ['title' => 'Obscure']);
         $this->assertSame(1, Song::count());
     }
 }

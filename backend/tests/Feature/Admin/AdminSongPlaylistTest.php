@@ -79,21 +79,19 @@ class AdminSongPlaylistTest extends TestCase
             ->assertOk()->assertJsonPath('phase', 'error');
     }
 
-    public function test_the_sync_walks_prepare_then_seed_to_done(): void
+    public function test_the_sync_scrapes_the_playlist_page_then_seeds_to_done(): void
     {
         Storage::fake('public');
         SeedPlaylist::create(['genre' => 'pop', 'spotify_playlist_id' => 'abcdefghijABCDEFGHIJ12']);
         $this->fakeSpotifyToken();
+        $this->fakeSpotifyPlaylistPage([['Song A', 'Act']]);
 
         Http::fake([
-            'api.spotify.com/v1/playlists/*/items*' => Http::response(['next' => null, 'items' => [
-                ['track' => [
-                    'id' => 'sp-a', 'name' => 'Song A', 'popularity' => 70, 'external_ids' => ['isrc' => 'X'],
-                    'artists' => [['id' => 'art-1', 'name' => 'Act']],
-                    'album' => ['release_date' => '2015', 'images' => [['url' => 'https://img/a.jpg']]],
-                ]],
-            ]], 200),
-            'api.spotify.com/v1/artists*' => Http::response(['artists' => [['id' => 'art-1', 'followers' => ['total' => 999]]]], 200),
+            'api.spotify.com/v1/search*' => Http::response(['tracks' => ['items' => [[
+                'id' => 'sp-a', 'name' => 'Song A', 'popularity' => 70, 'external_ids' => ['isrc' => 'X'],
+                'artists' => [['id' => 'art-1', 'name' => 'Act']],
+                'album' => ['release_date' => '2015', 'images' => [['url' => 'https://img/a.jpg']]],
+            ]]]], 200),
             'itunes.apple.com/search*' => Http::response(['results' => [[
                 'kind' => 'song', 'trackId' => 1, 'trackName' => 'Song A', 'artistName' => 'Act',
                 'previewUrl' => 'https://audio-ssl.itunes.apple.com/a.m4a',
@@ -103,10 +101,10 @@ class AdminSongPlaylistTest extends TestCase
         ]);
 
         $admin = $this->admin();
-        $res = $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync', ['start' => true]);
-        $res->assertOk()->assertJsonPath('phase', 'prepare');
+        $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync', ['start' => true])
+            ->assertOk()->assertJsonPath('phase', 'prepare');
 
-        // Advance until it settles.
+        $res = null;
         for ($i = 0; $i < 10; $i++) {
             $res = $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync');
             if (in_array($res->json('phase'), ['done', 'error'], true)) {
@@ -117,9 +115,41 @@ class AdminSongPlaylistTest extends TestCase
         $res->assertJsonPath('phase', 'done')->assertJsonPath('seeded', 1);
         $this->assertDatabaseHas('songs', [
             'provider_track_id' => 'sp-a', 'genre' => 'pop', 'popularity' => 70,
-            'preview_url' => '/storage/song-previews/sp-a.m4a', 'artist_follower_count' => 999,
+            'preview_url' => '/storage/song-previews/sp-a.m4a',
         ]);
         $this->assertSame(1, Song::count());
+    }
+
+    public function test_a_scraped_track_still_seeds_when_spotify_search_is_unavailable(): void
+    {
+        Storage::fake('public');
+        SeedPlaylist::create(['genre' => 'pop', 'spotify_playlist_id' => 'abcdefghijABCDEFGHIJ12']);
+        $this->fakeSpotifyToken();
+        $this->fakeSpotifyPlaylistPage([['Song B', 'Band']]);
+
+        Http::fake([
+            'api.spotify.com/v1/search*' => Http::response('<html>403</html>', 403, ['Content-Type' => 'text/html']),
+            'itunes.apple.com/search*' => Http::response(['results' => [[
+                'kind' => 'song', 'trackId' => 2, 'trackName' => 'Song B', 'artistName' => 'Band',
+                'previewUrl' => 'https://audio-ssl.itunes.apple.com/b.m4a',
+                'artworkUrl100' => 'https://is1.mzstatic.com/100x100bb.jpg', 'releaseDate' => '2010-01-01T00:00:00Z',
+            ]]], 200),
+            'audio-ssl.itunes.apple.com/*' => Http::response('m4a', 200),
+        ]);
+
+        $admin = $this->admin();
+        $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync', ['start' => true]);
+
+        $res = null;
+        for ($i = 0; $i < 10; $i++) {
+            $res = $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync');
+            if (in_array($res->json('phase'), ['done', 'error'], true)) {
+                break;
+            }
+        }
+
+        $res->assertJsonPath('phase', 'done')->assertJsonPath('seeded', 1);
+        $this->assertDatabaseHas('songs', ['title' => 'Song B', 'artist' => 'Band', 'genre' => 'pop']);
     }
 
     public function test_one_unreadable_playlist_does_not_sink_the_whole_sync(): void
@@ -130,15 +160,14 @@ class AdminSongPlaylistTest extends TestCase
         $this->fakeSpotifyToken();
 
         Http::fake([
-            'api.spotify.com/v1/playlists/blockedblockedblocked1/items*' => Http::response('<html>403</html>', 403, ['Content-Type' => 'text/html']),
-            'api.spotify.com/v1/playlists/*/items*' => Http::response(['next' => null, 'items' => [
-                ['track' => [
-                    'id' => 'sp-a', 'name' => 'Song A', 'popularity' => 70, 'external_ids' => ['isrc' => 'X'],
-                    'artists' => [['id' => 'art-1', 'name' => 'Act']],
-                    'album' => ['release_date' => '2015', 'images' => []],
-                ]],
-            ]], 200),
-            'api.spotify.com/v1/artists*' => Http::response(['artists' => [['id' => 'art-1', 'followers' => ['total' => 5]]]], 200),
+            'open.spotify.com/embed/playlist/blockedblockedblocked1' => Http::response('<html>nope</html>', 404),
+            'open.spotify.com/embed/playlist/*' => Http::response(
+                '<html><script id="__NEXT_DATA__" type="application/json">'
+                .json_encode(['x' => [['title' => 'Song A', 'subtitle' => 'Act', 'uri' => 'spotify:track:1']]])
+                .'</script></html>',
+                200,
+            ),
+            'api.spotify.com/v1/search*' => Http::response(['tracks' => ['items' => []]], 200),
             'itunes.apple.com/search*' => Http::response(['results' => [[
                 'kind' => 'song', 'trackId' => 1, 'trackName' => 'Song A', 'artistName' => 'Act',
                 'previewUrl' => 'https://audio-ssl.itunes.apple.com/a.m4a',
@@ -161,6 +190,6 @@ class AdminSongPlaylistTest extends TestCase
         $res->assertJsonPath('phase', 'done')
             ->assertJsonPath('seeded', 1)
             ->assertJsonPath('failed_playlists', ['blockedblockedblocked1']);
-        $this->assertDatabaseHas('songs', ['provider_track_id' => 'sp-a']);
+        $this->assertDatabaseHas('songs', ['title' => 'Song A']);
     }
 }

@@ -29,6 +29,33 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
+     * Fake the public Spotify embed playlist page (open.spotify.com) with an
+     * embedded __NEXT_DATA__ payload SpotifyClient::scrapePlaylistItems can
+     * walk. Http::fake() accumulates, so call this alongside other fakes.
+     *
+     * @param  array<int, array{0: string, 1: string}>  $tracks  [title, artist] pairs
+     */
+    protected function fakeSpotifyPlaylistPage(array $tracks): void
+    {
+        $items = [];
+        foreach ($tracks as $i => [$title, $artist]) {
+            $items[] = ['title' => $title, 'subtitle' => $artist, 'uri' => 'spotify:track:t'.$i];
+        }
+
+        $json = json_encode(['props' => ['pageProps' => ['state' => ['data' => ['entity' => [
+            'title' => 'Test Playlist',
+            'trackList' => $items,
+        ]]]]]]);
+
+        Http::fake([
+            'open.spotify.com/embed/playlist/*' => Http::response(
+                '<html><body><script id="__NEXT_DATA__" type="application/json">'.$json.'</script></body></html>',
+                200,
+            ),
+        ]);
+    }
+
+    /**
      * Starting a round used to re-fetch its preview from Deezer (whose URLs
      * expired every ~15 min). The pool is now seeded from iTunes, whose
      * preview URLs are stable, so SongDiscoveryService::ensurePlayable() is

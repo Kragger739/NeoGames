@@ -49,9 +49,114 @@ class SpotifyClient
     }
 
     /**
-     * Every track on a playlist, paged. Skips removed (`track` null) and
-     * local-file entries. `$playlistRef` may be a bare id or an
-     * open.spotify.com URL.
+     * Resolve a scraped title/artist to a normalized track: a Spotify
+     * search match when one is available (for real popularity + ids),
+     * otherwise a synthetic entry keyed on the title/artist so the song is
+     * still seeded (mid-tier popularity, follower count self-heals at reveal
+     * time). Search failing entirely (a fully locked-down app) is fine.
+     *
+     * @return NormalizedSpotifyTrack
+     */
+    public function resolveTrack(string $title, string $artist): array
+    {
+        $wantArtist = mb_strtolower(trim($artist));
+        $wantTitle = mb_strtolower(trim($title));
+
+        try {
+            foreach ($this->searchTrack(trim($artist.' '.$title), 5) as $hit) {
+                $gotArtist = mb_strtolower($hit['artist']);
+                $gotTitle = mb_strtolower($hit['title']);
+
+                if (($gotArtist === $wantArtist || str_contains($gotArtist, $wantArtist) || str_contains($wantArtist, $gotArtist))
+                    && (str_starts_with($gotTitle, $wantTitle) || str_starts_with($wantTitle, $gotTitle))) {
+                    return $hit;
+                }
+            }
+        } catch (RuntimeException) {
+            // Search unavailable - fall through to the synthetic entry.
+        }
+
+        return [
+            'provider_track_id' => 'scraped:'.substr(md5($wantArtist.'|'.$wantTitle), 0, 22),
+            'isrc' => null,
+            'title' => $title,
+            'artist' => $artist,
+            'artist_provider_id' => null,
+            'album_art_url' => null,
+            'popularity' => 60,
+            'release_year' => null,
+        ];
+    }
+
+    /**
+     * The track list of a public playlist, scraped from the public embed
+     * page (open.spotify.com/embed/playlist/{id}) rather than the Web API -
+     * the API playlist endpoints are 403-blocked for app tokens on
+     * non-extended-quota apps. Returns bare title/artist strings; callers
+     * resolve each via search() for ids + popularity.
+     *
+     * Only what the page server-renders is returned (the full list for a
+     * playlist up to a few hundred tracks; longer ones are truncated).
+     *
+     * @return array<int, array{title: string, artist: string}>
+     */
+    public function scrapePlaylistItems(string $playlistRef): array
+    {
+        $id = $this->parsePlaylistId($playlistRef);
+
+        $response = Http::withHeaders([
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                .'(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        ])->get("https://open.spotify.com/embed/playlist/{$id}");
+
+        if ($response->failed()) {
+            throw new RuntimeException("Spotify playlist page failed ({$response->status()}) for {$id}.");
+        }
+
+        if (! preg_match('#<script id="__NEXT_DATA__" type="application/json">(.+?)</script>#s', $response->body(), $m)) {
+            throw new RuntimeException("Couldn't read the track list from the Spotify page for {$id}.");
+        }
+
+        $data = json_decode($m[1], true);
+        $items = [];
+        $this->collectScrapedTracks($data, $items);
+
+        if ($items === []) {
+            throw new RuntimeException("The Spotify page for {$id} had no tracks (private or empty playlist?).");
+        }
+
+        return $items;
+    }
+
+    /**
+     * Walk the embed page's Next.js payload for track entries - objects that
+     * carry a spotify:track: uri plus a title/subtitle pair.
+     *
+     * @param  array<int, array{title: string, artist: string}>  $out
+     */
+    private function collectScrapedTracks(mixed $node, array &$out): void
+    {
+        if (is_array($node)) {
+            $isTrack = isset($node['title'], $node['subtitle'], $node['uri'])
+                && is_string($node['uri']) && str_starts_with($node['uri'], 'spotify:track:');
+
+            if ($isTrack) {
+                $artist = trim(preg_split('/[,;]/u', str_replace("\u{00a0}", ' ', (string) $node['subtitle']))[0] ?? '');
+                $out[] = ['title' => (string) $node['title'], 'artist' => $artist];
+
+                return;
+            }
+
+            foreach ($node as $child) {
+                $this->collectScrapedTracks($child, $out);
+            }
+        }
+    }
+
+    /**
+     * Every track on a playlist, paged, via the Web API. Kept for the rare
+     * app that has extended-quota access; the admin sync and Workshop import
+     * use scrapePlaylistItems() instead.
      *
      * @return array<int, NormalizedSpotifyTrack>
      */

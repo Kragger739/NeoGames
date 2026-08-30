@@ -11,9 +11,12 @@ use Throwable;
 
 /**
  * Browser-driven song sync: the admin dashboard calls step() repeatedly, and
- * each call does a small, time-bounded slice of work (fetch one playlist's
- * track list, or seed a handful of tracks). Nothing depends on a queue
- * worker or the CLI - the whole run is observable and resumable from the
+ * each call does a small, time-bounded slice of work - scrape one playlist's
+ * track list from its public Spotify page, or resolve + seed a few tracks.
+ * Nothing depends on a queue worker or the CLI, and nothing depends on the
+ * Spotify playlist API (403-blocked for app tokens): the track list comes
+ * from the public embed page, popularity from a per-track search (best
+ * effort), and the preview from Apple. The run is resumable from the
  * progress state cached under PROGRESS_KEY.
  *
  * The CLI `songs:sync` command still exists for the weekly schedule; both
@@ -23,8 +26,8 @@ class IncrementalSongSync
 {
     public const PROGRESS_KEY = 'songs:sync-progress';
 
-    /** Tracks seeded per step() call - each does an iTunes lookup + clip download. */
-    private const SEED_BATCH = 4;
+    /** Tracks resolved+seeded per step() - each is a search + iTunes lookup + clip download. */
+    private const SEED_BATCH = 3;
 
     public function __construct(
         private SpotifyClient $spotify,
@@ -63,8 +66,8 @@ class IncrementalSongSync
             'prepared_count' => 0,
             'total_playlists' => count($playlists),
             'failed_playlists' => [],
-            'items' => [],
-            'seen_ids' => [],
+            'items' => [],       // [{genre_tag, title, artist}]
+            'seen_keys' => [],   // "artist|title" dedup
             'total_items' => 0,
             'seeded' => 0,
             'skipped' => 0,
@@ -140,27 +143,23 @@ class IncrementalSongSync
 
         if ($next !== null) {
             try {
-                $tracks = $this->spotify->playlistTracks($next['playlist_id']);
-                $followers = $this->spotify->artistFollowerCounts(array_column($tracks, 'artist_provider_id'));
+                foreach ($this->spotify->scrapePlaylistItems($next['playlist_id']) as $row) {
+                    $key = mb_strtolower(trim($row['artist']).'|'.trim($row['title']));
 
-                foreach ($tracks as $track) {
-                    $id = $track['provider_track_id'];
-
-                    if (in_array($id, $state['seen_ids'], true)) {
+                    if ($row['title'] === '' || in_array($key, $state['seen_keys'], true)) {
                         continue;
                     }
 
-                    $state['seen_ids'][] = $id;
+                    $state['seen_keys'][] = $key;
                     $state['items'][] = [
                         'genre_tag' => $next['genre_tag'],
-                        'track' => $track,
-                        'follower' => $followers[$track['artist_provider_id'] ?? ''] ?? null,
+                        'title' => $row['title'],
+                        'artist' => $row['artist'],
                     ];
                 }
             } catch (Throwable $e) {
-                // One unreadable playlist (private, Spotify-editorial, or
-                // an API hiccup) must not sink the whole run - note it and
-                // carry on with the rest.
+                // One unreadable playlist (private / removed / page changed)
+                // must not sink the whole run - note it and carry on.
                 $state['failed_playlists'][] = $next['playlist_id'];
             }
 
@@ -169,15 +168,14 @@ class IncrementalSongSync
 
         if ($state['playlists'] === []) {
             $state['total_items'] = count($state['items']);
-            $failed = $state['failed_playlists'];
 
             if ($state['items'] === []) {
+                $failed = $state['failed_playlists'];
                 $state['phase'] = 'error';
                 $state['error'] = $failed === []
                     ? 'None of the configured playlists returned any tracks.'
-                    : count($failed).' playlist(s) could not be read (private, or a Spotify-made '
-                        .'editorial playlist - use a public playlist created by a normal user): '
-                        .implode(', ', $failed);
+                    : count($failed).' playlist(s) could not be read - make sure they are public and '
+                        .'not a Spotify-made editorial playlist: '.implode(', ', $failed);
             } else {
                 $state['phase'] = 'seed';
             }
@@ -191,7 +189,8 @@ class IncrementalSongSync
     {
         for ($i = 0; $i < self::SEED_BATCH && $state['items'] !== []; $i++) {
             $item = array_shift($state['items']);
-            $song = $this->seeder->persist($item['track'], $item['genre_tag'], $item['follower']);
+            $track = $this->spotify->resolveTrack($item['title'], $item['artist']);
+            $song = $this->seeder->persist($track, $item['genre_tag'], null);
             $song ? $state['seeded']++ : $state['skipped']++;
         }
 

@@ -111,29 +111,26 @@ class SongPoolSeeder
     public function seedPlaylist(string $playlistRef, ?string $genreTag, ?int $throttleMs = null, ?callable $log = null): array
     {
         $throttleMs ??= (int) config('music.itunes_throttle_ms', 3200);
-        $tracks = $this->spotify->playlistTracks($playlistRef);
-        $followers = $this->spotify->artistFollowerCounts(
-            array_column($tracks, 'artist_provider_id'),
-        );
+        // Track list from the public playlist page (the Web API playlist
+        // endpoints are 403-blocked for app tokens); popularity + ids per
+        // track from a best-effort search.
+        $rows = $this->spotify->scrapePlaylistItems($playlistRef);
 
         $seeded = 0;
         $skipped = 0;
 
-        foreach ($tracks as $i => $track) {
-            $song = $this->persist(
-                $track,
-                $genreTag,
-                $followers[$track['artist_provider_id'] ?? ''] ?? null,
-            );
+        foreach ($rows as $i => $row) {
+            $track = $this->spotify->resolveTrack($row['title'], $row['artist']);
+            $song = $this->persist($track, $genreTag, null);
 
             if ($song) {
                 $seeded++;
             } else {
                 $skipped++;
-                $log && $log("  no preview: {$track['artist']} - {$track['title']}");
+                $log && $log("  no preview: {$row['artist']} - {$row['title']}");
             }
 
-            if ($throttleMs > 0 && $i < count($tracks) - 1) {
+            if ($throttleMs > 0 && $i < count($rows) - 1) {
                 usleep($throttleMs * 1000);
             }
         }
