@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\AdminUpdateUserRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 
@@ -36,6 +37,26 @@ class AdminUserController extends Controller
 
     public function show(User $user)
     {
+        return response()->json($this->toAdminArray($user));
+    }
+
+    public function update(AdminUpdateUserRequest $request, User $user)
+    {
+        $data = $request->validated();
+
+        $user->name = $data['name'];
+        $user->username = $data['username'];
+        $user->email = $data['email'];
+        $user->is_admin = $data['is_admin'];
+
+        if ($data['email_verified']) {
+            $user->email_verified_at = $user->email_verified_at ?? now();
+        } else {
+            $user->email_verified_at = null;
+        }
+
+        $user->save();
+
         return response()->json($this->toAdminArray($user));
     }
 

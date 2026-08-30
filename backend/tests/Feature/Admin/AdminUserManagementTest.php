@@ -97,4 +97,81 @@ class AdminUserManagementTest extends TestCase
             ->getJson("/api/admin/users/{$target->id}")
             ->assertForbidden();
     }
+
+    public function test_admin_can_update_core_fields(): void
+    {
+        $admin = $this->admin();
+        $target = User::factory()->unverified()->create(['name' => 'Old', 'username' => 'old', 'email' => 'old@example.com']);
+
+        $this->actingAs($admin)->patchJson("/api/admin/users/{$target->id}", [
+            'name' => 'New Name',
+            'username' => 'newname',
+            'email' => 'new@example.com',
+            'email_verified' => true,
+            'is_admin' => true,
+        ])->assertOk()
+            ->assertJsonPath('name', 'New Name')
+            ->assertJsonPath('username', 'newname')
+            ->assertJsonPath('email_verified', true)
+            ->assertJsonPath('is_admin', true);
+
+        $target->refresh();
+        $this->assertNotNull($target->email_verified_at);
+        $this->assertTrue($target->is_admin);
+    }
+
+    public function test_update_can_unverify_an_email(): void
+    {
+        $admin = $this->admin();
+        // Explicit alpha_dash-safe username/email: the request re-submits the
+        // target's current values unchanged, so faker's default userName()
+        // (which is ~50% dot-containing) would otherwise fail `alpha_dash`.
+        $target = User::factory()->create([
+            'username' => 'verifieduser',
+            'email' => 'verified@example.com',
+        ]); // verified by factory default
+
+        $this->actingAs($admin)->patchJson("/api/admin/users/{$target->id}", [
+            'name' => $target->name,
+            'username' => $target->username,
+            'email' => $target->email,
+            'email_verified' => false,
+            'is_admin' => false,
+        ])->assertOk()->assertJsonPath('email_verified', false);
+
+        $this->assertNull($target->refresh()->email_verified_at);
+    }
+
+    public function test_update_rejects_a_taken_username_but_allows_the_users_own(): void
+    {
+        $admin = $this->admin();
+        User::factory()->create(['username' => 'taken']);
+        $target = User::factory()->create(['username' => 'mine']);
+
+        $base = fn (array $over) => array_merge([
+            'name' => $target->name, 'username' => 'mine', 'email' => $target->email,
+            'email_verified' => true, 'is_admin' => false,
+        ], $over);
+
+        $this->actingAs($admin)->patchJson("/api/admin/users/{$target->id}", $base(['username' => 'taken']))
+            ->assertUnprocessable()->assertJsonValidationErrors('username');
+
+        $this->actingAs($admin)->patchJson("/api/admin/users/{$target->id}", $base([]))
+            ->assertOk();
+    }
+
+    public function test_admin_cannot_remove_their_own_admin_access(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->patchJson("/api/admin/users/{$admin->id}", [
+            'name' => $admin->name,
+            'username' => $admin->username,
+            'email' => $admin->email,
+            'email_verified' => true,
+            'is_admin' => false,
+        ])->assertUnprocessable()->assertJsonValidationErrors('is_admin');
+
+        $this->assertTrue($admin->refresh()->is_admin);
+    }
 }

@@ -179,4 +179,5 @@ Route::middleware(['auth:sanctum', 'verified', 'admin'])
     ->group(function () {
         Route::get('/users', [AdminUserController::class, 'index']);
         Route::get('/users/{user}', [AdminUserController::class, 'show']);
+        Route::patch('/users/{user}', [AdminUserController::class, 'update']);
     });
