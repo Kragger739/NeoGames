@@ -104,9 +104,11 @@ class SongPoolSeeder
 
     /**
      * Seed one genre's pool from a Spotify playlist reference (id or URL).
+     * Skips tracks already in the pool. On a rate limit, waits 60s and
+     * retries the same track.
      *
      * @param  (callable(string $line): void)|null  $log
-     * @return array{seeded: int, skipped: int}
+     * @return array{seeded: int, skipped: int, already: int}
      */
     public function seedPlaylist(string $playlistRef, ?string $genreTag, ?int $throttleMs = null, ?callable $log = null): array
     {
@@ -118,16 +120,32 @@ class SongPoolSeeder
 
         $seeded = 0;
         $skipped = 0;
+        $already = 0;
 
         foreach ($rows as $i => $row) {
-            $track = $this->spotify->resolveTrack($row['title'], $row['artist']);
-            $song = $this->persist($track, $genreTag, null);
+            if ($this->inPool($row['title'], $row['artist'])) {
+                $already++;
 
-            if ($song) {
-                $seeded++;
-            } else {
-                $skipped++;
-                $log && $log("  no preview: {$row['artist']} - {$row['title']}");
+                continue;
+            }
+
+            while (true) {
+                try {
+                    $track = $this->spotify->resolveTrack($row['title'], $row['artist']);
+                    $song = $this->persist($track, $genreTag, null);
+
+                    if ($song) {
+                        $seeded++;
+                    } else {
+                        $skipped++;
+                        $log && $log("  no preview: {$row['artist']} - {$row['title']}");
+                    }
+
+                    break;
+                } catch (RateLimitException) {
+                    $log && $log('  rate limited - waiting 60s...');
+                    sleep(60);
+                }
             }
 
             if ($throttleMs > 0 && $i < count($rows) - 1) {
@@ -135,7 +153,17 @@ class SongPoolSeeder
             }
         }
 
-        return ['seeded' => $seeded, 'skipped' => $skipped];
+        return ['seeded' => $seeded, 'skipped' => $skipped, 'already' => $already];
+    }
+
+    private function inPool(string $title, string $artist): bool
+    {
+        return Song::query()
+            ->where('provider_track_id', SpotifyClient::scrapedId($artist, $title))
+            ->orWhere(fn ($q) => $q
+                ->whereRaw('LOWER(title) = ?', [mb_strtolower(trim($title))])
+                ->whereRaw('LOWER(artist) = ?', [mb_strtolower(trim($artist))]))
+            ->exists();
     }
 
     /**

@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Throwable;
 
+// RateLimitException lives in this namespace.
+
 /**
  * Apple's iTunes Search API - no auth, no key. Its only job here is to hand
  * back a playable 30-second preview (and cover art) for a track that Spotify
@@ -37,8 +39,8 @@ class AppleMusicClient
             'country' => config('music.itunes_country', 'US'),
         ]);
 
-        if ($response->status() === 403) {
-            throw new RuntimeException('iTunes Search API rate limit hit (HTTP 403).');
+        if ($response->status() === 403 || $response->status() === 429) {
+            throw new RateLimitException('iTunes Search API rate limit hit (HTTP '.$response->status().').');
         }
 
         if ($response->failed()) {

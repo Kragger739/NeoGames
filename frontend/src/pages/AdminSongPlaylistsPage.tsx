@@ -96,8 +96,11 @@ export function AdminSongPlaylistsPage() {
         <p className={progress.phase === "error" ? "form-error" : "hint"}>
           {progress.phase === "prepare" &&
             `Reading playlists ${progress.prepared_count} / ${progress.total_playlists}…`}
-          {progress.phase === "seed" &&
-            `Adding songs ${progress.seeded + progress.skipped} / ${progress.total_items} (${progress.seeded} added, ${progress.skipped} had no preview)…`}
+          {progress.phase === "seed" && progress.rate_limited_until &&
+            "Rate limited by Spotify / iTunes — waiting 60s, then resuming…"}
+          {progress.phase === "seed" && !progress.rate_limited_until &&
+            `Adding songs ${progress.seeded + progress.skipped + progress.already} / ${progress.total_items} ` +
+              `(${progress.seeded} added, ${progress.already} already in pool, ${progress.skipped} no preview)…`}
           {progress.phase === "done" &&
             `Done — ${progress.summary}. Pool now holds ${progress.pool_size} songs.`}
           {progress.phase === "error" && `Sync failed: ${progress.error}`}

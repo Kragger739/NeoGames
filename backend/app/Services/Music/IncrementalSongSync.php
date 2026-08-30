@@ -67,10 +67,12 @@ class IncrementalSongSync
             'total_playlists' => count($playlists),
             'failed_playlists' => [],
             'items' => [],       // [{genre_tag, title, artist}]
-            'seen_keys' => [],   // "artist|title" dedup
+            'seen_keys' => [],   // "artist|title" dedup within this run
             'total_items' => 0,
             'seeded' => 0,
             'skipped' => 0,
+            'already' => 0,      // already in the pool before this run
+            'rate_limited_until' => null,
             'started_at' => now()->toIso8601String(),
             'error' => null,
             'summary' => null,
@@ -95,6 +97,13 @@ class IncrementalSongSync
             return $this->clientState($state ?: ['phase' => 'idle']);
         }
 
+        // Still cooling down from a rate limit - do nothing, let the client
+        // keep waiting (it also honours rate_limited_until).
+        if (($state['rate_limited_until'] ?? null) && time() < $state['rate_limited_until']) {
+            return $this->clientState($state);
+        }
+        $state['rate_limited_until'] = null;
+
         try {
             match ($state['phase']) {
                 'prepare' => $this->prepareOne($state),
@@ -107,7 +116,7 @@ class IncrementalSongSync
         }
 
         if ($state['phase'] === 'done') {
-            $summary = "{$state['seeded']} seeded, {$state['skipped']} skipped for no preview";
+            $summary = "{$state['seeded']} added, {$state['already']} already in pool, {$state['skipped']} skipped for no preview";
 
             if (($state['failed_playlists'] ?? []) !== []) {
                 $summary .= '; '.count($state['failed_playlists']).' playlist(s) unreadable';
@@ -189,14 +198,45 @@ class IncrementalSongSync
     {
         for ($i = 0; $i < self::SEED_BATCH && $state['items'] !== []; $i++) {
             $item = array_shift($state['items']);
-            $track = $this->spotify->resolveTrack($item['title'], $item['artist']);
-            $song = $this->seeder->persist($track, $item['genre_tag'], null);
-            $song ? $state['seeded']++ : $state['skipped']++;
+
+            // Already in the pool from an earlier run - skip the API work.
+            if ($this->alreadyInPool($item['title'], $item['artist'])) {
+                $state['already']++;
+
+                continue;
+            }
+
+            try {
+                $track = $this->spotify->resolveTrack($item['title'], $item['artist']);
+                $song = $this->seeder->persist($track, $item['genre_tag'], null);
+                $song ? $state['seeded']++ : $state['skipped']++;
+            } catch (RateLimitException) {
+                // Put the track back and pause ~60s; the client waits, then
+                // calls step() again and we pick up right here.
+                array_unshift($state['items'], $item);
+                $state['rate_limited_until'] = time() + 60;
+
+                return;
+            } catch (Throwable) {
+                // A one-off failure (iTunes 5xx, a decode error) - skip this
+                // track rather than sinking the whole run.
+                $state['skipped']++;
+            }
         }
 
         if ($state['items'] === []) {
             $state['phase'] = 'done';
         }
+    }
+
+    private function alreadyInPool(string $title, string $artist): bool
+    {
+        return Song::query()
+            ->where('provider_track_id', SpotifyClient::scrapedId($artist, $title))
+            ->orWhere(fn ($q) => $q
+                ->whereRaw('LOWER(title) = ?', [mb_strtolower(trim($title))])
+                ->whereRaw('LOWER(artist) = ?', [mb_strtolower(trim($artist))]))
+            ->exists();
     }
 
     /**
@@ -224,8 +264,10 @@ class IncrementalSongSync
             'total_playlists' => $state['total_playlists'] ?? 0,
             'seeded' => $state['seeded'] ?? 0,
             'skipped' => $state['skipped'] ?? 0,
+            'already' => $state['already'] ?? 0,
             'total_items' => $state['total_items'] ?? 0,
             'failed_playlists' => array_values($state['failed_playlists'] ?? []),
+            'rate_limited_until' => $state['rate_limited_until'] ?? null,
             'error' => $state['error'] ?? null,
             'summary' => $state['summary'] ?? null,
             'pool_size' => Song::count(),

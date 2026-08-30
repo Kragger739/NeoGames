@@ -72,12 +72,14 @@ class SpotifyClient
                     return $hit;
                 }
             }
+        } catch (RateLimitException $e) {
+            throw $e; // let the caller cool down and retry
         } catch (RuntimeException) {
-            // Search unavailable - fall through to the synthetic entry.
+            // Search unavailable / blocked - fall through to the synthetic entry.
         }
 
         return [
-            'provider_track_id' => 'scraped:'.substr(md5($wantArtist.'|'.$wantTitle), 0, 22),
+            'provider_track_id' => self::scrapedId($artist, $title),
             'isrc' => null,
             'title' => $title,
             'artist' => $artist,
@@ -86,6 +88,12 @@ class SpotifyClient
             'popularity' => 60,
             'release_year' => null,
         ];
+    }
+
+    /** Stable synthetic id for a title/artist pair that has no Spotify id. */
+    public static function scrapedId(string $artist, string $title): string
+    {
+        return 'scraped:'.substr(md5(mb_strtolower(trim($artist).'|'.trim($title))), 0, 22);
     }
 
     /**
@@ -430,7 +438,7 @@ class SpotifyClient
 
         if ($response->status() === 429) {
             $retryAfter = $response->header('Retry-After') ?: '?';
-            throw new RuntimeException("Spotify rate limit hit (Retry-After: {$retryAfter}s).");
+            throw new RateLimitException("Spotify rate limit hit (Retry-After: {$retryAfter}s).");
         }
 
         // A 403 with an HTML body is Google's edge (GFE) rejecting the

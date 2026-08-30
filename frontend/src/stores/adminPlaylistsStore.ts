@@ -16,8 +16,10 @@ export interface SyncProgress {
   total_playlists: number;
   seeded: number;
   skipped: number;
+  already: number;
   total_items: number;
   failed_playlists: string[];
+  rate_limited_until: number | null;
   error: string | null;
   summary: string | null;
   pool_size: number;
@@ -67,7 +69,13 @@ export const useAdminPlaylistsStore = create<AdminPlaylistsState>((set, get) => 
         await get().fetch();
         return;
       }
-      await sleep(res.phase === "prepare" ? 400 : 900);
+      if (res.rate_limited_until) {
+        // Spotify / iTunes rate limit - wait out the cooldown, then resume.
+        const waitMs = Math.max(1000, res.rate_limited_until * 1000 - Date.now() + 500);
+        await sleep(waitMs);
+      } else {
+        await sleep(res.phase === "prepare" ? 400 : 900);
+      }
     }
     set({ running: false });
   }

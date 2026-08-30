@@ -79,7 +79,8 @@ class SyncSongsCommand extends Command
                     continue;
                 }
 
-                $this->line("  playlist {$playlistId}: +{$result['seeded']} seeded, {$result['skipped']} without a preview");
+                $already = $result['already'] ?? 0;
+                $this->line("  playlist {$playlistId}: +{$result['seeded']} seeded, {$already} already in pool, {$result['skipped']} without a preview");
                 $seeded += $result['seeded'];
                 $skipped += $result['skipped'];
             }
