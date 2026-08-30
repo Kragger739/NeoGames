@@ -16,8 +16,10 @@ const GENRE_LABELS: Record<string, string> = {
 };
 
 export function AdminSongPlaylistsPage() {
-  const { genres, playlists, poolSize, lastSync, status, syncing, fetch, add, remove, sync } =
+  const { genres, playlists, poolSize, lastSync, status, syncError, fetch, add, remove, sync } =
     useAdminPlaylistsStore();
+
+  const syncing = lastSync?.state === "queued" || lastSync?.state === "running";
 
   const [genre, setGenre] = useState("");
   const [playlist, setPlaylist] = useState("");
@@ -72,15 +74,22 @@ export function AdminSongPlaylistsPage() {
 
       <div className="admin-sync-bar">
         <Button onClick={() => void sync()} disabled={syncing}>
-          {syncing ? "Queuing…" : "Sync now"}
+          {syncing ? "Syncing…" : "Sync now"}
         </Button>
-        <span className="hint">
-          Pool: {poolSize} songs
-          {lastSync
-            ? ` · last sync ${new Date(lastSync.at).toLocaleString()} — ${lastSync.summary}`
-            : " · never synced"}
-        </span>
+        <span className="hint">Pool: {poolSize} songs</span>
       </div>
+      {syncError && <p className="form-error">{syncError}</p>}
+      {lastSync && (
+        <p className="hint">
+          {lastSync.state === "queued" && "Sync queued — waiting for the worker…"}
+          {lastSync.state === "running" &&
+            `Sync running${lastSync.started_at ? ` (started ${new Date(lastSync.started_at).toLocaleTimeString()})` : ""} — this takes a few minutes for a large pool.`}
+          {lastSync.state === "done" &&
+            `Last sync ${new Date(lastSync.at).toLocaleString()} — ${lastSync.summary}.`}
+          {lastSync.state === "error" && `Last sync failed: ${lastSync.summary}`}
+        </p>
+      )}
+      {!lastSync && <p className="hint">Never synced.</p>}
 
       <form className="admin-form" onSubmit={handleAdd}>
         <label>

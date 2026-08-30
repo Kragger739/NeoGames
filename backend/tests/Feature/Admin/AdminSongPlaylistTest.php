@@ -60,12 +60,39 @@ class AdminSongPlaylistTest extends TestCase
         $this->assertDatabasemissing('seed_playlists', ['id' => $row->id]);
     }
 
-    public function test_sync_now_queues_the_job(): void
+    public function test_sync_now_queues_the_job_and_marks_it_queued(): void
     {
         Queue::fake();
+        SeedPlaylist::create(['genre' => 'pop', 'spotify_playlist_id' => 'abcdefghijABCDEFGHIJ12']);
 
-        $this->actingAs($this->admin())->postJson('/api/admin/song-playlists/sync')->assertStatus(202);
+        $this->actingAs($this->admin())->postJson('/api/admin/song-playlists/sync')
+            ->assertStatus(202)
+            ->assertJsonPath('queued', true)
+            ->assertJsonPath('last_sync.state', 'queued');
 
         Queue::assertPushed(SyncSongPool::class);
+    }
+
+    public function test_sync_now_is_rejected_with_no_playlists_and_no_german_rap_fallback(): void
+    {
+        Queue::fake();
+        config(['music.german_rap_artists' => []]);
+
+        $this->actingAs($this->admin())->postJson('/api/admin/song-playlists/sync')
+            ->assertUnprocessable()->assertJsonValidationErrors('playlist');
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_sync_now_does_not_double_queue_while_one_is_already_running(): void
+    {
+        Queue::fake();
+        SeedPlaylist::create(['genre' => 'pop', 'spotify_playlist_id' => 'abcdefghijABCDEFGHIJ12']);
+        \App\Console\Commands\SyncSongsCommand::putStatus('running');
+
+        $this->actingAs($this->admin())->postJson('/api/admin/song-playlists/sync')
+            ->assertStatus(202)->assertJsonPath('queued', false)->assertJsonPath('reason', 'already_running');
+
+        Queue::assertNothingPushed();
     }
 }

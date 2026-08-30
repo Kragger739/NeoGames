@@ -84,8 +84,26 @@ class AdminSongPlaylistController extends Controller
 
     public function sync()
     {
+        if (SeedPlaylist::query()->doesntExist() && config('music.german_rap_artists', []) === []) {
+            throw ValidationException::withMessages([
+                'playlist' => ['Add at least one Spotify playlist before syncing.'],
+            ]);
+        }
+
+        $status = Cache::get(SyncSongsCommand::STATUS_CACHE_KEY);
+        $running = in_array($status['state'] ?? null, ['queued', 'running'], true)
+            && isset($status['started_at'])
+            && now()->diffInMinutes($status['started_at']) < 60;
+
+        if ($running) {
+            return response()->json(['queued' => false, 'reason' => 'already_running', 'last_sync' => $status], 202);
+        }
+
+        // Mark it queued right away so the dashboard reflects the request
+        // even before the queue worker picks the job up.
+        SyncSongsCommand::putStatus('queued');
         SyncSongPool::dispatch();
 
-        return response()->json(['queued' => true], 202);
+        return response()->json(['queued' => true, 'last_sync' => Cache::get(SyncSongsCommand::STATUS_CACHE_KEY)], 202);
     }
 }

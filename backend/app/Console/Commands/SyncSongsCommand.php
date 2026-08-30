@@ -34,8 +34,11 @@ class SyncSongsCommand extends Command
 
     public function handle(SpotifyClient $spotify, SongPoolSeeder $seeder): int
     {
+        self::putStatus('running');
+
         if (! config('services.spotify.client_id') || ! config('services.spotify.client_secret')) {
             $this->error('SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET are not set.');
+            self::putStatus('error', 'Spotify API credentials are not configured on the server.');
 
             return self::FAILURE;
         }
@@ -44,6 +47,7 @@ class SyncSongsCommand extends Command
 
         if ($genres === []) {
             $this->warn('No genres to sync - add Spotify playlists in the admin dashboard first.');
+            self::putStatus('error', 'No playlists configured - add at least one above, then sync again.');
 
             return self::SUCCESS;
         }
@@ -86,16 +90,32 @@ class SyncSongsCommand extends Command
         }
 
         $summary = "{$seeded} tracks seeded, {$skipped} skipped for no iTunes preview";
-        Cache::forever(self::STATUS_CACHE_KEY, [
-            'at' => now()->toIso8601String(),
-            'summary' => $summary,
-            'pool_size' => Song::count(),
-        ]);
+        self::putStatus('done', $summary);
 
         $this->newLine();
         $this->info("Done. {$summary}. Pool now holds ".Song::count().' songs.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * @param  'queued'|'running'|'done'|'error'  $state
+     */
+    public static function putStatus(string $state, ?string $summary = null): void
+    {
+        $existing = Cache::get(self::STATUS_CACHE_KEY, []);
+        $running = in_array($state, ['queued', 'running'], true);
+
+        Cache::forever(self::STATUS_CACHE_KEY, [
+            'state' => $state,
+            'summary' => $summary ?? ($running ? null : ($existing['summary'] ?? null)),
+            'started_at' => $running
+                ? ($state === 'queued' ? now()->toIso8601String() : ($existing['started_at'] ?? now()->toIso8601String()))
+                : ($existing['started_at'] ?? null),
+            'finished_at' => $running ? null : now()->toIso8601String(),
+            'at' => now()->toIso8601String(),
+            'pool_size' => Song::count(),
+        ]);
     }
 
     /**
