@@ -11,7 +11,6 @@ use App\Models\Season;
 use App\Models\SeasonProgress;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -72,15 +71,7 @@ class ProfileController extends Controller
             $request->validate(['password' => ['required', 'string', 'current_password']]);
         }
 
-        if ($user->avatar_path) {
-            Storage::disk('public')->delete($user->avatar_path);
-        }
-
-        DB::table('sessions')->where('user_id', $user->id)->delete();
-        DB::table('notifications')
-            ->where('notifiable_type', $user->getMorphClass())
-            ->where('notifiable_id', $user->id)
-            ->delete();
+        $user->purgeArtifacts();
 
         Auth::guard('web')->logout();
         Session::invalidate();

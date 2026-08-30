@@ -14,12 +14,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable(['name', 'username', 'email', 'password', 'avatar_path', 'equipped_cosmetics', 'provider', 'provider_id'])]
-#[Hidden(['password', 'remember_token', 'equipped_cosmetics'])]
+#[Hidden(['password', 'remember_token', 'equipped_cosmetics', 'banned_at', 'ban_reason'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
@@ -146,6 +147,27 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isBanned(): bool
     {
         return $this->banned_at !== null;
+    }
+
+    /**
+     * Remove the per-user artifacts that FK cascades don't reach when this
+     * account is deleted: the uploaded avatar file on the 'public' disk,
+     * the sessions table (no FK to users), and morphed notifications.
+     * Shared by ProfileController::destroy() (self-delete) and
+     * AdminUserController::destroy() (admin delete).
+     */
+    public function purgeArtifacts(): void
+    {
+        if ($this->avatar_path) {
+            Storage::disk('public')->delete($this->avatar_path);
+        }
+
+        DB::table('sessions')->where('user_id', $this->id)->delete();
+
+        DB::table('notifications')
+            ->where('notifiable_type', $this->getMorphClass())
+            ->where('notifiable_id', $this->id)
+            ->delete();
     }
 
     public function rooms(): HasMany
