@@ -46,7 +46,7 @@ class SoloModeTest extends TestCase
 
         $this->seedSongsForAllTiers();
         $host = User::factory()->create();
-        $room = GameRoom::factory()->for($host, 'host')->create(['mode' => 'solo', 'songs_per_tier' => 1]);
+        $room = GameRoom::factory()->for($host, 'host')->create(['player_mode' => 'solo', 'songs_per_tier' => 1]);
 
         app(RoundService::class)->start($room);
 
@@ -59,7 +59,7 @@ class SoloModeTest extends TestCase
 
         $this->seedSongsForAllTiers();
         $host = User::factory()->create();
-        $room = GameRoom::factory()->for($host, 'host')->create(['mode' => 'solo', 'songs_per_tier' => 1]);
+        $room = GameRoom::factory()->for($host, 'host')->create(['player_mode' => 'solo', 'songs_per_tier' => 1]);
         app(RoundService::class)->start($room);
         $round = $room->rounds()->first();
 
@@ -89,7 +89,7 @@ class SoloModeTest extends TestCase
 
         $this->seedSongsForAllTiers();
         $host = User::factory()->create();
-        $room = GameRoom::factory()->for($host, 'host')->create(['mode' => 'solo', 'songs_per_tier' => 1]);
+        $room = GameRoom::factory()->for($host, 'host')->create(['player_mode' => 'solo', 'songs_per_tier' => 1]);
         app(RoundService::class)->start($room);
         $round = $room->rounds()->first();
         $round->update(['snippet_stage' => SnippetStage::SEQUENCE[count(SnippetStage::SEQUENCE) - 1]]);
@@ -115,7 +115,7 @@ class SoloModeTest extends TestCase
 
         $this->seedSongsForAllTiers();
         $host = User::factory()->create();
-        $room = GameRoom::factory()->for($host, 'host')->create(['mode' => 'solo', 'songs_per_tier' => 1]);
+        $room = GameRoom::factory()->for($host, 'host')->create(['player_mode' => 'solo', 'songs_per_tier' => 1]);
         app(RoundService::class)->start($room);
         $round = $room->rounds()->first();
 
@@ -146,7 +146,7 @@ class SoloModeTest extends TestCase
         // simply sits untouched until a guess (or nothing) happens to it.
         $this->seedSongsForAllTiers();
         $host = User::factory()->create();
-        $room = GameRoom::factory()->for($host, 'host')->create(['mode' => 'solo', 'songs_per_tier' => 1]);
+        $room = GameRoom::factory()->for($host, 'host')->create(['player_mode' => 'solo', 'songs_per_tier' => 1]);
         app(RoundService::class)->start($room);
         $round = $room->rounds()->first();
 

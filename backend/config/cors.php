@@ -19,7 +19,13 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [env('FRONTEND_URL', 'http://localhost:5173')],
+    // FRONTEND_URL accepts a comma-separated list (same parsing pattern as
+    // SANCTUM_STATEFUL_DOMAINS below) so a temporary tunnel origin can be
+    // added alongside the normal local one instead of replacing it.
+    'allowed_origins' => array_filter(array_map(
+        'trim',
+        explode(',', env('FRONTEND_URL', 'http://localhost:5173')),
+    )),
 
     'allowed_origins_patterns' => [],
 

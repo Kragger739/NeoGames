@@ -1,15 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Check, Copy, LogOut, Rocket } from "lucide-react";
 
 import { RoomSettingsForm } from "../components/RoomSettingsForm";
 import { api } from "../lib/api";
+import { DIFFICULTY_TIERS } from "../lib/difficultyTiers";
 import { firstValidationError } from "../lib/errors";
 import { GAME_MODES } from "../lib/gameModes";
+import { leaveRoomOnServer } from "../lib/leaveRoom";
 import { SONG_GENRES } from "../lib/songGenres";
+import { getPlayerId } from "../lib/playerToken";
+import { playSound } from "../lib/sounds";
+import { EMPTY_AVATAR } from "../lib/avatarData";
 import type { RoomState } from "../lib/roomTypes";
 import { useAuthStore } from "../stores/authStore";
 import { useFriendsStore } from "../stores/friendsStore";
 import { useGameStore } from "../stores/gameStore";
+import { Avatar } from "../components/ui/Avatar";
+import { Button } from "../components/ui/Button";
+import { IconButton } from "../components/ui/IconButton";
 
 export function LobbyPage() {
   const { code } = useParams<{ code: string }>();
@@ -18,19 +27,27 @@ export function LobbyPage() {
   const fetchHost = useAuthStore((state) => state.fetchHost);
   const authStatus = useAuthStore((state) => state.status);
   const connectGame = useGameStore((state) => state.connect);
+  const leaveRoom = useGameStore((state) => state.leaveRoom);
   const gamePhase = useGameStore((state) => state.phase);
   const members = useGameStore((state) => state.members);
   const channelError = useGameStore((state) => state.channelError);
   const liveSongsPerTier = useGameStore((state) => state.songsPerTier);
+  const liveEnabledTiers = useGameStore((state) => state.enabledTiers);
   const liveGuessTimeoutSeconds = useGameStore((state) => state.guessTimeoutSeconds);
   const liveMode = useGameStore((state) => state.mode);
+  const livePlayerMode = useGameStore((state) => state.playerMode);
   const liveGenre = useGameStore((state) => state.genre);
   const liveYearFrom = useGameStore((state) => state.yearFrom);
   const liveYearTo = useGameStore((state) => state.yearTo);
   const liveArtistName = useGameStore((state) => state.artistName);
+  const liveArtistNames = useGameStore((state) => state.artistNames);
+  const liveDatasetId = useGameStore((state) => state.datasetId);
+  const liveDatasetName = useGameStore((state) => state.datasetName);
   const friends = useFriendsStore((state) => state.friends);
   const friendsStatus = useFriendsStore((state) => state.status);
   const fetchFriends = useFriendsStore((state) => state.fetch);
+  const onlineUserIds = useFriendsStore((state) => state.onlineUserIds);
+  const connectPresence = useFriendsStore((state) => state.connectPresence);
 
   const [room, setRoom] = useState<RoomState | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
@@ -65,6 +82,7 @@ export function LobbyPage() {
       liveSongsPerTier === null &&
       liveGuessTimeoutSeconds === null &&
       liveMode === null &&
+      livePlayerMode === null &&
       liveGenre === null
     ) {
       return;
@@ -74,8 +92,10 @@ export function LobbyPage() {
         ? {
             ...prev,
             songs_per_tier: liveSongsPerTier ?? prev.songs_per_tier,
+            enabled_tiers: liveEnabledTiers ?? prev.enabled_tiers,
             guess_timeout_seconds: liveGuessTimeoutSeconds ?? prev.guess_timeout_seconds,
             mode: liveMode ?? prev.mode,
+            player_mode: livePlayerMode ?? prev.player_mode,
             genre: liveGenre ?? prev.genre,
             // Unlike the fields above, null is a real, meaningful value
             // here (genre isn't "year") once the store has loaded at all -
@@ -84,23 +104,42 @@ export function LobbyPage() {
             year_from: liveYearFrom,
             year_to: liveYearTo,
             artist_name: liveArtistName,
+            artist_names: liveArtistNames,
+            dataset_id: liveDatasetId,
+            dataset_name: liveDatasetName,
           }
         : prev,
     );
   }, [
     liveSongsPerTier,
+    liveEnabledTiers,
     liveGuessTimeoutSeconds,
     liveMode,
+    livePlayerMode,
     liveGenre,
     liveYearFrom,
     liveYearTo,
     liveArtistName,
+    liveArtistNames,
+    liveDatasetId,
+    liveDatasetName,
   ]);
 
   useEffect(() => {
     if (!code) return;
     connectGame(code);
   }, [code, connectGame]);
+
+  // A little celebratory blip whenever the lobby roster grows - skips the
+  // very first population of the list (joining an already-full lobby
+  // shouldn't fire a sound per existing member).
+  const previousMemberCount = useRef<number | null>(null);
+  useEffect(() => {
+    if (previousMemberCount.current !== null && members.length > previousMemberCount.current) {
+      playSound("join");
+    }
+    previousMemberCount.current = members.length;
+  }, [members.length]);
 
   useEffect(() => {
     if (gamePhase === "playing" && code) {
@@ -114,7 +153,12 @@ export function LobbyPage() {
     if (host && friendsStatus === "idle") {
       void fetchFriends();
     }
-  }, [host, friendsStatus, fetchFriends]);
+    // Presence is needed to filter the invite list down to online friends
+    // only - connectPresence() is idempotent, safe to call on every re-run.
+    if (host) {
+      connectPresence();
+    }
+  }, [host, friendsStatus, fetchFriends, connectPresence]);
 
   async function handleStart() {
     if (!code) return;
@@ -129,7 +173,25 @@ export function LobbyPage() {
     }
   }
 
-  const isHost = host !== null;
+  // Being logged in as *a* host isn't enough - has to be the host who
+  // actually owns *this* room, or any other logged-in host visiting a
+  // friend's lobby would see the settings form/Start button too (the
+  // backend already rejects their PATCH/start attempts, but the UI showing
+  // them at all is its own bug - confirmed live).
+  const isHost = host !== null && room !== null && room.host_id === host.id;
+
+  // isHost alone would hide the invite panel from a friend who joined
+  // someone else's room - the backend only requires being seated
+  // (FriendService::inviteToRoom), not owning the room. getPlayerId()
+  // (set at join/create time) cross-referenced against the live presence
+  // roster is the only client-side signal for "am I seated here."
+  const playerId = getPlayerId();
+  const isSeated = isHost || (playerId !== null && members.some((m) => m.id === playerId));
+
+  // Only friends currently online (per the shared presence channel) are
+  // worth showing here - inviting someone who isn't around to see it isn't
+  // useful, and clutters the list.
+  const onlineFriends = friends.filter((friend) => onlineUserIds.has(friend.id));
 
   async function handleCopyInviteLink() {
     if (!code) return;
@@ -144,6 +206,12 @@ export function LobbyPage() {
     }
   }
 
+  async function handleLeave() {
+    if (code) await leaveRoomOnServer(code);
+    leaveRoom();
+    navigate("/");
+  }
+
   async function handleInvite(friendId: number) {
     if (!code) return;
     try {
@@ -156,58 +224,95 @@ export function LobbyPage() {
 
   return (
     <div className="lobby-page">
-      <h1>Room {code?.toUpperCase()}</h1>
-      <button type="button" className="copy-invite-button" onClick={handleCopyInviteLink}>
-        {linkCopied ? "Copied!" : "Copy invite link"}
-      </button>
+      <div className="lobby-header">
+        <h1 className="room-ticket">{code?.toUpperCase()}</h1>
+        <div className="lobby-header-actions">
+          <Button variant="ghost" onClick={handleCopyInviteLink}>
+            <Copy size={16} strokeWidth={2.5} />
+            {linkCopied ? "Copied!" : "Copy invite link"}
+          </Button>
+          <IconButton icon={LogOut} label="Leave room" onClick={() => void handleLeave()} />
+        </div>
+      </div>
       {channelError && <p className="form-error">{channelError}</p>}
       {room && code && isHost && room.status === "lobby" ? (
         <RoomSettingsForm
           code={code}
           songsPerTier={room.songs_per_tier}
+          enabledTiers={room.enabled_tiers}
           guessTimeoutSeconds={room.guess_timeout_seconds}
           mode={room.mode}
+          playerMode={room.player_mode}
           genre={room.genre}
           yearFrom={room.year_from}
           yearTo={room.year_to}
           artistName={room.artist_name}
+          artistNames={room.artist_names}
+          datasetId={room.dataset_id}
+          datasetName={room.dataset_name}
+          hostLevel={host?.level ?? null}
         />
       ) : (
-        room && (
+        room &&
+        (room.mode === "classic" ? (
+          // Classic has no configurable settings to summarize - see
+          // RoomSettingsForm.tsx.
+          <p className="hint">Classic mode — songs from our all-time hits playlist.</p>
+        ) : (
           <p className="hint">
-            {room.songs_per_tier} songs per tier · {room.guess_timeout_seconds}s
-            per clip stage ·{" "}
+            {room.songs_per_tier} songs per tier ({room.enabled_tiers
+              .map((t) => DIFFICULTY_TIERS.find((d) => d.value === t)?.label ?? t)
+              .join(", ")}) ·{" "}
+            {room.guess_timeout_seconds}s per clip stage ·{" "}
             {GAME_MODES.find((m) => m.value === room.mode)?.label ?? room.mode} ·{" "}
             {room.genre === "year" && room.year_from && room.year_to
               ? `${room.year_from}–${room.year_to}`
               : room.genre === "artist" && room.artist_name
                 ? room.artist_name
-                : (SONG_GENRES.find((g) => g.value === room.genre)?.label ?? room.genre)}
+                : room.genre === "multi_artist" && room.artist_names && room.artist_names.length > 0
+                  ? room.artist_names.join(", ")
+                  : (SONG_GENRES.find((g) => g.value === room.genre)?.label ?? room.genre)}
           </p>
-        )
+        ))
       )}
-      <h2>Players ({members.length})</h2>
-      <ul className="player-list">
-        {members.map((member) => (
-          <li key={member.id}>{member.name}</li>
-        ))}
-      </ul>
+      {room?.player_mode !== "solo" && (
+        <>
+          <h2>Players ({members.length})</h2>
+          <ul className="player-list">
+            {members.map((member) => (
+              <li key={member.id}>
+                <span className="friend-name">
+                  <Avatar data={member.avatar ?? EMPTY_AVATAR} size="xs" animated={false} />
+                  {member.name}
+                </span>
+                {member.level !== null && <span className="player-level">Lvl {member.level}</span>}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
-      {isHost && friends.length > 0 && (
+      {isSeated && onlineFriends.length > 0 && (
         <>
           <h2>Invite a friend</h2>
           <ul className="player-list">
-            {friends.map((friend) => (
+            {onlineFriends.map((friend) => (
               <li key={friend.id}>
                 <span>{friend.username}</span>
-                <button
-                  type="button"
-                  className="button-secondary"
+                <Button
+                  variant="turquoise"
                   disabled={invitedIds.includes(friend.id)}
                   onClick={() => void handleInvite(friend.id)}
                 >
-                  {invitedIds.includes(friend.id) ? "Invited" : "Invite"}
-                </button>
+                  {invitedIds.includes(friend.id) ? (
+                    <>
+                      <Check size={16} strokeWidth={2.5} />
+                      Invited
+                    </>
+                  ) : (
+                    "Invite"
+                  )}
+                </Button>
               </li>
             ))}
           </ul>
@@ -217,12 +322,19 @@ export function LobbyPage() {
       {isHost ? (
         <>
           {startError && <p className="form-error">{startError}</p>}
-          <button onClick={handleStart} disabled={starting}>
-            {starting ? "Starting…" : "Start game"}
-          </button>
+          <Button size="lg" onClick={handleStart} disabled={starting}>
+            {starting ? (
+              "Starting…"
+            ) : (
+              <>
+                <Rocket size={20} strokeWidth={2.5} />
+                Start game
+              </>
+            )}
+          </Button>
         </>
       ) : (
-        <p>Waiting for the host to start the game…</p>
+        <p className="hint">Waiting for the host to start the game…</p>
       )}
     </div>
   );

@@ -32,4 +32,18 @@ return [
 
     'level_curve_coefficient' => 50,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Mode unlocks
+    |--------------------------------------------------------------------------
+    |
+    | Battle Royale requires the host to have reached this level - see
+    | App\Rules\BattleRoyaleRequiresLevel. A brand-new account (level 1)
+    | plays its first few games in Classic/Solo before this unlocks; that's
+    | the intended shape of the gate, not something to work around.
+    |
+    */
+
+    'battle_royale_min_level' => 3,
+
 ];

@@ -1,0 +1,826 @@
+/* ==========================================================================
+   "Der Dümmste fliegt" — same "Confetti Pop" light theme as every other
+   page (Songle included): no separate color palette here. .ddf-landing-
+   page/.ddf-lobby-page/.ddf-play-overlay/.ddf-gm-page are added to
+   app.css's shared page-shell selector for the same centered-column
+   treatment every page gets; .ddf-gm-page and .ddf-play-overlay widen
+   past the shared 640px cap below, the same way .game-play-page does.
+   Everything in this file is layout/structure only — colors are the
+   existing --coral/--turquoise/--sunflower/--grape/--win/--fail tokens
+   and Card/Button primitives, not a new palette.
+   ========================================================================== */
+
+.ddf-play-overlay {
+  max-width: 920px;
+}
+
+/* ==========================================================================
+   Landing / Lobby
+   ========================================================================== */
+
+.ddf-landing-header {
+  text-align: left;
+}
+
+.ddf-landing-card {
+  margin: 24px auto;
+  max-width: 420px;
+  text-align: left;
+}
+
+.ddf-checkbox-label {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.ddf-checkbox-label input[type="checkbox"] {
+  width: auto;
+}
+
+.ddf-lobby-invite {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 0 auto 40px;
+}
+
+.ddf-lobby-self-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 0 auto 32px;
+  max-width: 240px;
+}
+
+.ddf-lobby-player-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  font-weight: 700;
+}
+
+.ddf-ready-badge {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-faint);
+}
+
+.ddf-ready-badge-yes {
+  color: var(--win);
+}
+
+/* ==========================================================================
+   Webcam grid + cards
+   ========================================================================== */
+
+.ddf-webcam-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.ddf-webcam-card {
+  /* The footer is position:absolute inside the video wrap, so the card has
+     no in-flow width source - fill the parent (grid cell / capped column). */
+  width: 100%;
+  transition: transform 0.2s var(--ease-out);
+}
+
+.ddf-webcam-card-answering {
+  transform: translateY(-2px);
+}
+
+.ddf-webcam-card-answering .ddf-webcam-video-wrap {
+  box-shadow: var(--shadow-turquoise), 0 0 0 3px var(--turquoise);
+}
+
+.ddf-webcam-card-eliminated {
+  opacity: 0.5;
+  filter: grayscale(0.6);
+}
+
+.ddf-webcam-card-gm .ddf-webcam-video-wrap {
+  box-shadow: var(--shadow-grape), 0 0 0 2px var(--grape);
+}
+
+/* The GM camera is a fixed corner float, not part of the player grid. */
+.ddf-play-gm-tile {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  width: 200px;
+  z-index: 5;
+}
+
+.ddf-webcam-video-wrap {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--surface-sunk);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: box-shadow 0.2s var(--ease-out);
+}
+
+.ddf-webcam-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ddf-webcam-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  opacity: 0.4;
+}
+
+/* Per-question dot strip - top-left of the tile, above where the answer
+   status / eliminated badge now sits (moved to bottom-left below). */
+.ddf-webcam-dots {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 60%;
+  z-index: 1;
+}
+
+.ddf-webcam-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px rgba(33, 28, 51, 0.55);
+}
+
+.ddf-webcam-dot-correct {
+  background: var(--win);
+}
+
+.ddf-webcam-dot-wrong {
+  background: var(--fail);
+}
+
+.ddf-webcam-dot-grey {
+  background: var(--line);
+}
+
+.ddf-webcam-eliminated-badge,
+.ddf-webcam-status-badge {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  /* A dark tag reads correctly over live video regardless of the page's
+     light theme, same as any video-call name tag. */
+  background: rgba(33, 28, 51, 0.75);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ddf-webcam-eliminate-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+/* Name / hearts / status overlaid on the bottom of the video, not a strip
+   below it - white text on a shadow, no background box. */
+.ddf-webcam-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 10px;
+}
+
+.ddf-webcam-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.ddf-webcam-name {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 2px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ddf-hearts-row {
+  display: inline-flex;
+  gap: 2px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.75));
+}
+
+.ddf-heart-full {
+  color: var(--fail);
+}
+
+.ddf-heart-empty {
+  color: var(--line);
+}
+
+/* ==========================================================================
+   Question banner + countdown + answer input
+   ========================================================================== */
+
+.ddf-question-banner {
+  position: sticky;
+  bottom: 16px;
+  margin: 24px auto 0;
+  max-width: 720px;
+  padding: 20px 28px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  text-align: center;
+  z-index: 4;
+}
+
+.ddf-question-banner-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sunflower);
+  margin-bottom: 6px;
+}
+
+.ddf-question-banner-text {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.ddf-countdown {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 5;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  box-shadow: var(--shadow-turquoise), 0 0 0 4px var(--turquoise);
+  transition: box-shadow 0.3s var(--ease-out);
+}
+
+.ddf-countdown-warning {
+  box-shadow: var(--shadow-sm), 0 0 0 4px var(--sunflower);
+}
+
+.ddf-countdown-danger {
+  box-shadow: var(--shadow-coral), 0 0 0 4px var(--coral);
+  animation: ddf-pulse 1s var(--ease-out) infinite;
+}
+
+.ddf-countdown-number {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 28px;
+}
+
+.ddf-countdown-paused {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+@keyframes ddf-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+.ddf-answer-form {
+  display: flex;
+  gap: 10px;
+  max-width: 480px;
+  margin: 16px auto 0;
+}
+
+.ddf-answer-form input {
+  flex: 1;
+  border-radius: var(--radius-pill);
+  padding: 12px 18px;
+}
+
+.ddf-answer-submitted {
+  text-align: center;
+  color: var(--ink-soft);
+  font-weight: 700;
+  margin: 16px 0 0;
+}
+
+/* ==========================================================================
+   Voting + results
+   ========================================================================== */
+
+.ddf-voting-ballot,
+.ddf-voting-results {
+  max-width: 560px;
+  margin: 24px auto;
+  padding: 28px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  text-align: center;
+  animation: ddf-pop 0.4s var(--ease-bounce) both; /* impeccable-disable-line bounce-easing -- Bounce-Is-For-Arrivals-Only: sanctioned entrance for the voting/results overlay, mirrors round-reveal-card */
+}
+
+.ddf-voting-candidates {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.ddf-voting-waiting {
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+.ddf-voting-results-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.ddf-voting-results-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 24px;
+  align-items: center;
+  gap: 10px;
+}
+
+.ddf-voting-results-name {
+  font-weight: 700;
+  font-size: 13px;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ddf-voting-results-track {
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunk);
+  overflow: hidden;
+}
+
+/* Same scaleX-on-a-fixed-100%-track technique as .level-bar-fill/
+   .stage-progress-fill - animating transform, not width, avoids layout
+   thrash. */
+.ddf-voting-results-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--grape);
+  border-radius: var(--radius-pill);
+  transform-origin: left;
+  transition: transform 0.6s var(--ease-out);
+}
+
+.ddf-voting-results-fill-loser {
+  background: var(--fail);
+}
+
+.ddf-voting-results-count {
+  font-family: var(--display);
+  font-weight: 800;
+}
+
+.ddf-voting-results-banner {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 22px;
+  color: var(--fail);
+  margin-top: 8px;
+}
+
+.ddf-question-result-banner {
+  margin: 24px auto 0;
+  max-width: 720px;
+  padding: 20px 28px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  text-align: center;
+}
+
+.ddf-question-result-banner-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--win);
+  margin-bottom: 6px;
+}
+
+.ddf-question-result-banner-text {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.ddf-turn-status {
+  max-width: 480px;
+  margin: 16px auto 0;
+  padding: 10px 20px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   Life-lost / elimination / game-over — one-shot dramatic moments, never
+   a repeating strobe (see red-screen-glow's own precedent in app.css).
+   ========================================================================== */
+
+.ddf-life-lost-overlay,
+.ddf-elimination-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(18, 14, 28, 0.7);
+  animation: ddf-scrim-fade 2.5s ease-out both;
+}
+
+.ddf-life-lost-card,
+.ddf-elimination-card {
+  padding: 32px 48px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-float), 0 0 0 4px var(--fail);
+  text-align: center;
+  animation:
+    ddf-pop 0.4s var(--ease-bounce) both, /* impeccable-disable-line bounce-easing -- Bounce-Is-For-Arrivals-Only: one-shot arrival of a "life lost"/"eliminated" state */
+    ddf-shake 0.5s var(--ease-out) 0.4s 1;
+}
+
+.ddf-life-lost-name,
+.ddf-elimination-name {
+  display: block;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 22px;
+  margin-bottom: 12px;
+}
+
+.ddf-life-lost-hearts {
+  font-size: 32px;
+  letter-spacing: 4px;
+}
+
+.ddf-elimination-badge {
+  display: block;
+  font-weight: 800;
+  color: var(--fail);
+  margin-bottom: 8px;
+}
+
+@keyframes ddf-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.75) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes ddf-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-8px) rotate(-1deg);
+  }
+  40% {
+    transform: translateX(6px) rotate(1deg);
+  }
+  60% {
+    transform: translateX(-5px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes ddf-scrim-fade {
+  0% {
+    background: rgba(255, 71, 87, 0.45);
+  }
+  30% {
+    background: rgba(255, 71, 87, 0.45);
+  }
+  100% {
+    background: rgba(18, 14, 28, 0);
+  }
+}
+
+.ddf-game-over {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 64px 24px;
+  text-align: center;
+  animation: ddf-pop 0.5s var(--ease-bounce) both; /* impeccable-disable-line bounce-easing -- Bounce-Is-For-Arrivals-Only: the winner card's one-shot entrance */
+}
+
+.ddf-game-over-title {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 40px;
+  margin: 0;
+}
+
+.ddf-game-over-winner {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--sunflower);
+}
+
+/* ==========================================================================
+   Game Master panel — the same show-styled DdfGameView the players see
+   (see DdfGameView.tsx), with this controls strip stacked above it.
+   ========================================================================== */
+
+.ddf-gm-page {
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.ddf-gm-controls-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.ddf-gm-state {
+  color: var(--ink-soft);
+  font-size: 13px;
+  margin: 0;
+}
+
+.ddf-gm-mark-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-weight: 700;
+}
+
+.ddf-gm-vote-tally {
+  width: min(640px, 100%);
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  margin-bottom: 20px;
+}
+
+.ddf-gm-vote-progress {
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.ddf-gm-vote-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ddf-gm-tie-resolution {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.ddf-gm-tie-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ddf-gm-control-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.ddf-gm-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.ddf-gm-settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.ddf-gm-settings input {
+  width: 80px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.ddf-gm-answer-key {
+  width: min(640px, 100%);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  text-align: left;
+}
+
+.ddf-gm-answer-key-correct {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 800;
+  color: var(--win);
+}
+
+.ddf-gm-answer-key ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ddf-gm-advance-btn {
+  font-weight: 800;
+}
+
+/* Lobby: a webcam tile plus its ready badge, stacked. */
+.ddf-lobby-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Small fixed lobby tiles - they shouldn't balloon to fill the row when
+   only a couple of people are in the lobby. */
+.ddf-lobby-page .ddf-webcam-grid {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 180px));
+  justify-content: center;
+}
+
+/* ==========================================================================
+   Desktop (>=1280x880): the live GM panel + player view fill the viewport
+   with no page scroll. Lobby / landing keep the shared scrolling column.
+   ========================================================================== */
+
+@media (min-width: 1280px) and (min-height: 880px) {
+  .ddf-gm-page,
+  .ddf-play-overlay {
+    max-width: none;
+    width: 100vw;
+    height: 100dvh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    justify-content: flex-start;
+  }
+
+  .ddf-gm-page {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ddf-gm-controls-strip {
+    flex: 0 0 auto;
+    max-height: 32vh;
+    overflow: auto;
+    padding: 12px 16px;
+    margin-bottom: 0;
+  }
+
+  .ddf-gm-page .ddf-play-overlay {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+  }
+
+  .ddf-play-overlay {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 16px 24px;
+  }
+
+  .ddf-webcam-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 16px 0 0;
+    overflow: hidden;
+    align-content: start;
+    justify-content: center;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 336px));
+  }
+
+  /* Corner floats, pinned to the (position: relative) overlay. */
+  .ddf-countdown {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+  }
+
+  .ddf-play-gm-tile {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    width: 240px;
+  }
+
+  /* The question / answer / voting block flows below the cameras (gap =
+     distance to the grid; the overlay's bottom padding = distance to the
+     screen edge) instead of overlaying them. */
+  .ddf-question-banner,
+  .ddf-turn-status,
+  .ddf-question-result-banner,
+  .ddf-voting-ballot,
+  .ddf-voting-results {
+    position: static;
+    transform: none;
+    flex: 0 0 auto;
+    margin: 0 auto;
+    width: min(720px, 92%);
+    max-height: 38vh;
+    overflow: auto;
+  }
+
+  .ddf-answer-form {
+    flex: 0 0 auto;
+    margin: 0 auto;
+  }
+}

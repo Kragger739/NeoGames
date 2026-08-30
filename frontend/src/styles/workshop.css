@@ -1,0 +1,338 @@
+/* ==========================================================================
+   Workshop / Creator - overview list + dataset editor. Confetti Pop tokens.
+   ========================================================================== */
+
+.workshop-page,
+.dataset-editor {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 48px 20px 80px;
+}
+
+.workshop-page h2,
+.dataset-editor h2 {
+  margin: 28px 0 12px;
+}
+
+/* --- create actions --------------------------------------------------- */
+
+.wk-create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.wk-create-form,
+.wk-create-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wk-create-actions {
+  flex-direction: row;
+}
+
+.wk-create-form {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+  margin-bottom: 8px;
+}
+
+/* --- dataset list (overview) ---------------------------------------------- */
+
+.wk-list {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wk-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+}
+
+.wk-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.wk-name {
+  font-family: var(--display);
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.wk-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wk-meta .hint {
+  margin: 0;
+}
+
+.wk-actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+/* --- editor header ---------------------------------------------------- */
+
+.dataset-header {
+  margin-bottom: 16px;
+}
+
+.dataset-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+}
+
+.dataset-name-form {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.dataset-rename {
+  padding: 6px 10px;
+}
+
+.dataset-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.dataset-visibility {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunk);
+  color: var(--ink-soft);
+  box-shadow: var(--shadow-sm);
+}
+
+/* --- add-question / import forms --------------------------------------- */
+
+.wk-add-question,
+.wk-import,
+.wk-q-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+  text-align: left;
+}
+
+.wk-add-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.wk-add-row > label {
+  flex: 1 1 160px;
+}
+
+/* --- question list -------------------------------------------------------- */
+
+.wk-question-list,
+.wk-track-list {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wk-question-list li,
+.wk-track-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+}
+
+.wk-q-reorder {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.wk-q-reorder button {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  background: var(--surface-sunk);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  color: var(--ink-soft);
+  line-height: 0;
+}
+
+.wk-q-reorder button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.wk-q-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.wk-q-text {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.wk-q-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wk-q-meta .hint {
+  margin: 0;
+}
+
+.wk-q-edit {
+  flex: 1 1 auto;
+  box-shadow: none;
+  padding: 12px 0;
+}
+
+/* --- track list -------------------------------------------------------- */
+
+.wk-track-art {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.wk-track-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.wk-track-title {
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wk-track-body .hint {
+  margin: 0;
+}
+
+/* --- preview modal --------------------------------------------------------- */
+
+.wk-preview {
+  position: fixed;
+  inset: 0;
+  background: rgba(33, 28, 51, 0.55);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 100;
+}
+
+.wk-preview-card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+  padding: 24px;
+  max-width: 480px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.wk-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.wk-preview-head h2 {
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.wk-preview-toggle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wk-preview-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.wk-preview-answer {
+  display: block;
+  color: var(--turquoise-dark);
+  font-weight: 700;
+  font-size: 14px;
+}

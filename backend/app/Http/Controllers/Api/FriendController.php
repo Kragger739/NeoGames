@@ -15,9 +15,14 @@ class FriendController extends Controller
     {
         $user = $request->user();
         $pending = $friends->listPending($user);
+        $friendUsers = $friends->listFriends($user);
+        $roomCodes = $friends->currentRoomCodesFor($friendUsers->pluck('id'));
 
         return response()->json([
-            'friends' => $friends->listFriends($user)->map(fn (User $u) => $this->presentUser($u)),
+            'friends' => $friendUsers->map(fn (User $u) => [
+                ...$this->presentUser($u),
+                'current_room_code' => $roomCodes[$u->id] ?? null,
+            ]),
             'incoming_requests' => $pending['incoming']->map(fn (Friendship $f) => [
                 'id' => $f->id,
                 'user' => $this->presentUser($f->user),
@@ -26,6 +31,19 @@ class FriendController extends Controller
                 'id' => $f->id,
                 'user' => $this->presentUser($f->friend),
             ]),
+        ]);
+    }
+
+    public function search(Request $request, FriendService $friends)
+    {
+        $data = $request->validate([
+            'q' => ['required', 'string', 'min:2', 'max:24'],
+        ]);
+
+        $matches = $friends->searchUsers($request->user(), $data['q']);
+
+        return response()->json([
+            'results' => $matches->map(fn (User $u) => $this->presentUser($u))->values(),
         ]);
     }
 
@@ -65,6 +83,8 @@ class FriendController extends Controller
             'id' => $user->id,
             'username' => $user->username ?? $user->name,
             'level' => $user->level,
+            'xp' => $user->xp,
+            'avatar' => $user->avatarPayload(),
         ];
     }
 }

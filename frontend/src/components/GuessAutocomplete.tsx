@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
 import { api } from "../lib/api";
 
@@ -7,13 +7,11 @@ interface SongSuggestion {
   title: string;
   artist: string;
   album_art_url: string | null;
-  preview_url: string;
 }
 
 interface GuessAutocompleteProps {
   disabled: boolean;
   submitting: boolean;
-  volume: number;
   isSolo: boolean;
   onSubmit: (guess: string) => void;
 }
@@ -32,7 +30,6 @@ const SKIP_GUESS_TEXT = "[skip]";
 export function GuessAutocomplete({
   disabled,
   submitting,
-  volume,
   isSolo,
   onSubmit,
 }: GuessAutocompleteProps) {
@@ -40,11 +37,6 @@ export function GuessAutocomplete({
   const [results, setResults] = useState<SongSuggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
-  // Which suggestion (if any) currently has its preview playing - null means
-  // none. One shared <audio> element handles playback for every suggestion
-  // row, so starting a new preview naturally stops whatever was playing.
-  const [previewingId, setPreviewingId] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     if (query.trim().length < MIN_QUERY_LENGTH) {
@@ -78,28 +70,7 @@ export function GuessAutocomplete({
     };
   }, [query]);
 
-  function stopPreview() {
-    audioRef.current?.pause();
-    setPreviewingId(null);
-  }
-
-  function togglePreview(suggestion: SongSuggestion) {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    if (previewingId === suggestion.deezer_track_id) {
-      stopPreview();
-      return;
-    }
-
-    audio.src = suggestion.preview_url;
-    audio.volume = volume;
-    void audio.play();
-    setPreviewingId(suggestion.deezer_track_id);
-  }
-
   function selectSuggestion(suggestion: SongSuggestion) {
-    stopPreview();
     setOpen(false);
     setQuery("");
     setResults([]);
@@ -113,12 +84,10 @@ export function GuessAutocomplete({
     e.preventDefault();
     if (isEmpty) {
       if (!isSolo) return;
-      stopPreview();
       setOpen(false);
       onSubmit(SKIP_GUESS_TEXT);
       return;
     }
-    stopPreview();
     setOpen(false);
     onSubmit(query);
     setQuery("");
@@ -135,10 +104,7 @@ export function GuessAutocomplete({
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => {
-            setOpen(false);
-            stopPreview();
-          }, 150)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder="Song title or artist…"
           autoFocus
           disabled={disabled}
@@ -147,6 +113,15 @@ export function GuessAutocomplete({
           {submitting ? "Submitting…" : showSkip ? "Skip" : "Guess"}
         </button>
       </form>
+
+      {open &&
+        searching &&
+        results.length === 0 &&
+        query.trim().length >= MIN_QUERY_LENGTH && (
+          <ul className="guess-suggestions">
+            <li className="hint">Searching…</li>
+          </ul>
+        )}
 
       {open && results.length > 0 && (
         <ul className="guess-suggestions">
@@ -165,19 +140,6 @@ export function GuessAutocomplete({
               )}
               <button
                 type="button"
-                className="suggestion-preview"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => togglePreview(suggestion)}
-                aria-label={
-                  previewingId === suggestion.deezer_track_id
-                    ? "Stop preview"
-                    : "Play preview"
-                }
-              >
-                {previewingId === suggestion.deezer_track_id ? "⏸" : "▶"}
-              </button>
-              <button
-                type="button"
                 className="suggestion-label"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => selectSuggestion(suggestion)}
@@ -188,7 +150,6 @@ export function GuessAutocomplete({
           ))}
         </ul>
       )}
-      <audio ref={audioRef} onEnded={() => setPreviewingId(null)} />
     </div>
   );
 }

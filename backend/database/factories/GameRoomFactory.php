@@ -27,8 +27,10 @@ class GameRoomFactory extends Factory
             // SongFilter's constructor) that requires a real enum instance
             // rather than a null passthrough.
             'mode' => 'classic',
+            'player_mode' => 'multiplayer',
             'genre' => 'normal',
             'songs_per_tier' => 3,
+            'enabled_tiers' => array_column(DifficultyTier::cases(), 'value'),
             'guess_timeout_seconds' => 8,
             'current_tier' => DifficultyTier::Easy->value,
             'current_song_index' => 0,

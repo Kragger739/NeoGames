@@ -1,0 +1,272 @@
+/* ==========================================================================
+   Leaderboard + cosmetics wardrobe + season-track ladder.
+   Confetti Pop token set only - no new hues or fonts.
+   ========================================================================== */
+
+.leaderboard-page,
+.cosmetics-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 48px 20px 80px;
+}
+
+/* --- Leaderboard ------------------------------------------------------- */
+
+.leaderboard-list {
+  counter-reset: none;
+}
+
+.leaderboard-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--ink-faint);
+}
+
+.leaderboard-xp {
+  font-family: var(--display);
+  font-weight: 800;
+  color: var(--coral);
+  white-space: nowrap;
+}
+
+.leaderboard-me {
+  margin-top: 16px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.leaderboard-me strong {
+  font-family: var(--display);
+  font-weight: 800;
+  color: var(--ink);
+}
+
+/* Podium avatars sit above the name (ResultsPage). */
+.podium-name {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  overflow: visible;
+}
+
+/* --- Cosmetics: preview + slot tabs --------------------------------------- */
+
+.cos-preview {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0 24px;
+}
+
+.cos-slot-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.cos-slot-tab {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink-soft);
+  transition:
+    transform 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out),
+    background 140ms var(--ease-out),
+    color 140ms var(--ease-out);
+}
+
+.cos-slot-tab:hover:not(.is-active) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card);
+}
+
+.cos-slot-tab.is-active {
+  background: var(--grape);
+  color: #fff;
+  box-shadow: var(--shadow-grape);
+}
+
+/* --- Cosmetics: chips -------------------------------------------------- */
+
+.cos-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.cos-chip {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out);
+}
+
+.cos-chip:hover:not(:disabled):not(.is-selected) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+.cos-chip.is-selected {
+  box-shadow: 0 0 0 3px var(--surface), 0 0 0 6px var(--coral);
+}
+
+.cos-chip.is-locked {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.cos-chip-thumb {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunk);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.cos-chip-none {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.cos-chip-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.cos-chip-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.cos-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+/* --- Cosmetics: season track ladder --------------------------------------- */
+
+.cos-ladder-wrap {
+  background: var(--grape-wash);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.cos-ladder-wrap h2 {
+  margin: 0 0 12px;
+}
+
+.cos-progress {
+  margin-bottom: 16px;
+}
+
+.cos-progress-track {
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.cos-progress-fill {
+  height: 100%;
+  transform-origin: left;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--grape), var(--bubblegum));
+  transition: transform 0.3s var(--ease-out);
+}
+
+.cos-progress .hint {
+  margin: 8px 0 0;
+}
+
+.cos-ladder {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.cos-tier {
+  flex: 0 0 92px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  opacity: 0.55;
+}
+
+.cos-tier.is-reached {
+  opacity: 1;
+}
+
+.cos-tier.is-current {
+  box-shadow: 0 0 0 3px var(--surface), 0 0 0 6px var(--sunflower);
+}
+
+.cos-tier-n {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.cos-tier-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunk);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.cos-tier .hint {
+  margin: 0;
+  font-size: 11px;
+}

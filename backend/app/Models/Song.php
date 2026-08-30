@@ -32,6 +32,7 @@ class Song extends Model
         'popularity',
         'release_year',
         'genre',
+        'excluded',
         'last_used_at',
     ];
 
@@ -41,10 +42,17 @@ class Song extends Model
             'popularity' => 'integer',
             'release_year' => 'integer',
             'artist_fan_count' => 'integer',
+            'excluded' => 'boolean',
             'last_used_at' => 'datetime',
         ];
     }
 
+    /**
+     * The GLOBAL absolute-band tier this popularity falls in - for an
+     * Artist/MultiArtist song this can read differently than the tier it
+     * was actually drawn into, which is relative to that room's own pool
+     * (see SongDiscoveryService::relativeTierBucket()), not this.
+     */
     public function difficultyTier(): ?DifficultyTier
     {
         return DifficultyTier::fromPopularity($this->popularity);
@@ -84,6 +92,8 @@ class Song extends Model
      */
     public function scopeMatchingFilterIgnoringPopularity(Builder $query, SongFilter $filter): Builder
     {
+        $query->where('excluded', false);
+
         $tag = $filter->genre->cacheTag();
 
         if ($tag !== null) {
@@ -96,9 +106,15 @@ class Song extends Model
             $query->whereRaw('LOWER(artist) = ?', [mb_strtolower(trim($filter->artistName))]);
         }
 
+        if ($filter->genre === SongGenre::MultiArtist && ($filter->artistNames ?? []) !== []) {
+            $normalized = array_map(fn ($name) => mb_strtolower(trim($name)), $filter->artistNames);
+            $placeholders = implode(',', array_fill(0, count($normalized), '?'));
+            $query->whereRaw("LOWER(artist) IN ({$placeholders})", $normalized);
+        }
+
         return match ($filter->genre) {
             // Same relaxed floor as Classics - see SongDiscoveryService::discoveryYearFloor().
-            SongGenre::Classics, SongGenre::Artist => $query->where('release_year', '>=', config('songs.classics_min_release_year')),
+            SongGenre::Classics, SongGenre::Artist, SongGenre::MultiArtist, SongGenre::Iconic => $query->where('release_year', '>=', config('songs.classics_min_release_year')),
             SongGenre::Year => $query->whereBetween('release_year', [$filter->yearFrom, $filter->yearTo]),
             default => $query->where('release_year', '>=', config('songs.min_release_year')),
         };

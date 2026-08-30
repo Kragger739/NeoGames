@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { getEcho } from "../lib/echo";
 import type { FriendsIndexResponse, FriendUser } from "../lib/friendTypes";
 import type { PresenceMember } from "../lib/roomTypes";
+import { useAuthStore } from "./authStore";
 
 interface FriendsState {
   friends: FriendUser[];
@@ -12,11 +13,13 @@ interface FriendsState {
   onlineUserIds: Set<number>;
   status: "idle" | "loading" | "ready";
   presenceConnected: boolean;
+  notificationsConnected: boolean;
   fetch: () => Promise<void>;
   sendRequest: (username: string) => Promise<void>;
   accept: (friendshipId: number) => Promise<void>;
   remove: (friendshipId: number) => Promise<void>;
   connectPresence: () => void;
+  connectNotifications: () => void;
 }
 
 /**
@@ -33,6 +36,7 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
   onlineUserIds: new Set(),
   status: "idle",
   presenceConnected: false,
+  notificationsConnected: false,
 
   fetch: async () => {
     set({ status: "loading" });
@@ -80,6 +84,37 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
         next.delete(Number(member.id));
         return { onlineUserIds: next };
       });
+    });
+  },
+
+  /**
+   * Live "someone sent you a friend request" / "someone accepted your
+   * friend request" push, via the same per-user private channel
+   * RoomInviteToast already subscribes to independently (Echo/Pusher-js's
+   * channel.bind() supports multiple listeners per event, so both coexist
+   * fine) - each side just ignores notification types it doesn't
+   * recognize. Both types just trigger a full refetch rather than reading
+   * the payload: an acceptance needs to move a friendship out of
+   * outgoingRequests and into friends, which fetch() already does as one
+   * consistent snapshot. Drives both the dashboard's pending-count badge
+   * and the Friends page auto-refreshing without a manual reload.
+   */
+  connectNotifications: () => {
+    if (get().notificationsConnected) return;
+
+    const hostId = useAuthStore.getState().host?.id;
+    if (!hostId) return;
+
+    set({ notificationsConnected: true });
+
+    const channel = getEcho().private(`App.Models.User.${hostId}`);
+    channel.notification((notification: { type?: string }) => {
+      if (
+        notification.type === "friend.request_received" ||
+        notification.type === "friend.request_accepted"
+      ) {
+        void get().fetch();
+      }
     });
   },
 }));

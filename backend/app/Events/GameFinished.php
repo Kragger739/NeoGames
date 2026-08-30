@@ -29,7 +29,8 @@ class GameFinished implements ShouldBroadcastNow
         return [
             'scoreboard' => $this->room->players()
                 ->orderByDesc('score')
-                ->get(['id', 'nickname', 'score', 'is_eliminated']),
+                ->selectForSummary()
+                ->get(),
         ];
     }
 }

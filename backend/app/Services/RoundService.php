@@ -2,9 +2,10 @@
 
 namespace App\Services;
 
-use App\Enums\DifficultyTier;
 use App\Enums\GameMode;
+use App\Enums\RoomPlayerMode;
 use App\Enums\RoomStatus;
+use App\Enums\SongGenre;
 use App\Events\BattleRoyaleRoundResolved;
 use App\Events\GameFinished;
 use App\Events\RoundFailed;
@@ -13,6 +14,7 @@ use App\Events\RoundStarted;
 use App\Events\TierAdvanced;
 use App\Jobs\AdvanceRoundStage;
 use App\Jobs\ExpandSongPool;
+use App\Jobs\FinishGame;
 use App\Jobs\StartNextRound;
 use App\Models\GameRoom;
 use App\Models\Round;
@@ -21,6 +23,7 @@ use App\Support\SnippetStage;
 use App\Support\SongFilter;
 use App\Support\SongSelectionContext;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -47,9 +50,22 @@ class RoundService
 
     public function start(GameRoom $room): Round
     {
+        if ($room->dataset_id === null && in_array($room->genre, [SongGenre::Artist, SongGenre::MultiArtist], true)) {
+            // Synchronous safety net in case Start is clicked before
+            // PrimeArtistSongPool's background job (dispatched from
+            // GameRoomController::update()) has finished warming the pool.
+            // Deliberately BEFORE the status flip below: a Deezer failure
+            // here (rate limit, timeout) must leave the room untouched in
+            // "lobby" rather than stuck in "active" with no round ever
+            // created - findRandomSongForRelativeTier() also self-heals via
+            // its own call to this same method, so skipping it here on
+            // failure costs nothing but a retry.
+            $this->songDiscovery->ensureArtistPoolReady(SongFilter::fromRoom($room));
+        }
+
         $room->update([
             'status' => RoomStatus::Active->value,
-            'current_tier' => DifficultyTier::Easy->value,
+            'current_tier' => $room->firstEnabledTier()->value,
             'current_song_index' => 0,
         ]);
 
@@ -68,6 +84,12 @@ class RoundService
 
         $song->update(['last_used_at' => now()]);
 
+        // Host-scoped cross-game no-repeat memory - every mode records into
+        // it (see buildSelectionContext() for where it's read back), so a
+        // host replaying the same genre/artist pool isn't handed a wall of
+        // songs they just heard.
+        $room->host->songPlays()->syncWithoutDetaching([$song->id]);
+
         $round = $room->rounds()->create([
             'song_id' => $song->id,
             'tier' => $room->current_tier->value,
@@ -80,18 +102,36 @@ class RoundService
         $round->setRelation('room', $room);
         $round->setRelation('song', $song);
 
+        // Debug trail so a bad/broken song can be reported and traced back
+        // by round id alone (e.g. "round 492 played a dead clip") - see
+        // storage/logs/laravel.log, searchable by "round.started" or the id.
+        Log::info('round.started', [
+            'round_id' => $round->id,
+            'room_code' => $room->code,
+            'song_id' => $song->id,
+            'title' => $song->title,
+            'artist' => $song->artist,
+            'deezer_track_id' => $song->deezer_track_id,
+            'genre' => $room->genre->value,
+            'tier' => $room->current_tier->value,
+        ]);
+
         broadcast(new RoundStarted($round));
 
         // Fire-and-forget background pool growth for this filter - never
         // blocks this round's own start, and no-ops almost instantly once
-        // the pool is already healthy (see ExpandSongPool::handle).
-        ExpandSongPool::dispatch($filter);
+        // the pool is already healthy (see ExpandSongPool::handle). A custom
+        // dataset IS the pool, so there is nothing to grow.
+        if ($room->dataset_id === null) {
+            ExpandSongPool::dispatch($filter);
+        }
 
-        // Solo has no timer at all - stages only advance when the player
-        // guesses wrong (see GuessService::submit()/escalateSoloStage()).
-        // Skipping the dispatch entirely means handleStageTimeout() is
-        // simply never invoked for a Solo round.
-        if ($room->mode !== GameMode::Solo) {
+        // Solo (player_mode, not a GameMode - see RoomPlayerMode) has no
+        // timer at all - stages only advance when the player guesses wrong
+        // (see GuessService::submit()/escalateSoloStage()). Skipping the
+        // dispatch entirely means handleStageTimeout() is simply never
+        // invoked for a Solo round.
+        if ($room->player_mode !== RoomPlayerMode::Solo) {
             // The guessing grace period starts once the clip has actually
             // finished playing, not concurrently with it - otherwise a
             // late, long stage (e.g. 15s) could be force-escalated before
@@ -152,8 +192,23 @@ class RoundService
             }
         }
 
+        $excludeTrackIds = $usedSongs->pluck('deezer_track_id')->all();
+
+        // Host-scoped cross-game no-repeat preference (see User::songPlays()),
+        // applied in every mode - merged in on top of this game's own used
+        // songs, but still just a preference: the existing fallback chain
+        // below (pickFallback()/relaxationLevels()) already reuses an
+        // excluded track as a last resort rather than ever blocking a
+        // round, which is what keeps this soft instead of a hard cap - and
+        // is what lets a small Artist/MultiArtist pool keep starting rounds
+        // once its history covers every track.
+        $excludeTrackIds = array_unique(array_merge(
+            $excludeTrackIds,
+            $room->host->songPlays()->pluck('deezer_track_id')->all(),
+        ));
+
         return new SongSelectionContext(
-            excludeTrackIds: $usedSongs->pluck('deezer_track_id')->all(),
+            excludeTrackIds: $excludeTrackIds,
             usedArtistDeezerIds: $usedSongs->pluck('artist_deezer_id')->filter()->values()->all(),
             eraCounts: $eraCounts,
         );
@@ -190,12 +245,13 @@ class RoundService
             return;
         }
 
-        $nextTier = $room->current_tier->next();
+        $nextTier = $room->nextEnabledTier();
 
         if ($nextTier === null) {
-            $room->update(['status' => RoomStatus::Finished->value]);
-            $this->leveling->awardForGameFinish($round);
-            broadcast(new GameFinished($room));
+            // Same reveal delay as the next-round path above, via a
+            // dedicated job rather than finishing synchronously here - see
+            // finishGame()'s docblock for why.
+            FinishGame::dispatch($room->id, $round->id)->delay(now()->addSeconds(self::REVEAL_DELAY_SECONDS));
 
             return;
         }
@@ -208,6 +264,43 @@ class RoundService
         broadcast(new TierAdvanced($room->fresh()));
 
         StartNextRound::dispatch($room->id)->delay(now()->addSeconds(self::REVEAL_DELAY_SECONDS));
+    }
+
+    /**
+     * Actually ends the game: marks the room finished, awards placement XP,
+     * and broadcasts GameFinished - split out from
+     * advanceAfterRoundResolved()/resolveBattleRoyaleRound() and invoked
+     * only via FinishGame's delayed dispatch, so the room's status (and the
+     * frontend's navigation to /results, which is keyed off it) doesn't
+     * flip the instant the final round resolves. Without the delay, the
+     * last round's reveal card got skipped past almost immediately while
+     * every earlier round got the full REVEAL_DELAY_SECONDS to sit on
+     * screen - the same reveal window every other round already gets.
+     */
+    public function finishGame(GameRoom $room, int $roundId): void
+    {
+        $room->update(['status' => RoomStatus::Finished->value]);
+
+        $round = Round::find($roundId);
+
+        if ($round) {
+            $this->leveling->awardForGameFinish($round);
+        }
+
+        broadcast(new GameFinished($room->fresh()));
+
+        // Every 80th finished game (any mode), clear the host's no-repeat
+        // memory (User::songPlays()) so their rotation starts fresh instead
+        // of the pool of already-seen songs only ever growing - query-based
+        // rather than a separate counter column, so it can never drift out
+        // of sync with the room history it reflects.
+        $finishedGames = GameRoom::where('host_id', $room->host_id)
+            ->where('status', RoomStatus::Finished->value)
+            ->count();
+
+        if ($finishedGames % 80 === 0) {
+            $room->host->songPlays()->detach();
+        }
     }
 
     /**
@@ -367,8 +460,8 @@ class RoundService
         $round = Round::find($round->id);
         $room = $round->room;
 
-        $survivors = $room->activePlayers()->whereIn('id', $correctIds)->get(['id', 'nickname']);
-        $eliminated = $room->activePlayers()->whereNotIn('id', $correctIds)->get(['id', 'nickname']);
+        $survivors = $room->activePlayers()->whereIn('id', $correctIds)->selectForSummary()->get();
+        $eliminated = $room->activePlayers()->whereNotIn('id', $correctIds)->selectForSummary()->get();
 
         if ($eliminated->isNotEmpty()) {
             $room->players()->whereIn('id', $eliminated->pluck('id'))->update(['is_eliminated' => true]);
@@ -380,11 +473,11 @@ class RoundService
         // Covers both "one player left" (they win) and "zero left" (a full
         // wipe) - either way the existing score-sorted scoreboard is all
         // GameFinished needs to show the result, no separate "declare
-        // winner" step required.
+        // winner" step required. Same delayed finishGame() as Classic/Solo
+        // (see its docblock) - the round-resolved broadcast just above is
+        // what shows the reveal card; finishing must wait for it.
         if ($room->activePlayers()->count() <= 1) {
-            $room->update(['status' => RoomStatus::Finished->value]);
-            $this->leveling->awardForGameFinish($round);
-            broadcast(new GameFinished($room->fresh()));
+            FinishGame::dispatch($room->id, $round->id)->delay(now()->addSeconds(self::REVEAL_DELAY_SECONDS));
 
             return;
         }

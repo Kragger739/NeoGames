@@ -31,6 +31,8 @@ class RoundStageAdvanced implements ShouldBroadcastNow
             'audio_url' => $this->round->song->audioUrl(),
             'stage' => $this->round->snippet_stage,
             'tier' => $this->round->tier->value,
+            'round_number' => $this->round->room->roundNumber(),
+            'total_rounds' => $this->round->room->totalRounds(),
             'server_time' => now()->toIso8601String(),
         ];
     }

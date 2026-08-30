@@ -17,6 +17,10 @@ use Illuminate\Support\Facades\DB;
  */
 class LevelingService
 {
+    public function __construct(
+        private SeasonService $seasons,
+    ) {}
+
     /**
      * Called from RoundService::advanceAfterRoundResolved() only once the
      * game has actually finished (no next tier). $finalRound anchors the
@@ -84,5 +88,9 @@ class LevelingService
         }
 
         User::where('id', $userId)->increment('xp', $amount);
+
+        // Season XP rides the same placement amounts and the same one-shot
+        // guard above, so it can never be double-counted for a finished game.
+        $this->seasons->awardSeasonXp($userId, $amount);
     }
 }

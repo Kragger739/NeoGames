@@ -1,16 +1,18 @@
-import { FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../lib/api";
 import { firstValidationError } from "../lib/errors";
 import { setPlayerId, setPlayerToken } from "../lib/playerToken";
 import { useAuthStore } from "../stores/authStore";
+import { Button } from "../components/ui/Button";
 
 interface JoinResponse {
   id: number;
   nickname: string;
   connection_token: string;
   room_code: string;
+  game: string;
 }
 
 export function JoinPage() {
@@ -44,7 +46,11 @@ export function JoinPage() {
       });
       setPlayerToken(response.data.connection_token);
       setPlayerId(response.data.id);
-      navigate(`/rooms/${response.data.room_code}/lobby`);
+      const lobbyPath =
+        response.data.game === "ddf"
+          ? `/ddf-rooms/${response.data.room_code}/lobby`
+          : `/rooms/${response.data.room_code}/lobby`;
+      navigate(lobbyPath);
     } catch (err) {
       setError(firstValidationError(err));
       setSubmitting(false);
@@ -82,9 +88,9 @@ export function JoinPage() {
       {isAuthenticated ? (
         <>
           {error && <p className="form-error">{error}</p>}
-          <button type="button" onClick={() => void join(undefined)} disabled={submitting}>
+          <Button size="lg" onClick={() => void join(undefined)} disabled={submitting}>
             {submitting ? "Joining…" : `Join as ${host?.username ?? host?.name}`}
-          </button>
+          </Button>
         </>
       ) : (
         <form onSubmit={handleSubmit}>
@@ -98,9 +104,9 @@ export function JoinPage() {
             />
           </label>
           {error && <p className="form-error">{error}</p>}
-          <button type="submit" disabled={submitting}>
-            {submitting ? "Joining…" : "Join"}
-          </button>
+          <Button type="submit" size="lg" disabled={submitting}>
+            {submitting ? "Joining…" : "Join the game"}
+          </Button>
         </form>
       )}
     </div>

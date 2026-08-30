@@ -17,7 +17,7 @@ import type {
   ScoreboardEntry,
   TierAdvancedPayload,
 } from "../lib/gameEvents";
-import type { GameMode, PresenceMember, RoomState, SongGenre } from "../lib/roomTypes";
+import type { GameMode, PlayerMode, PresenceMember, RoomState, SongGenre } from "../lib/roomTypes";
 
 type Phase = "lobby" | "playing" | "revealed" | "finished";
 
@@ -25,6 +25,7 @@ export interface Outcome {
   type: "won" | "failed" | "battle_royale";
   answer: RevealedAnswer;
   winnerNickname?: string; // "won" only
+  winnerLevel?: number | null; // "won" only
   points?: number; // "won" only
   survivors?: BattleRoyalePlayer[]; // "battle_royale" only
   eliminated?: BattleRoyalePlayer[]; // "battle_royale" only
@@ -33,8 +34,11 @@ export interface Outcome {
 interface GameState {
   phase: Phase;
   code: string | null;
+  hostId: number | null;
   round: RoundStartedPayload | null;
   tier: string | null;
+  roundNumber: number | null;
+  totalRounds: number | null;
   outcome: Outcome | null;
   missedNotices: string[];
   scoreboard: ScoreboardEntry[] | null;
@@ -43,11 +47,16 @@ interface GameState {
   channelError: string | null;
   guessTimeoutSeconds: number | null;
   songsPerTier: number | null;
+  enabledTiers: string[] | null;
   mode: GameMode | null;
+  playerMode: PlayerMode | null;
   genre: SongGenre | null;
   yearFrom: number | null;
   yearTo: number | null;
   artistName: string | null;
+  artistNames: string[] | null;
+  datasetId: number | null;
+  datasetName: string | null;
   // False until the catch-up GET resolves at least once. `phase` defaults
   // to "lobby" before that, which is indistinguishable from a genuine
   // room.reset - consumers that navigate off of phase === "lobby" (e.g.
@@ -55,7 +64,40 @@ interface GameState {
   // reset before its real status has loaded.
   caughtUp: boolean;
   connect: (code: string) => void;
+  leaveRoom: () => void;
 }
+
+// Reused by both store creation and leaveRoom() so a player backing out of
+// a room can't leave any stale field behind for whatever room they join
+// next.
+const initialState = {
+  phase: "lobby" as Phase,
+  code: null,
+  hostId: null,
+  round: null,
+  tier: null,
+  roundNumber: null,
+  totalRounds: null,
+  outcome: null,
+  missedNotices: [],
+  scoreboard: null,
+  players: [],
+  members: [],
+  channelError: null,
+  guessTimeoutSeconds: null,
+  songsPerTier: null,
+  enabledTiers: null,
+  mode: null,
+  playerMode: null,
+  genre: null,
+  yearFrom: null,
+  yearTo: null,
+  datasetId: null,
+  datasetName: null,
+  artistName: null,
+  artistNames: null,
+  caughtUp: false,
+};
 
 /**
  * Single owner of the room's Echo channel subscription. Centralized here
@@ -65,24 +107,15 @@ interface GameState {
  * effect - the two independent join/leave cycles were racing.
  */
 export const useGameStore = create<GameState>((set, get) => ({
-  phase: "lobby",
-  code: null,
-  round: null,
-  tier: null,
-  outcome: null,
-  missedNotices: [],
-  scoreboard: null,
-  players: [],
-  members: [],
-  channelError: null,
-  guessTimeoutSeconds: null,
-  songsPerTier: null,
-  mode: null,
-  genre: null,
-  yearFrom: null,
-  yearTo: null,
-  artistName: null,
-  caughtUp: false,
+  ...initialState,
+
+  leaveRoom: () => {
+    const code = get().code;
+    if (code) {
+      getEcho().leave(`room.${code}`);
+    }
+    set(initialState);
+  },
 
   connect: (code: string) => {
     if (get().code === code) return;
@@ -96,13 +129,19 @@ export const useGameStore = create<GameState>((set, get) => ({
       const state = response.data;
       set({
         players: state.players,
+        hostId: state.host_id,
         guessTimeoutSeconds: state.guess_timeout_seconds,
         songsPerTier: state.songs_per_tier,
+        enabledTiers: state.enabled_tiers,
         mode: state.mode,
+        playerMode: state.player_mode,
         genre: state.genre,
         yearFrom: state.year_from,
         yearTo: state.year_to,
+        datasetId: state.dataset_id,
+        datasetName: state.dataset_name,
         artistName: state.artist_name,
+        artistNames: state.artist_names,
       });
 
       if (get().phase !== "lobby") return;
@@ -112,6 +151,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           phase: "playing",
           round: state.current_round,
           tier: state.current_round.tier,
+          roundNumber: state.current_round.round_number,
+          totalRounds: state.current_round.total_rounds,
         });
       } else if (state.status === "finished") {
         set({ phase: "finished", scoreboard: state.players });
@@ -146,13 +187,20 @@ export const useGameStore = create<GameState>((set, get) => ({
         phase: "playing",
         round: payload,
         tier: payload.tier,
+        roundNumber: payload.round_number,
+        totalRounds: payload.total_rounds,
         outcome: null,
         missedNotices: [],
       });
     });
 
     channel.listen(".round.stage_advanced", (payload: RoundStageAdvancedPayload) => {
-      set({ round: payload, tier: payload.tier });
+      set({
+        round: payload,
+        tier: payload.tier,
+        roundNumber: payload.round_number,
+        totalRounds: payload.total_rounds,
+      });
     });
 
     channel.listen(".round.won", (payload: RoundWonPayload) => {
@@ -162,6 +210,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           type: "won",
           answer: payload.answer,
           winnerNickname: payload.winner_nickname,
+          winnerLevel: payload.winner_level,
           points: payload.points,
         },
         players: payload.scoreboard,
@@ -197,7 +246,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
 
     channel.listen(".tier.advanced", (payload: TierAdvancedPayload) => {
-      set({ tier: payload.tier });
+      set({
+        tier: payload.tier,
+        roundNumber: payload.round_number,
+        totalRounds: payload.total_rounds,
+      });
     });
 
     channel.listen(".game.finished", (payload: GameFinishedPayload) => {
@@ -209,6 +262,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         phase: "lobby",
         round: null,
         tier: null,
+        roundNumber: null,
+        totalRounds: null,
         outcome: null,
         missedNotices: [],
         scoreboard: null,
@@ -219,12 +274,17 @@ export const useGameStore = create<GameState>((set, get) => ({
     channel.listen(".room.settings_updated", (payload: RoomSettingsUpdatedPayload) => {
       set({
         songsPerTier: payload.songs_per_tier,
+        enabledTiers: payload.enabled_tiers,
         guessTimeoutSeconds: payload.guess_timeout_seconds,
         mode: payload.mode as GameMode,
+        playerMode: payload.player_mode as PlayerMode,
         genre: payload.genre as SongGenre,
         yearFrom: payload.year_from,
         yearTo: payload.year_to,
+        datasetId: payload.dataset_id,
+        datasetName: payload.dataset_name,
         artistName: payload.artist_name,
+        artistNames: payload.artist_names,
       });
     });
   },

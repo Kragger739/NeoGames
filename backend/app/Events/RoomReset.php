@@ -33,7 +33,8 @@ class RoomReset implements ShouldBroadcastNow
         return [
             'players' => $this->room->players()
                 ->orderByDesc('score')
-                ->get(['id', 'nickname', 'score', 'is_eliminated']),
+                ->selectForSummary()
+                ->get(),
         ];
     }
 }

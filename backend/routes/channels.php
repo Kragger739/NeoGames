@@ -18,7 +18,7 @@ Broadcast::channel('room.{code}', function (User|RoomPlayer $authenticatable, st
 
     if ($authenticatable instanceof User) {
         return $authenticatable->id === $room->host_id
-            ? ['id' => 'host', 'name' => $authenticatable->name]
+            ? ['id' => 'host', 'name' => $authenticatable->name, 'level' => $authenticatable->level, 'avatar' => $authenticatable->avatarPayload()]
             : false;
     }
 
@@ -26,7 +26,28 @@ Broadcast::channel('room.{code}', function (User|RoomPlayer $authenticatable, st
         return false;
     }
 
-    return ['id' => $authenticatable->id, 'name' => $authenticatable->nickname];
+    return [
+        'id' => $authenticatable->id,
+        'name' => $authenticatable->nickname,
+        'level' => $authenticatable->user?->level,
+        'avatar' => $authenticatable->user?->avatarPayload(),
+    ];
+});
+
+/**
+ * GM-only - carries "Der Dümmste fliegt" data that must stay hidden from
+ * players until the public reveal (live answer text, individual vote
+ * choices). Same explicit-reject-wrong-guard precedent as online-users
+ * below: a RoomPlayer must never resolve here even by coincidence.
+ */
+Broadcast::channel('room.{code}.gm', function (User|RoomPlayer $authenticatable, string $code) {
+    if ($authenticatable instanceof RoomPlayer) {
+        return false;
+    }
+
+    $room = GameRoom::where('code', $code)->first();
+
+    return $room && $authenticatable->id === $room->host_id;
 });
 
 /**

@@ -30,16 +30,19 @@ class RoundWon implements ShouldBroadcastNow
             'round_id' => $this->round->id,
             'winner_id' => $this->round->winning_player_id,
             'winner_nickname' => $this->round->winningPlayer?->nickname,
+            'winner_level' => $this->round->winningPlayer?->user?->level,
             'points' => $this->points,
             'answer' => [
                 'title' => $this->round->song->title,
                 'artist' => $this->round->song->artist,
                 'album_art_url' => $this->round->song->album_art_url,
                 'artist_fan_count' => $this->round->song->artist_fan_count,
+                'deezer_track_id' => $this->round->song->deezer_track_id,
             ],
             'scoreboard' => $this->round->room->players()
                 ->orderByDesc('score')
-                ->get(['id', 'nickname', 'score', 'is_eliminated']),
+                ->selectForSummary()
+                ->get(),
         ];
     }
 }

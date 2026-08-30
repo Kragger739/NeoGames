@@ -6,5 +6,5 @@ enum GameMode: string
 {
     case Classic = 'classic';
     case BattleRoyale = 'battle_royale';
-    case Solo = 'solo';
+    case Custom = 'custom';
 }

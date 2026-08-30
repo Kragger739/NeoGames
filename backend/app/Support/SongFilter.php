@@ -20,24 +20,51 @@ final class SongFilter
         public readonly ?int $yearFrom = null,
         public readonly ?int $yearTo = null,
         public readonly ?string $artistName = null,
+        public readonly ?array $artistNames = null,
+        // The room's enabled tiers (Part A) - [] means "use
+        // DifficultyTier::ordered()", needed by the Artist/MultiArtist
+        // relative-ranking bucket math in SongDiscoveryService.
+        public readonly array $enabledTiers = [],
+        // A custom Workshop dataset id. When set, genre/year/artist are all
+        // ignored: SongDiscoveryService picks straight from dataset_tracks.
+        public readonly ?int $datasetId = null,
     ) {}
 
     public static function fromRoom(GameRoom $room): self
     {
-        return new self($room->current_tier, $room->genre, $room->year_from, $room->year_to, $room->artist_name);
+        return new self(
+            tier: $room->current_tier,
+            genre: $room->genre,
+            yearFrom: $room->year_from,
+            yearTo: $room->year_to,
+            artistName: $room->artist_name,
+            artistNames: $room->artist_names,
+            enabledTiers: $room->enabledTiers(),
+            datasetId: $room->dataset_id,
+        );
     }
 
     /**
      * Stable identifier for ExpandSongPool's lock key. Year mode's range and
-     * Artist mode's name are both arbitrary per-room (not one of a handful
-     * of fixed values), so each gets its own effectively-per-room key rather
-     * than sharing one with every other Year/Artist-mode room.
+     * Artist/MultiArtist's name(s) are all arbitrary per-room (not one of a
+     * handful of fixed values), so each gets its own effectively-per-room
+     * key rather than sharing one with every other Year/Artist/MultiArtist
+     * room.
      */
     public function cacheKey(): string
     {
+        if ($this->datasetId !== null) {
+            return "dataset:{$this->datasetId}:{$this->tier->value}";
+        }
+
         $genrePart = match ($this->genre) {
             SongGenre::Year => "year:{$this->yearFrom}-{$this->yearTo}",
             SongGenre::Artist => "artist:{$this->artistName}",
+            SongGenre::MultiArtist => 'multi_artist:'.implode(',', collect($this->artistNames ?? [])
+                ->map(fn ($name) => mb_strtolower(trim($name)))
+                ->sort()
+                ->values()
+                ->all()),
             default => $this->genre->value,
         };
 

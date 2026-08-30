@@ -1,4 +1,4 @@
-import { PropsWithChildren, useEffect } from "react";
+import { type PropsWithChildren, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 
 import { useAuthStore } from "../stores/authStore";
@@ -18,6 +18,10 @@ export function RequireHost({ children }: PropsWithChildren) {
 
   if (!host) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (!host.email_verified) {
+    return <Navigate to="/verify-email" replace />;
   }
 
   return <>{children}</>;

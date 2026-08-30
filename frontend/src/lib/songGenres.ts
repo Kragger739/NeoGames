@@ -1,5 +1,8 @@
 import type { SongGenre } from "./roomTypes";
 
+/** Safety cap on how many artists a Multi-artist room can list - mirrors backend's SongGenre::MAX_MULTI_ARTIST_COUNT. */
+export const MULTI_ARTIST_MAX = 10;
+
 export const SONG_GENRES: { value: SongGenre; label: string; description: string }[] = [
   {
     value: "normal",
@@ -25,6 +28,11 @@ export const SONG_GENRES: { value: SongGenre; label: string; description: string
     value: "artist",
     label: "Artist",
     description: "Only songs by one artist you pick.",
+  },
+  {
+    value: "multi_artist",
+    label: "Multi-artist",
+    description: "Only songs from several artists you pick.",
   },
   {
     value: "classics",

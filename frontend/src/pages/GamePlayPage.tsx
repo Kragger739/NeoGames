@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { LogOut, Volume2, VolumeX } from "lucide-react";
 
 import { GuessAutocomplete } from "../components/GuessAutocomplete";
 import { api } from "../lib/api";
@@ -7,27 +8,35 @@ import { firstValidationError } from "../lib/errors";
 import { RoundReveal } from "../components/RoundReveal";
 import { useCountdown } from "../hooks/useCountdown";
 import { useVolume } from "../hooks/useVolume";
+import { leaveRoomOnServer } from "../lib/leaveRoom";
 import { getPlayerId, getPlayerToken } from "../lib/playerToken";
+import { isSoundMuted, playSound, setSoundMuted } from "../lib/sounds";
 import {
   MAX_SNIPPET_SECONDS,
   SNIPPET_STAGE_SEQUENCE,
   getStageSegments,
 } from "../lib/snippetStages";
+import { EMPTY_AVATAR } from "../lib/avatarData";
 import { useGameStore } from "../stores/gameStore";
+import { Avatar } from "../components/ui/Avatar";
+import { IconButton } from "../components/ui/IconButton";
 
 export function GamePlayPage() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
 
   const connect = useGameStore((state) => state.connect);
+  const leaveRoom = useGameStore((state) => state.leaveRoom);
   const phase = useGameStore((state) => state.phase);
   const round = useGameStore((state) => state.round);
   const tier = useGameStore((state) => state.tier);
+  const roundNumber = useGameStore((state) => state.roundNumber);
+  const totalRounds = useGameStore((state) => state.totalRounds);
   const outcome = useGameStore((state) => state.outcome);
   const missedNotices = useGameStore((state) => state.missedNotices);
   const players = useGameStore((state) => state.players);
   const guessTimeoutSeconds = useGameStore((state) => state.guessTimeoutSeconds);
-  const mode = useGameStore((state) => state.mode);
+  const playerMode = useGameStore((state) => state.playerMode);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fillRef = useRef<HTMLDivElement | null>(null);
@@ -37,6 +46,7 @@ export function GamePlayPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [alreadyGuessedCorrectly, setAlreadyGuessedCorrectly] = useState(false);
+  const [muted, setMuted] = useState(isSoundMuted);
   const isPlayer = getPlayerToken() !== null;
   const myPlayerId = getPlayerId();
   const amIEliminated = players.some((p) => p.id === myPlayerId && p.is_eliminated);
@@ -49,6 +59,22 @@ export function GamePlayPage() {
     phase === "playing" ? (round?.server_time ?? null) : null,
     round && guessTimeoutSeconds !== null ? round.stage + guessTimeoutSeconds : null,
   );
+
+  // A single tick as the guess timer enters its final 3 seconds - a nudge,
+  // not a metronome, so it fires once per threshold-crossing rather than
+  // once per second.
+  const lastTickedRound = useRef<number | null>(null);
+  useEffect(() => {
+    if (
+      secondsLeft !== null &&
+      secondsLeft <= 3 &&
+      secondsLeft > 0 &&
+      lastTickedRound.current !== round?.round_id
+    ) {
+      lastTickedRound.current = round?.round_id ?? null;
+      playSound("tick");
+    }
+  }, [secondsLeft, round?.round_id]);
 
   useEffect(() => {
     if (!code) return;
@@ -134,6 +160,18 @@ export function GamePlayPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round]);
 
+  async function handleLeave() {
+    if (code) await leaveRoomOnServer(code);
+    leaveRoom();
+    navigate("/");
+  }
+
+  function toggleMuted() {
+    const next = !muted;
+    setSoundMuted(next);
+    setMuted(next);
+  }
+
   async function submitGuess(guess: string) {
     if (!round || !guess.trim()) return;
     setError(null);
@@ -145,6 +183,7 @@ export function GamePlayPage() {
       );
       if (response.data.correct) {
         setAlreadyGuessedCorrectly(true);
+        playSound("correct");
       }
     } catch (err) {
       setError(firstValidationError(err));
@@ -157,11 +196,25 @@ export function GamePlayPage() {
     <div className="game-play-page">
       <div className="game-play-layout">
         <div className="game-play-main">
-          <h1>Room {code?.toUpperCase()}</h1>
-          {tier && <p className="hint">Tier: {tier}</p>}
+          <div className="game-play-header">
+            <h1>Room {code?.toUpperCase()}</h1>
+            <IconButton icon={LogOut} label="Leave room" onClick={() => void handleLeave()} />
+          </div>
+          {tier && (
+            <p className="hint">
+              Tier: {tier}
+              {roundNumber !== null && totalRounds !== null && (
+                <span> · Round {roundNumber} of {totalRounds}</span>
+              )}
+            </p>
+          )}
 
           <div className="volume-control">
-            <label htmlFor="volume">🔊</label>
+            <IconButton
+              icon={muted ? VolumeX : Volume2}
+              label={muted ? "Unmute sound effects" : "Mute sound effects"}
+              onClick={toggleMuted}
+            />
             <input
               id="volume"
               type="range"
@@ -171,7 +224,7 @@ export function GamePlayPage() {
               value={volume}
               onChange={(e) => setVolume(Number(e.target.value))}
               style={{
-                background: `linear-gradient(to right, var(--accent) ${volume * 100}%, var(--border) ${volume * 100}%)`,
+                background: `linear-gradient(to right, var(--coral) ${volume * 100}%, var(--line) ${volume * 100}%)`,
               }}
             />
           </div>
@@ -180,7 +233,7 @@ export function GamePlayPage() {
             <>
               <p className="stage-info">
                 Snippet length: {round.stage}s
-                {mode !== "solo" && secondsLeft !== null && (
+                {playerMode !== "solo" && secondsLeft !== null && (
                   <span className="countdown"> · extends in {secondsLeft}s</span>
                 )}
               </p>
@@ -226,8 +279,7 @@ export function GamePlayPage() {
                   <GuessAutocomplete
                     disabled={submitting}
                     submitting={submitting}
-                    volume={volume}
-                    isSolo={mode === "solo"}
+                    isSolo={playerMode === "solo"}
                     onSubmit={submitGuess}
                   />
                   {error && <p className="form-error">{error}</p>}
@@ -261,8 +313,10 @@ export function GamePlayPage() {
               .sort((a, b) => b.score - a.score)
               .map((player) => (
                 <li key={player.id}>
-                  <span>
+                  <span className="friend-name">
+                    <Avatar data={player.avatar ?? EMPTY_AVATAR} size="xs" animated={false} />
                     {player.nickname}
+                    {player.level !== null && <span className="player-level">Lvl {player.level}</span>}
                     {player.is_eliminated && " (out)"}
                   </span>
                   <span>{player.score}</span>

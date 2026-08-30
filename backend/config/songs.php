@@ -19,6 +19,18 @@ return [
     'expand_lock_seconds' => 600,
 
     /*
+    | The hard cap on how many surviving candidates a single discovery pass
+    | (discoverFromChart/Playlist/WordSearch -> processCandidates) will spend
+    | Deezer calls on - two per candidate (trackDetails + artistFanCount).
+    | Without it, a cold-cache round start processes a whole 50-track chart,
+    | or all ten of Iconic's seed playlists at once, synchronously inside the
+    | web request and blows past its execution-time limit. ExpandSongPool
+    | tops the pool up to min_pool_size in the background afterward.
+    */
+
+    'discovery_pass_limit' => 20,
+
+    /*
     |--------------------------------------------------------------------------
     | Release-year floors
     |--------------------------------------------------------------------------

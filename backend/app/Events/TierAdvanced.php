@@ -28,6 +28,8 @@ class TierAdvanced implements ShouldBroadcastNow
     {
         return [
             'tier' => $this->room->current_tier->value,
+            'round_number' => $this->room->roundNumber(),
+            'total_rounds' => $this->room->totalRounds(),
         ];
     }
 }

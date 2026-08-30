@@ -3,6 +3,7 @@
 namespace App\Services\Deezer;
 
 use Carbon\Carbon;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Throwable;
@@ -161,6 +162,38 @@ class DeezerClient
     }
 
     /**
+     * Live artist-search results for the room-settings Artist-genre
+     * autocomplete - lets the host pick a real Deezer artist directly rather
+     * than typing blind and hoping resolveArtistId() (see
+     * SongDiscoveryService) finds the right one later. Sorted by fan count,
+     * not Deezer's own relevance order (confirmed unreliable - see
+     * findArtistId()'s docblock), so the artist the host almost certainly
+     * means sorts first rather than a same-named nobody.
+     *
+     * @return array<int, array{deezer_artist_id: string, name: string, picture_url: ?string, fan_count: int}>
+     */
+    public function searchArtists(string $query, int $limit = 8): array
+    {
+        $response = Http::get(self::BASE_URL.'/search/artist', [
+            'q' => $query,
+            'limit' => self::ARTIST_SEARCH_LIMIT,
+        ]);
+
+        $this->assertNoApiError($response);
+
+        $results = $response->json('data', []);
+
+        usort($results, fn (array $a, array $b) => ($b['nb_fan'] ?? 0) <=> ($a['nb_fan'] ?? 0));
+
+        return array_map(fn (array $artist) => [
+            'deezer_artist_id' => (string) $artist['id'],
+            'name' => $artist['name'],
+            'picture_url' => $artist['picture_medium'] ?? null,
+            'fan_count' => (int) ($artist['nb_fan'] ?? 0),
+        ], array_slice($results, 0, $limit));
+    }
+
+    /**
      * GET /artist/{id}/top - the artist's own top tracks, same normalized
      * shape as chart()/search() (confirmed live - identical track JSON).
      * Used for the Artist genre, which sources exclusively from one act's
@@ -172,6 +205,29 @@ class DeezerClient
     {
         $response = Http::get(self::BASE_URL."/artist/{$artistId}/top", [
             'limit' => $limit,
+        ]);
+
+        $this->assertNoApiError($response);
+
+        return array_map(
+            fn (array $track) => $this->normalizeTrack($track),
+            $response->json('data', []),
+        );
+    }
+
+    /**
+     * GET /playlist/{id}/tracks, same normalized shape as chart()/search()/
+     * artistTopTracks() (confirmed identical track JSON). Used for genres
+     * seeded from one curated Deezer playlist rather than a chart or
+     * generic search - see SongGenre::deezerPlaylistIds().
+     *
+     * @return array<int, array{deezer_track_id: string, title: string, artist: string, artist_deezer_id: ?string, album_art_url: ?string, preview_url: ?string, popularity: int}>
+     */
+    public function playlistTracks(string $playlistId, int $limit = 50, int $index = 0): array
+    {
+        $response = Http::get(self::BASE_URL."/playlist/{$playlistId}/tracks", [
+            'limit' => $limit,
+            'index' => $index,
         ]);
 
         $this->assertNoApiError($response);
@@ -250,7 +306,7 @@ class DeezerClient
         }
     }
 
-    private function assertNoApiError(\Illuminate\Http\Client\Response $response): void
+    private function assertNoApiError(Response $response): void
     {
         if ($response->failed()) {
             throw new RuntimeException('Deezer request failed: '.$response->body());

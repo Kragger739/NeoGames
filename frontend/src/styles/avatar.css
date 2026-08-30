@@ -1,0 +1,107 @@
+/* ==========================================================================
+   <Avatar> - photo/silhouette + stacked cosmetic layers.
+   Confetti Pop token set only; no new hues or fonts.
+   ========================================================================== */
+
+.avatar {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  /* Circular at every size so the cosmetic rings / badges / effects - which
+     are all drawn around a circle - line up with the border whether the
+     avatar is 34px or 96px. */
+  border-radius: 50%;
+  align-self: center;
+  /* Base fill behind every layer - a background cosmetic covers it when one
+     is equipped; otherwise a no-photo avatar still reads as a soft disc
+     rather than a bare silhouette on the page ground. */
+  background: var(--surface-sunk);
+  overflow: hidden;
+}
+
+.avatar-lg {
+  width: 96px;
+  height: 96px;
+}
+
+.avatar-md {
+  width: 72px;
+  height: 72px;
+}
+
+.avatar-sm {
+  width: 48px;
+  height: 48px;
+}
+
+.avatar-xs {
+  width: 34px;
+  height: 34px;
+}
+
+.avatar-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  z-index: 1;
+  box-shadow: var(--shadow-card);
+}
+
+.avatar-sm .avatar-photo,
+.avatar-xs .avatar-photo {
+  box-shadow: var(--shadow-sm);
+}
+
+/* Silhouette placeholder when there's no photo - just the masked-person glyph,
+   NO opaque fill, so an equipped `background` cosmetic (z0, behind this) shows
+   through. The base .avatar fill covers the no-cosmetic case. */
+.avatar-photo.art-placeholder {
+  position: absolute;
+  background: none;
+  box-shadow: none;
+}
+
+.avatar-photo.art-placeholder::after {
+  content: "";
+  position: absolute;
+  inset: 22%;
+  background: rgba(255, 255, 255, 0.9);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E");
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+
+.avatar-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.avatar-layer-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* The one animated cosmetic (effect_sparkle). Off under reduced-motion, and
+   <Avatar animated={false}> skips the layer entirely on list surfaces. */
+.cosmetic-spin {
+  animation: cosmetic-spin 7s linear infinite;
+}
+
+@keyframes cosmetic-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cosmetic-spin {
+    animation: none;
+  }
+}

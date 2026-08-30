@@ -3,11 +3,12 @@
 namespace App\Services;
 
 use App\Enums\GameMode;
+use App\Enums\RoomPlayerMode;
 use App\Events\GuessMissed;
 use App\Events\RoundWon;
 use App\Models\Guess;
-use App\Models\Round;
 use App\Models\RoomPlayer;
+use App\Models\Round;
 use App\Support\Scoring;
 use Illuminate\Support\Str;
 
@@ -34,7 +35,7 @@ class GuessService
         if (! $correct) {
             broadcast(new GuessMissed($round, $player->nickname));
 
-            if ($mode === GameMode::Solo) {
+            if ($round->room->player_mode === RoomPlayerMode::Solo) {
                 return $this->roundService->escalateSoloStage($round);
             }
 
@@ -45,9 +46,9 @@ class GuessService
             return $this->resolveBattleRoyaleGuess($round, $player);
         }
 
-        // Classic + Solo: atomic conditional update, only the first
-        // correct guess wins the round, race-safe without explicit
-        // row locking.
+        // Classic/Custom/solo (player_mode): atomic conditional update,
+        // only the first correct guess wins the round, race-safe without
+        // explicit row locking.
         $won = Round::where('id', $round->id)
             ->where('status', 'playing')
             ->update([

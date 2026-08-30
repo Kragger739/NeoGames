@@ -130,6 +130,36 @@ class ExpandSongPoolTest extends TestCase
     }
 
     /**
+     * matchingFilter()'s global popularity band is meaningless for Artist/
+     * MultiArtist (they rank relatively - see SongDiscoveryService::
+     * relativeTierBucket()), so the health check must be skipped for them
+     * and ensureArtistPoolReady() called directly instead of the chart/
+     * word-search discoverAndCache() loop.
+     */
+    public function test_artist_genre_bypasses_the_global_band_health_check_and_uses_artist_top_tracks(): void
+    {
+        Http::fake([
+            'api.deezer.com/search/artist*' => Http::response([
+                'data' => [['id' => 555, 'name' => 'Real Artist', 'nb_fan' => 1_000_000]],
+            ], 200),
+            'api.deezer.com/artist/555/top*' => Http::response([
+                'data' => [$this->fakeDeezerTrack('artist-song', 'Some Song', rank: 40_000)],
+            ], 200),
+            'api.deezer.com/track/artist-song' => Http::response(
+                $this->fakeDeezerTrackDetails('artist-song', 'Some Song'),
+                200,
+            ),
+        ]);
+
+        (new ExpandSongPool(new SongFilter(DifficultyTier::Easy, SongGenre::Artist, artistName: 'Real Artist')))
+            ->handle(app(SongDiscoveryService::class));
+
+        $this->assertDatabaseHas('songs', ['deezer_track_id' => 'artist-song']);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/chart/'));
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/search?'));
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function fakeDeezerTrack(string $id, string $name, int $rank = 500_000): array

@@ -6,15 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
+use App\Services\EmailVerificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    public function register(RegisterRequest $request)
+    public function register(RegisterRequest $request, EmailVerificationService $verification)
     {
         $user = User::create([
             'name' => $request->validated('name'),
@@ -25,18 +26,25 @@ class AuthController extends Controller
 
         Auth::login($user);
 
+        // Fail-open: a transient SMTP hiccup must not 500 the registration.
+        // The user lands on the verify screen and can hit "Resend" from there.
+        try {
+            $verification->sendCode($user);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to send verification code on registration', [
+                'user_id' => $user->id,
+                'exception' => $e->getMessage(),
+            ]);
+        }
+
         return response()->json($user, 201);
     }
 
     public function login(LoginRequest $request)
     {
-        $credentials = $request->validated();
-
-        if (! Auth::attempt($credentials, remember: true)) {
-            throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
-            ]);
-        }
+        // Throttled (email+IP), honours an optional "remember" flag, and
+        // regenerates the session on success - see LoginRequest.
+        $request->authenticate();
 
         Session::regenerate();
 

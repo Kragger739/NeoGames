@@ -132,4 +132,40 @@ class RoomJoinTest extends TestCase
             'user_id' => null,
         ]);
     }
+
+    /**
+     * The host's own auto-seat from room creation already counts as the
+     * room's one occupant - a genuinely new player is rejected outright,
+     * not just capped after the fact.
+     */
+    public function test_a_second_player_cannot_join_a_solo_room(): void
+    {
+        $host = User::factory()->create();
+        $room = GameRoom::factory()->for($host, 'host')->create(['player_mode' => 'solo']);
+        RoomPlayer::factory()->for($room, 'room')->create(['user_id' => $host->id]);
+
+        $response = $this->postJson("/api/rooms/{$room->code}/join", ['nickname' => 'Intruder']);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('nickname');
+        $this->assertSame(1, $room->players()->count());
+    }
+
+    /**
+     * Reclaiming your own existing seat (see the "reopening a join link"
+     * tests above) must keep working in a solo room - the solo cap only
+     * ever blocks a genuinely new occupant, never the one player already
+     * seated.
+     */
+    public function test_the_host_can_still_reopen_their_own_seat_in_a_solo_room(): void
+    {
+        $host = User::factory()->create(['username' => 'soloHost']);
+        $room = GameRoom::factory()->for($host, 'host')->create(['player_mode' => 'solo']);
+        $seat = RoomPlayer::factory()->for($room, 'room')->create(['user_id' => $host->id, 'nickname' => 'soloHost']);
+
+        $response = $this->actingAs($host)->postJson("/api/rooms/{$room->code}/join");
+
+        $response->assertOk();
+        $response->assertJsonPath('id', $seat->id);
+    }
 }

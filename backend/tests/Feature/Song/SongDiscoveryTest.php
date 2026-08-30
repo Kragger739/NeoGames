@@ -152,6 +152,149 @@ class SongDiscoveryTest extends TestCase
         $this->assertDatabaseCount('songs', 1);
     }
 
+    /**
+     * Iconic must source ONLY from its seed playlist - no word-search
+     * expansion, no other candidates. Faking just the playlist-tracks
+     * endpoint (and asserting nothing else was ever called) proves that
+     * directly rather than merely checking the picked song looks
+     * plausible.
+     */
+    public function test_iconic_sources_exclusively_from_its_seed_playlists(): void
+    {
+        $fakes = [];
+
+        foreach (SongGenre::Iconic->deezerPlaylistIds() as $playlistId) {
+            $fakes["api.deezer.com/playlist/{$playlistId}/tracks*"] = Http::response(['data' => []], 200);
+        }
+
+        $fakes['api.deezer.com/playlist/'.SongGenre::Iconic->deezerPlaylistIds()[0].'/tracks*'] = Http::response([
+            'data' => [
+                $this->fakeDeezerTrack('playlist-track', 'Playlist Track', previewUrl: 'https://example.com/a.mp3'),
+            ],
+        ], 200);
+        $fakes['api.deezer.com/track/playlist-track'] = Http::response(
+            $this->fakeDeezerTrackDetails('playlist-track', 'Playlist Track'),
+            200,
+        );
+
+        Http::fake($fakes);
+
+        $song = app(SongDiscoveryService::class)->findRandomSongForTier(
+            new SongFilter(DifficultyTier::Easy, SongGenre::Iconic),
+        );
+
+        $this->assertNotNull($song);
+        $this->assertSame('playlist-track', $song->deezer_track_id);
+        $this->assertSame('iconic', $song->genre);
+        $this->assertDatabaseCount('songs', 1);
+
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/search'));
+    }
+
+    /**
+     * A track appearing on more than one of Iconic's ten seed playlists
+     * (a real, expected occurrence - "Top Hits 2018"/"2019"/etc. and the
+     * all-time list plainly overlap) must only ever end up as one row, not
+     * one per playlist it's found on.
+     */
+    public function test_iconic_deduplicates_a_track_shared_across_multiple_seed_playlists(): void
+    {
+        $ids = SongGenre::Iconic->deezerPlaylistIds();
+        $fakes = [];
+
+        foreach ($ids as $playlistId) {
+            $fakes["api.deezer.com/playlist/{$playlistId}/tracks*"] = Http::response(['data' => []], 200);
+        }
+
+        $fakes["api.deezer.com/playlist/{$ids[0]}/tracks*"] = Http::response([
+            'data' => [
+                $this->fakeDeezerTrack('shared-track', 'Shared Track', previewUrl: 'https://example.com/a.mp3'),
+                $this->fakeDeezerTrack('only-on-first', 'Only On First', previewUrl: 'https://example.com/b.mp3'),
+            ],
+        ], 200);
+        $fakes["api.deezer.com/playlist/{$ids[1]}/tracks*"] = Http::response([
+            'data' => [
+                // Same deezer_track_id as above - a real cross-playlist duplicate.
+                $this->fakeDeezerTrack('shared-track', 'Shared Track', previewUrl: 'https://example.com/a.mp3'),
+                $this->fakeDeezerTrack('only-on-second', 'Only On Second', previewUrl: 'https://example.com/c.mp3'),
+            ],
+        ], 200);
+        $fakes['api.deezer.com/track/shared-track'] = Http::response(
+            $this->fakeDeezerTrackDetails('shared-track', 'Shared Track'),
+            200,
+        );
+        $fakes['api.deezer.com/track/only-on-first'] = Http::response(
+            $this->fakeDeezerTrackDetails('only-on-first', 'Only On First'),
+            200,
+        );
+        $fakes['api.deezer.com/track/only-on-second'] = Http::response(
+            $this->fakeDeezerTrackDetails('only-on-second', 'Only On Second'),
+            200,
+        );
+
+        Http::fake($fakes);
+
+        app(SongDiscoveryService::class)->topUpTier(new SongFilter(DifficultyTier::Easy, SongGenre::Iconic), attempts: 1);
+
+        // Exactly 3 unique songs, and the shared track was only ever
+        // requested via trackDetails() once (Http::fake() records every
+        // dispatched request regardless of URL repetition, so this proves
+        // the merge deduped it BEFORE processing, not just at the DB layer).
+        $this->assertDatabaseCount('songs', 3);
+        $sharedTrackRequests = Http::recorded(fn ($request) => str_contains($request->url(), '/track/shared-track'));
+        $this->assertCount(1, $sharedTrackRequests);
+    }
+
+    /**
+     * A cold-cache discovery pass over a large candidate set (Iconic's ten
+     * seed playlists, a full 50-track chart) must not fire an unbounded
+     * number of Deezer calls - two per surviving candidate (trackDetails +
+     * artistFanCount) - or a first-round Start on an empty cache runs the
+     * web request straight past its execution-time limit. The pass is
+     * capped; ExpandSongPool tops the rest up in the background afterward.
+     */
+    public function test_a_discovery_pass_caps_how_many_candidates_it_spends_api_calls_on(): void
+    {
+        $tracks = [];
+
+        for ($i = 0; $i < 40; $i++) {
+            $tracks[] = $this->fakeDeezerTrack(
+                "hit-{$i}",
+                "Hit {$i}",
+                previewUrl: "https://example.com/{$i}.mp3",
+                rank: 95_000,
+                artist: "Artist {$i}",
+            );
+        }
+
+        Http::fake([
+            'api.deezer.com/chart/0/tracks*' => Http::response(['data' => $tracks], 200),
+            'api.deezer.com/track/*' => function ($request) {
+                $id = basename(parse_url($request->url(), PHP_URL_PATH));
+
+                return Http::response([
+                    'id' => $id,
+                    'title' => 'Hit',
+                    'artist' => ['id' => "artist-{$id}", 'name' => "Artist {$id}"],
+                    'album' => ['cover_medium' => null],
+                    'preview' => 'https://example.com/p.mp3',
+                    'rank' => 95_000,
+                    'release_date' => '2015-06-09',
+                ], 200);
+            },
+            'api.deezer.com/artist/*' => Http::response(['id' => 'a', 'nb_fan' => 1_000_000], 200),
+        ]);
+
+        app(SongDiscoveryService::class)->topUpTier(new SongFilter(DifficultyTier::Easy), attempts: 1);
+
+        $limit = (int) config('songs.discovery_pass_limit');
+        $trackDetailCalls = Http::recorded(fn ($request) => str_contains($request->url(), 'api.deezer.com/track/'));
+
+        $this->assertGreaterThan(0, $limit);
+        $this->assertLessThanOrEqual($limit, $trackDetailCalls->count());
+        $this->assertLessThanOrEqual($limit, Song::count());
+    }
+
     public function test_it_discards_tracks_released_before_2000(): void
     {
         Http::fake([
@@ -366,6 +509,81 @@ class SongDiscoveryTest extends TestCase
         );
 
         $this->assertSame($match->id, $song->id);
+        Http::assertNothingSent();
+    }
+
+    /**
+     * 7 songs / 5 tiers -> sizes [2,2,1,1,1] (base 1, remainder 2 given to
+     * the two easiest buckets first) - popularity descending so rank order
+     * is exact, proving tiers rank relative to this room's own pool rather
+     * than the global absolute popularity bands.
+     */
+    public function test_relative_tier_bucket_gives_uneven_split_remainder_to_the_easiest_tiers_first(): void
+    {
+        Http::fake(); // any call at all fails the test via assertNothingSent below.
+
+        foreach ([100, 99, 98, 97, 96, 95, 94] as $popularity) {
+            Song::factory()->create(['artist' => 'Real Artist', 'popularity' => $popularity, 'release_year' => 2020]);
+        }
+
+        $easySong = app(SongDiscoveryService::class)->findRandomSongForTier(
+            new SongFilter(DifficultyTier::Easy, SongGenre::Artist, artistName: 'Real Artist'),
+        );
+        $extremeSong = app(SongDiscoveryService::class)->findRandomSongForTier(
+            new SongFilter(DifficultyTier::Extreme, SongGenre::Artist, artistName: 'Real Artist'),
+        );
+
+        $this->assertContains($easySong->popularity, [100, 99]);
+        $this->assertSame(94, $extremeSong->popularity);
+        Http::assertNothingSent();
+    }
+
+    /**
+     * Guaranteed-song fallback for the relative-ranking path: when every
+     * song in a tier's own bucket is already excluded (used this game), it
+     * must still serve something rather than leaving the room without a
+     * song - same graceful-degrade guarantee the global-band path already
+     * has, extended to Artist/MultiArtist's relative bucketing.
+     */
+    public function test_relative_tier_bucket_falls_back_to_the_closest_cached_song_when_its_own_bucket_is_fully_excluded(): void
+    {
+        Http::fake([
+            'api.deezer.com/search/artist*' => Http::response(['data' => []], 200),
+        ]);
+
+        $onlySong = Song::factory()->create(['artist' => 'Real Artist', 'popularity' => 80, 'release_year' => 2020]);
+
+        $song = app(SongDiscoveryService::class)->findRandomSongForTier(
+            new SongFilter(DifficultyTier::Easy, SongGenre::Artist, artistName: 'Real Artist'),
+            new SongSelectionContext(excludeTrackIds: [$onlySong->deezer_track_id]),
+        );
+
+        $this->assertSame($onlySong->id, $song->id);
+    }
+
+    /**
+     * Extends the single-Artist case-insensitive match to any of several
+     * named artists (Part B) - matching against the songs.artist column
+     * directly, same as Artist genre.
+     */
+    public function test_multi_artist_filter_matches_any_of_the_named_artists_case_insensitively(): void
+    {
+        Http::fake(); // any call at all fails the test via assertNothingSent below.
+
+        $a = Song::factory()->create(['artist' => 'artist one', 'release_year' => 2020, 'popularity' => 80]);
+        $b = Song::factory()->create(['artist' => 'Artist Two', 'release_year' => 2020, 'popularity' => 70]);
+        Song::factory()->create(['artist' => 'Someone Else', 'release_year' => 2020, 'popularity' => 90]);
+
+        $song = app(SongDiscoveryService::class)->findRandomSongForTier(
+            new SongFilter(
+                DifficultyTier::Easy,
+                SongGenre::MultiArtist,
+                artistNames: ['Artist One', 'artist two'],
+                enabledTiers: [DifficultyTier::Easy],
+            ),
+        );
+
+        $this->assertContains($song->id, [$a->id, $b->id]);
         Http::assertNothingSent();
     }
 

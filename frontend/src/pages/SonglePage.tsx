@@ -1,23 +1,21 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Gamepad2 } from "lucide-react";
 
 import { api } from "../lib/api";
 import { firstValidationError } from "../lib/errors";
-import { setPlayerId, setPlayerToken } from "../lib/playerToken";
 import type { CreateRoomResponse } from "../lib/roomTypes";
+import { setPlayerId, setPlayerToken } from "../lib/playerToken";
 import { useAuthStore } from "../stores/authStore";
+import { Button } from "../components/ui/Button";
+import { IconButton } from "../components/ui/IconButton";
+import { PartyNote } from "../components/illustrations/PartyNote";
 
-export function DashboardPage() {
+export function SonglePage() {
   const host = useAuthStore((state) => state.host);
-  const logout = useAuthStore((state) => state.logout);
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-
-  async function handleLogout() {
-    await logout();
-    navigate("/login");
-  }
 
   // "New room" used to be a link to a settings form; now it drops you
   // straight into a live room, and settings (including mode) become
@@ -37,19 +35,30 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="dashboard-page">
-      <h1>Welcome, {host?.name}</h1>
-      {host && <p className="hint">Level {host.level} · {host.xp} XP</p>}
-      <nav>
-        <button type="button" onClick={() => void handleNewRoom()} disabled={creating}>
-          {creating ? "Creating…" : "New room"}
-        </button>
-        <Link to="/profile">Profile</Link>
-        <Link to="/friends">Friends</Link>
-      </nav>
+    <div className="songle-page">
+      <div className="songle-page-header">
+        <IconButton
+          icon={ArrowLeft}
+          label="Back to Home"
+          variant="danger"
+          onClick={() => navigate("/")}
+        />
+      </div>
+      <p className="dashboard-wordmark">Songle</p>
+      <PartyNote className="dashboard-hero" />
+      {host && <h1>Hey, {host.name}!</h1>}
+      <Button variant="primary" size="lg" onClick={() => void handleNewRoom()} disabled={creating}>
+        {creating ? (
+          "Setting up…"
+        ) : (
+          <>
+            <Gamepad2 size={20} strokeWidth={2.5} />
+            Start a game night
+          </>
+        )}
+      </Button>
       {createError && <p className="form-error">{createError}</p>}
       <p className="hint">Songs are pulled automatically — no setup needed.</p>
-      <button onClick={handleLogout}>Log out</button>
     </div>
   );
 }

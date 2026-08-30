@@ -33,6 +33,7 @@ class RoundFailed implements ShouldBroadcastNow
                 'artist' => $this->round->song->artist,
                 'album_art_url' => $this->round->song->album_art_url,
                 'artist_fan_count' => $this->round->song->artist_fan_count,
+                'deezer_track_id' => $this->round->song->deezer_track_id,
             ],
         ];
     }

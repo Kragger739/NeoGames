@@ -1,17 +1,24 @@
-/* Shared page shell */
+/* ==========================================================================
+   Shared page shell
+   ========================================================================== */
 .auth-page,
-.dashboard-page,
+.home-page,
+.songle-page,
 .new-room-page,
 .join-page,
 .lobby-page,
 .game-play-page,
 .results-page,
 .profile-page,
-.friends-page {
+.friends-page,
+.ddf-landing-page,
+.ddf-lobby-page,
+.ddf-play-overlay,
+.ddf-gm-page {
   width: 100%;
-  max-width: 560px;
+  max-width: 640px;
   margin: 0 auto;
-  padding: 40px 20px 64px;
+  padding: 48px 20px 80px;
   text-align: center;
   box-sizing: border-box;
   flex: 1;
@@ -21,49 +28,229 @@
 }
 
 .game-play-page {
-  max-width: 760px;
+  max-width: 920px;
 }
 
-/* Links & nav */
-a {
-  color: var(--accent);
+.dashboard-wordmark {
+  font-family: var(--display);
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--grape);
+  margin: 0 0 24px;
 }
 
-.dashboard-page nav {
+.songle-page-header {
   display: flex;
-  justify-content: center;
-  gap: 16px;
+  justify-content: flex-start;
+}
+
+.dashboard-hero {
+  width: 160px;
+  height: 160px;
+  margin: 0 auto;
+  filter: drop-shadow(0 12px 20px rgba(255, 92, 122, 0.25));
+  animation: hero-bob 3.5s ease-in-out infinite;
+}
+
+@keyframes hero-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(2deg);
+  }
+}
+
+/* PartyNote's own dance - independent of the whole-mascot hero-bob float,
+   so it reads as "grooving" rather than just drifting up and down. */
+.party-note-arm-left,
+.party-note-arm-right {
+  transform-origin: 62px 148px;
+  animation: party-note-arm-swing 0.9s ease-in-out infinite alternate;
+}
+
+.party-note-arm-right {
+  transform-origin: 138px 148px;
+  animation-direction: alternate-reverse;
+}
+
+@keyframes party-note-arm-swing {
+  from {
+    transform: rotate(-10deg);
+  }
+  to {
+    transform: rotate(10deg);
+  }
+}
+
+.party-note-head {
+  transform-origin: 100px 186px;
+  animation: party-note-head-groove 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes party-note-head-groove {
+  from {
+    transform: rotate(-3deg);
+  }
+  to {
+    transform: rotate(3deg);
+  }
+}
+
+.party-note-stem {
+  transform-origin: 127px 128px;
+  animation: party-note-stem-sway 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes party-note-stem-sway {
+  from {
+    transform: rotate(-2deg);
+  }
+  to {
+    transform: rotate(2deg);
+  }
+}
+
+.party-note-confetti-piece {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: party-note-confetti-twinkle 1.8s ease-in-out infinite;
+}
+
+@keyframes party-note-confetti-twinkle {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.7;
+  }
+}
+
+/* ==========================================================================
+   Game picker grid (Home page)
+   ========================================================================== */
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
   margin: 24px 0;
 }
 
-.dashboard-page nav a,
-.dashboard-page nav button {
-  padding: 8px 16px;
-  border-radius: 8px;
-  background: var(--code-bg);
-  border: 1px solid var(--border);
+.game-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
   text-decoration: none;
-  color: var(--text);
-  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 0.18s var(--ease-out), box-shadow 0.18s ease;
 }
 
-.dashboard-page nav a:hover,
-.dashboard-page nav button:hover:not(:disabled) {
-  border-color: var(--accent-border);
-  background: var(--code-bg);
-  color: var(--text);
+.game-tile:not(.game-tile-locked):hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-turquoise);
 }
 
-.dashboard-page > button {
-  margin-top: 8px;
-  border-color: var(--border);
-  background: transparent;
-  color: var(--text);
+.game-tile-locked {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
-.dashboard-page > button:hover:not(:disabled) {
-  background: var(--code-bg);
-  color: var(--text-h);
+.game-tile-icon {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 4px;
+}
+
+.game-tile-icon-lucide {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 8px;
+  color: var(--ink-soft);
+}
+
+/* Playable games (vs. the muted "coming soon" lucide icons above) get the
+   tile's own hue and a small continuous drift - same bob+tilt idea as
+   .dashboard-hero, just scaled down for a 32px grid icon rather than a
+   160px mascot. Lucide's plane-takeoff icon is two sibling <path>s (a
+   plain ground line, then the plane shape) - animating only the second
+   path, not the whole <svg>, keeps the ground line still while the plane
+   drifts above it. */
+.game-tile-icon-lucide-playable {
+  color: var(--turquoise-dark);
+}
+
+.game-tile-icon-lucide-playable path:last-child {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: game-tile-icon-drift 3.5s ease-in-out infinite;
+}
+
+@keyframes game-tile-icon-drift {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-6deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(6deg);
+  }
+}
+
+.game-tile-label {
+  font-size: 17px;
+  margin: 0;
+}
+
+/* ==========================================================================
+   Links & nav
+   ========================================================================== */
+a {
+  color: var(--grape);
+  font-weight: 600;
+}
+
+.home-page nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin: 28px 0;
+}
+
+.home-page nav a,
+.home-page nav button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: none;
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 15px;
+  transition: transform 0.18s var(--ease-out), box-shadow 0.18s ease;
+}
+
+.home-page nav a:hover,
+.home-page nav button:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.home-page > button {
+  margin-top: 12px;
 }
 
 .new-room-page > p:first-child,
@@ -73,11 +260,36 @@ a {
   margin-bottom: 8px;
 }
 
-/* Forms */
+.auth-card {
+  text-align: left;
+  margin: 12px 0;
+}
+
+.auth-card form {
+  margin: 0;
+}
+
+.oauth-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.auth-divider {
+  text-align: center;
+  color: var(--ink-faint);
+  font-size: 13px;
+  margin: 4px 0 16px;
+}
+
+/* ==========================================================================
+   Forms
+   ========================================================================== */
 form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   align-items: stretch;
   margin: 24px 0;
   text-align: left;
@@ -88,100 +300,394 @@ form label {
   flex-direction: column;
   gap: 6px;
   font-size: 14px;
-  color: var(--text);
+  font-weight: 600;
+  color: var(--ink-soft);
 }
 
 input,
 select {
   font: inherit;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--code-bg);
-  color: var(--text-h);
+  padding: 13px 16px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
   box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 input:focus-visible,
 select:focus-visible,
 button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: none;
+  border-color: var(--coral);
+  box-shadow: 0 0 0 4px var(--coral-wash);
 }
 
 input[type="number"] {
-  width: 100px;
+  width: 110px;
 }
 
+/* ==========================================================================
+   Buttons — raw <button> keeps a sane default (settings-form controls,
+   third-party autofocus, etc.), but every purposeful action goes through
+   the Button primitive's .btn classes below.
+   ========================================================================== */
 button {
   font: inherit;
-  font-weight: 500;
-  padding: 10px 18px;
-  border-radius: 8px;
-  border: 1px solid var(--accent-border);
-  background: var(--accent-bg);
-  color: var(--accent);
+  font-family: var(--sans);
+  font-weight: 700;
+  padding: 13px 22px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--coral);
+  color: #fff;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  box-shadow: var(--shadow-coral);
+  transition: transform 0.15s var(--ease-out), box-shadow 0.15s ease, background 0.15s ease;
 }
 
 button:hover:not(:disabled) {
-  background: var(--accent);
-  color: var(--bg);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 14px 28px rgba(255, 92, 122, 0.4);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
 }
 
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-pill);
+  padding: 13px 24px;
+  font-size: 15px;
+}
+
+.btn-lg {
+  padding: 18px 36px;
+  font-size: 18px;
+  border-radius: var(--radius-pill);
+}
+
+.btn-primary {
+  background: var(--coral);
+  color: #fff;
+  box-shadow: var(--shadow-coral);
+}
+
+.btn-turquoise {
+  background: var(--turquoise);
+  color: #fff;
+  box-shadow: var(--shadow-turquoise);
+}
+
+.btn-grape {
+  background: var(--grape);
+  color: #fff;
+  box-shadow: var(--shadow-grape);
+}
+
+.btn-danger {
+  background: var(--fail);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(255, 71, 87, 0.32);
+}
+
+.btn-ghost {
+  background: var(--surface);
+  color: var(--ink-soft);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
+}
+
+/* Icon button — small circular action (leave/close/copy/mute). */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.icon-btn-ghost {
+  background: var(--surface);
+  color: var(--ink-soft);
+  box-shadow: var(--shadow-sm);
+}
+
+.icon-btn-ghost:hover:not(:disabled) {
+  color: var(--ink);
+  transform: translateY(-1px) scale(1.06);
+}
+
+.icon-btn-coral {
+  background: var(--coral);
+  color: #fff;
+  box-shadow: var(--shadow-coral);
+}
+
+.icon-btn-turquoise {
+  background: var(--turquoise);
+  color: #fff;
+  box-shadow: var(--shadow-turquoise);
+}
+
+.icon-btn-danger {
+  background: var(--fail);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(255, 71, 87, 0.32);
 }
 
 .form-error {
-  color: #ef4444;
+  color: var(--fail);
   font-size: 14px;
+  font-weight: 600;
   margin: 0;
 }
 
 .hint {
-  color: var(--text);
+  color: var(--ink-soft);
   font-size: 14px;
   margin: 4px 0 16px;
 }
 
-/* Generic lists (players, misses) */
+/* ==========================================================================
+   Card primitive
+   ========================================================================== */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.card-interactive {
+  cursor: pointer;
+  transition: transform 0.18s var(--ease-out), box-shadow 0.18s ease;
+}
+
+.card-interactive:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-float);
+}
+
+.card-tint-coral {
+  background: var(--coral-wash);
+}
+.card-tint-turquoise {
+  background: var(--turquoise-wash);
+}
+.card-tint-sunflower {
+  background: var(--sunflower-wash);
+}
+.card-tint-grape {
+  background: var(--grape-wash);
+}
+.card-tint-bubblegum {
+  background: var(--bubblegum-wash);
+}
+
+/* ==========================================================================
+   Badge primitive
+   ========================================================================== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  font-family: var(--display);
+}
+
+.badge-coral {
+  background: var(--coral);
+  color: #fff;
+}
+.badge-turquoise {
+  background: var(--turquoise);
+  color: #fff;
+}
+.badge-sunflower {
+  background: var(--sunflower);
+  color: var(--ink);
+}
+.badge-grape {
+  background: var(--grape);
+  color: #fff;
+}
+.badge-gold {
+  background: linear-gradient(135deg, #ffd95e, #e6a80f);
+  color: #5a3d00;
+}
+.badge-silver {
+  background: linear-gradient(135deg, #eef0f4, #b9bfc9);
+  color: #33363d;
+}
+.badge-bronze {
+  background: linear-gradient(135deg, #e3a26a, #b06a34);
+  color: #402106;
+}
+
+/* Level shown next to a nickname wherever other players appear - lobby,
+   scoreboard, reveal callouts. */
+.player-level {
+  color: var(--turquoise-dark);
+  background: var(--turquoise-wash);
+  font-size: 11px;
+  font-weight: 800;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+
+/* ==========================================================================
+   Generic lists (players, misses, scoreboard)
+   ========================================================================== */
 .player-list,
 .miss-feed,
-.scoreboard {
+.scoreboard,
+.song-history {
   list-style: none;
   margin: 16px 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   text-align: left;
 }
 
 .player-list li,
 .miss-feed li,
-.scoreboard li {
+.scoreboard li,
+.song-history li {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: var(--code-bg);
-  border: 1px solid var(--border);
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
   font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .scoreboard li span:last-child {
-  font-weight: 600;
-  color: var(--accent);
+  font-weight: 800;
+  font-family: var(--display);
+  color: var(--coral);
+  font-size: 18px;
 }
 
-/* Lobby */
+.song-history-art {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.song-history-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.song-history-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.song-history-guessers {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.song-history-guesser {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--turquoise-dark);
+}
+
+.song-history-stage {
+  font-family: var(--display);
+  font-weight: 800;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+/* ==========================================================================
+   Lobby
+   ========================================================================== */
+.lobby-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+/* Room code as a torn-edge event ticket - the lobby's single most-shared
+   piece of information, so it gets the loudest treatment on the page. */
+.room-ticket {
+  display: inline-block;
+  margin: 0;
+  padding: 14px 28px;
+  font-size: 32px;
+  letter-spacing: 0.08em;
+  background: var(--sunflower);
+  color: var(--ink);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 24px rgba(255, 201, 60, 0.4);
+  transform: rotate(-1.5deg);
+  background-image: radial-gradient(circle, transparent 8px, var(--sunflower) 8.5px);
+  background-size: 20px 100%;
+  background-position: -4px 0;
+  @media (max-width: 1024px) {
+    font-size: 26px;
+    padding: 12px 22px;
+  }
+}
+
+.lobby-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .lobby-page h2 {
-  margin-top: 24px;
+  margin-top: 28px;
 }
 
 .lobby-page button {
@@ -189,16 +695,34 @@ button:disabled {
 }
 
 .copy-invite-button {
-  border-color: var(--border);
-  background: transparent;
-  color: var(--text);
+  background: var(--surface);
+  color: var(--ink-soft);
+  box-shadow: var(--shadow-sm);
   font-size: 14px;
-  padding: 8px 14px;
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
 }
 
 .copy-invite-button:hover:not(:disabled) {
-  background: var(--code-bg);
-  color: var(--text-h);
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
+}
+
+/* Same ghost treatment as .copy-invite-button, used on every in-room page
+   (lobby/game-play/results) to back out to the dashboard. */
+.leave-button {
+  background: var(--surface);
+  color: var(--ink-soft);
+  box-shadow: var(--shadow-sm);
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
+  margin: 8px 8px 16px 0;
+}
+
+.leave-button:hover:not(:disabled) {
+  color: var(--fail);
+  box-shadow: 0 10px 24px rgba(255, 71, 87, 0.22);
 }
 
 .room-settings-form {
@@ -209,24 +733,29 @@ button:disabled {
   min-height: 1.2em;
   margin: 8px 0 0;
   font-size: 13px;
-  opacity: 0.75;
+  font-weight: 700;
+  color: var(--turquoise-dark);
 }
 
 .mode-picker {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 14px;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunk);
+  padding: 16px;
   margin: 0;
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
 }
 
 .mode-picker legend {
   padding: 0 4px;
-  font-size: 14px;
-  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
 }
 
 .mode-option {
@@ -234,26 +763,52 @@ button:disabled {
   flex-direction: row;
   align-items: flex-start;
   gap: 10px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: var(--code-bg);
-  border: 1px solid var(--border);
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 2px solid transparent;
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
+  transition: transform 0.15s var(--ease-out), border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mode-option:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+/* A level-gated mode/genre option not yet unlocked - still fully visible
+   (so it's clear it exists and how to unlock it), just dimmed and
+   unclickable. */
+.mode-option-locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mode-option-locked:hover {
+  transform: none;
+  box-shadow: var(--shadow-sm);
 }
 
 .mode-option:has(input:checked) {
-  border-color: var(--accent-border);
+  border-color: var(--coral);
+  background: var(--coral-wash);
+  box-shadow: var(--shadow-coral);
 }
 
-.mode-option input[type="radio"] {
+.mode-option input[type="radio"],
+.mode-option input[type="checkbox"] {
   margin-top: 3px;
-  accent-color: var(--accent);
+  width: 18px;
+  height: 18px;
+  accent-color: var(--coral);
 }
 
 .mode-option strong {
   display: block;
-  color: var(--text-h);
-  font-weight: 500;
+  color: var(--ink);
+  font-weight: 800;
+  font-family: var(--display);
 }
 
 .mode-option .hint {
@@ -263,8 +818,16 @@ button:disabled {
 .year-range-inputs {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   gap: 10px;
-  margin-top: 8px;
+  margin-top: 10px;
+}
+
+/* Forces the multi-artist chip list onto its own line below the add-artist
+   input, rather than sitting beside it in .year-range-inputs' row flex. */
+.artist-chip-list {
+  flex: 1 1 100%;
+  margin: 4px 0 0;
 }
 
 .year-range-inputs label {
@@ -275,10 +838,12 @@ button:disabled {
 }
 
 .year-range-inputs input[type="number"] {
-  width: 80px;
+  width: 84px;
 }
 
-/* Game play: two-column on wide viewports */
+/* ==========================================================================
+   Game play — two-column on wide viewports, controller-style stack on phone
+   ========================================================================== */
 .game-play-layout {
   display: flex;
   gap: 32px;
@@ -292,12 +857,20 @@ button:disabled {
   text-align: center;
 }
 
+.game-play-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
 .game-play-main h1 {
-  font-size: 32px;
+  font-size: 36px;
+  margin: 12px 0;
 }
 
 .scoreboard-panel {
-  flex: 0 0 200px;
+  flex: 0 0 220px;
 }
 
 .scoreboard-panel h2 {
@@ -306,40 +879,67 @@ button:disabled {
 
 @media (max-width: 720px) {
   .game-play-layout {
-    flex-direction: column;
+    flex-direction: column-reverse;
+    gap: 20px;
   }
 
   .scoreboard-panel {
     width: 100%;
   }
+
+  /* Controller mode: compact horizontal strip instead of a full card
+     stack, so the guess input stays close to the thumb. */
+  .scoreboard-panel .scoreboard {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 4px;
+  }
+
+  .scoreboard-panel .scoreboard li {
+    flex: 0 0 auto;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  .scoreboard-panel .scoreboard li span:last-child {
+    font-size: 15px;
+  }
+
+  .game-play-page {
+    padding-bottom: 32px;
+  }
 }
 
 .stage-info {
   font-size: 15px;
-  color: var(--text);
+  font-weight: 600;
+  color: var(--ink-soft);
 }
 
 .countdown {
-  color: var(--accent);
+  color: var(--coral);
+  font-weight: 800;
 }
 
 .stage-progress {
   position: relative;
-  height: 8px;
-  margin: 10px 0;
+  height: 12px;
+  margin: 14px 0;
 }
 
 .stage-progress-segment {
   position: absolute;
   top: 0;
   bottom: 0;
-  border-radius: 6px;
-  background: var(--border);
-  margin: 0 2px;
+  border-radius: var(--radius-pill);
+  background: var(--line-soft);
+  margin: 0 3px;
 }
 
 .stage-progress-segment-filled {
-  background: var(--accent-bg);
+  background: var(--coral-wash);
 }
 
 .stage-progress-fill {
@@ -348,8 +948,8 @@ button:disabled {
   left: 0;
   height: 100%;
   width: 100%;
-  background: var(--accent);
-  border-radius: 6px;
+  background: linear-gradient(90deg, var(--coral), var(--bubblegum));
+  border-radius: var(--radius-pill);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform linear;
@@ -365,8 +965,8 @@ button:disabled {
 
 .volume-control input[type="range"] {
   width: 140px;
-  height: 4px;
-  border-radius: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
   appearance: none;
   -webkit-appearance: none;
   outline: none;
@@ -381,42 +981,45 @@ button:disabled {
    already a fair way in from the left - this makes the fill (and thus
    what "empty" looks like) always match the real value exactly. */
 .volume-control input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
   background: transparent;
 }
 
 .volume-control input[type="range"]::-moz-range-track {
-  height: 4px;
-  border-radius: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
   background: transparent;
 }
 
 .volume-control input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px;
-  height: 14px;
-  margin-top: -5px;
+  width: 20px;
+  height: 20px;
+  margin-top: -7px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--coral);
+  box-shadow: var(--shadow-coral);
   cursor: pointer;
 }
 
 .volume-control input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   border: none;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--coral);
+  box-shadow: var(--shadow-coral);
   cursor: pointer;
 }
 
 .play-clip-button {
   display: block;
   margin: 4px auto 20px;
-  font-size: 16px;
-  padding: 12px 28px;
+  font-size: 17px;
+  padding: 16px 36px;
+  border-radius: var(--radius-pill);
 }
 
 .guess-autocomplete {
@@ -426,25 +1029,26 @@ button:disabled {
 .guess-autocomplete form {
   flex-direction: row;
   align-items: stretch;
+  margin: 0;
 }
 
 .guess-autocomplete form input {
   flex: 1;
+  font-size: 16px;
 }
 
 .guess-suggestions {
   position: absolute;
   z-index: 10;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   left: 0;
   right: 0;
   list-style: none;
   margin: 0;
-  padding: 6px;
-  border-radius: 10px;
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  padding: 8px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -461,17 +1065,80 @@ button:disabled {
   text-align: left;
   background: transparent;
   border: none;
-  color: var(--text-h);
-  padding: 8px 10px;
-  border-radius: 6px;
-  font-weight: 400;
+  color: var(--ink);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  box-shadow: none;
 }
 
 .suggestion-label:hover {
-  background: var(--accent-bg);
-  color: var(--accent);
+  background: var(--coral-wash);
+  color: var(--coral-dark);
+  transform: none;
+  box-shadow: none;
 }
 
+/* Anchors the artist-search dropdown (reuses .guess-suggestions) under the
+   Artist genre's text input, same relative/absolute pairing as
+   .guess-autocomplete. */
+.artist-picker {
+  position: relative;
+}
+
+/* Multi-artist's own inner positioning context, separate from
+   .artist-picker: without this, the dropdown's `top: 100%` anchors to the
+   whole picker (input + the growing chip list below it) once an artist is
+   added, so it drifts under the chips instead of staying under the input
+   being typed into. */
+.artist-search {
+  position: relative;
+  display: block;
+}
+
+/* Friend search typeahead — same relative/absolute pairing as
+   .guess-autocomplete, reusing .suggestion-label for the rows. */
+.friend-search {
+  position: relative;
+}
+
+.friend-suggestions {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.friend-suggestions li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.friend-suggestions .suggestion-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.friend-suggestions .suggestion-label:disabled {
+  opacity: 0.6;
+}
+
+/* ==========================================================================
+   Round reveal
+   ========================================================================== */
 .round-reveal-overlay {
   position: fixed;
   inset: 0;
@@ -480,7 +1147,8 @@ button:disabled {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: var(--scrim);
+  background: rgba(33, 28, 51, 0.55);
+  backdrop-filter: blur(3px);
   box-sizing: border-box;
 }
 
@@ -493,82 +1161,129 @@ button:disabled {
 
 .round-reveal-card {
   width: 100%;
-  max-width: 360px;
-  padding: 32px 28px;
-  border-radius: 10px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  max-width: 380px;
+  padding: 36px 32px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
   text-align: center;
-  animation: reveal-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: reveal-pop 0.5s var(--ease-bounce) both; /* impeccable-disable-line bounce-easing -- Bounce-Is-For-Arrivals-Only: sanctioned for the round-reveal entrance, see DESIGN.md */
 }
 
 .round-reveal-card.is-won {
-  border-color: var(--success-glow);
+  box-shadow: var(--shadow-float), 0 0 0 4px var(--win);
   animation:
-    reveal-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1) both,
-    green-pulse 1.6s ease-out 0.4s 2;
+    reveal-pop 0.5s var(--ease-bounce) both,
+    green-pulse 1.6s ease-out 0.5s 2;
 }
 
 .round-reveal-card.is-failed {
-  border-color: var(--danger-glow);
-  box-shadow: var(--shadow), 0 0 0 3px var(--danger-glow);
+  box-shadow: var(--shadow-float), 0 0 0 4px var(--fail);
   animation:
-    reveal-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1) both,
-    red-shake 0.5s ease-in-out 0.4s 1;
+    reveal-pop 0.5s var(--ease-bounce) both,
+    red-shake 0.5s ease-in-out 0.5s 1;
+}
+
+.round-reveal-badge {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 6px 12px rgba(33, 28, 51, 0.25));
+}
+
+.round-reveal-card {
+  position: relative;
 }
 
 .round-reveal-title {
-  margin: 4px 0 0;
+  margin: 12px 0 0;
 }
 
 .round-reveal-artist {
   margin: 4px 0 0;
-  color: var(--text);
+  color: var(--ink-soft);
+  font-weight: 600;
 }
 
 .round-reveal-stats {
-  margin: 4px 0 0;
-  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 6px 0 0;
+  color: var(--ink-faint);
   font-size: 13px;
-  opacity: 0.75;
 }
 
 .round-reveal-outcome {
-  margin: 16px 0 0;
-  font-size: 16px;
+  margin: 18px 0 0;
+  font-size: 18px;
+  font-family: var(--display);
+  font-weight: 700;
 }
 
 .round-reveal-outcome-won {
-  color: var(--success);
-  font-weight: 500;
+  color: var(--win);
 }
 
 .round-reveal-outcome-failed {
-  color: var(--danger);
-  font-weight: 500;
+  color: var(--fail);
+}
+
+/* Debug-only reference tag, not a design element - lets a bad round/song
+   get reported by id instead of a vague "the guessing screen broke". */
+.round-reveal-debug-id {
+  margin: 10px 0 0;
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--ink-faint);
+  opacity: 0.6;
+}
+
+/* Same nav-pill treatment as .home-page nav a/button. */
+.round-reveal-links {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0 0;
+}
+
+.round-reveal-links a {
+  padding: 9px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunk);
+  text-decoration: none;
+  color: var(--ink-soft);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.round-reveal-links a:hover {
+  background: var(--grape-wash);
+  color: var(--grape-dark);
 }
 
 @keyframes reveal-pop {
   from {
     opacity: 0;
-    transform: scale(0.85);
+    transform: scale(0.75) translateY(12px);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: scale(1) translateY(0);
   }
 }
 
 @keyframes green-pulse {
   0% {
-    box-shadow: 0 0 0 0 var(--success-glow);
+    box-shadow: var(--shadow-float), 0 0 0 4px var(--win);
   }
   70% {
-    box-shadow: 0 0 0 24px transparent;
+    box-shadow: var(--shadow-float), 0 0 0 26px transparent;
   }
   100% {
-    box-shadow: 0 0 0 0 transparent;
+    box-shadow: var(--shadow-float), 0 0 0 4px var(--win);
   }
 }
 
@@ -578,40 +1293,58 @@ button:disabled {
     transform: translateX(0);
   }
   20% {
-    transform: translateX(-6px);
+    transform: translateX(-8px) rotate(-1deg);
   }
   40% {
-    transform: translateX(5px);
+    transform: translateX(6px) rotate(1deg);
   }
   60% {
-    transform: translateX(-4px);
+    transform: translateX(-5px);
   }
   80% {
-    transform: translateX(3px);
+    transform: translateX(4px);
   }
 }
 
 @keyframes red-screen-glow {
   0% {
-    background: var(--danger-glow);
+    background: rgba(255, 71, 87, 0.55);
   }
   100% {
-    background: var(--scrim);
+    background: rgba(33, 28, 51, 0.55);
   }
 }
 
 /* Album art thumbnails - the null-safe placeholder keeps row/card height
-   consistent instead of a broken-image icon or a layout jump. */
+   consistent instead of a broken-image icon or a layout jump. A gradient
+   fill plus a masked glyph reads as "no photo yet" rather than "broken
+   image" - avatars get a person silhouette, everything else (album art,
+   suggestion art) stays a plain gradient swatch. */
 .art-placeholder {
-  background: var(--code-bg);
+  background: linear-gradient(135deg, var(--grape), var(--bubblegum));
   display: block;
+}
+
+.avatar-preview.art-placeholder {
+  position: relative;
+}
+
+.avatar-preview.art-placeholder::after {
+  content: "";
+  position: absolute;
+  inset: 22%;
+  background: rgba(255, 255, 255, 0.9);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E");
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
 }
 
 .suggestion-art {
   flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
   object-fit: cover;
 }
 
@@ -619,56 +1352,174 @@ button:disabled {
   width: 220px;
   height: 220px;
   max-width: 100%;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   object-fit: cover;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-card);
 }
 
-/* Results */
+/* ==========================================================================
+   Results
+   ========================================================================== */
+.results-hero {
+  width: 180px;
+  height: auto;
+  margin: 0 auto;
+  filter: drop-shadow(0 14px 22px rgba(255, 92, 122, 0.28));
+}
+
+.podium-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 200px;
+  margin: 0 auto;
+}
+
+/* Names sit in a row under the podium graphic rather than inside the SVG,
+   so long nicknames can truncate with an ellipsis instead of overflowing a
+   fixed-width block - flex-basis approximates each block's own width/
+   position in the 200-wide viewBox (2nd/1st/3rd left to right, matching
+   the podium's own left-to-right block order). */
+.podium-names {
+  display: flex;
+  width: 100%;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.podium-name {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--ink);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.podium-name-2 {
+  flex: 0 0 26%;
+}
+
+.podium-name-1 {
+  flex: 0 0 34%;
+  font-size: 15px;
+}
+
+.podium-name-3 {
+  flex: 0 0 26%;
+}
+
+.results-leave {
+  margin: 24px auto 0;
+}
+
+/* The scoreboard list only ever holds 4th place and beyond - the top 3
+   render on the podium above instead (see .podium-names) - so the rank
+   counter starts at 3 and there's no medal-color styling left to apply
+   here. */
 .results-page ol.scoreboard {
-  counter-reset: rank;
+  counter-reset: rank 3;
 }
 
 .results-page ol.scoreboard li {
   counter-increment: rank;
+  position: relative;
 }
 
 .results-page ol.scoreboard li::before {
-  content: counter(rank) ".";
-  color: var(--text);
-  margin-right: 8px;
+  content: counter(rank);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface-sunk);
+  color: var(--ink-soft);
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 13px;
+  margin-right: 4px;
+  flex: 0 0 auto;
 }
 
-/* Reusable secondary/ghost button - transparent at rest, fills with Booth
-   Seat on hover. Same treatment as .dashboard-page > button and
-   .copy-invite-button; a shared class so new UI (profile, friends) doesn't
-   redefine it per page. */
+/* Reusable secondary/ghost button - the same look as the .btn-ghost
+   primitive, kept as a class for pages not yet migrated to <Button>. */
 .button-secondary {
-  border-color: var(--border);
-  background: transparent;
-  color: var(--text);
+  background: var(--surface);
+  color: var(--ink-soft);
+  box-shadow: var(--shadow-sm);
 }
 
 .button-secondary:hover:not(:disabled) {
-  background: var(--code-bg);
-  color: var(--text-h);
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
 }
 
-/* Profile */
+/* ==========================================================================
+   Profile
+   ========================================================================== */
+.avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 24px;
+}
+
+/* 96px on the profile page (lg radius), 48px on the dashboard (sm radius). */
+.avatar-preview {
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  box-shadow: var(--shadow-card);
+}
+
+.avatar-preview-small {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  margin: 0 auto;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Level-tier unlocks (see leveling.ts's avatarFrameForLevel) - a colored
+   ring outside the frame rather than a border, so it reads as a badge. */
+.avatar-frame-bronze {
+  box-shadow: 0 0 0 4px #cd7f32, var(--shadow-card);
+}
+
+.avatar-frame-silver {
+  box-shadow: 0 0 0 4px #c0c0c0, var(--shadow-card);
+}
+
+.avatar-frame-gold {
+  box-shadow: 0 0 0 4px #d4af37, var(--shadow-card);
+}
+
+.avatar-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .profile-username {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  font-size: 20px;
-  font-weight: 500;
-  color: var(--text-h);
+  font-size: 22px;
+  font-family: var(--display);
+  font-weight: 800;
+  color: var(--ink);
   margin: 24px 0;
 }
 
 .profile-edit-button {
   font-size: 13px;
-  padding: 4px 12px;
+  padding: 6px 14px;
 }
 
 .profile-edit-actions {
@@ -678,40 +1529,51 @@ button:disabled {
 
 .level-card {
   margin-top: 24px;
-  padding: 16px;
-  border-radius: 10px;
-  background: var(--code-bg);
-  border: 1px solid var(--border);
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: var(--grape-wash);
   text-align: left;
 }
 
 .level-label {
-  font-weight: 500;
-  color: var(--text-h);
-  margin-bottom: 8px;
+  font-weight: 800;
+  font-family: var(--display);
+  color: var(--ink);
+  margin-bottom: 10px;
 }
 
 .level-bar {
-  height: 8px;
-  border-radius: 4px;
-  background: var(--border);
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.6);
   overflow: hidden;
 }
 
 .level-bar-fill {
   height: 100%;
   width: 100%;
-  background: var(--accent);
-  border-radius: 4px;
+  background: linear-gradient(90deg, var(--grape), var(--bubblegum));
+  border-radius: var(--radius-pill);
   transform-origin: left;
-  transition: transform 0.2s;
+  transition: transform 0.3s var(--ease-out);
 }
 
 .level-card .hint {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
+  color: var(--grape-dark);
 }
 
-/* Friends */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 0 8px;
+}
+
+/* ==========================================================================
+   Friends
+   ========================================================================== */
 .friend-actions {
   display: flex;
   gap: 8px;
@@ -725,41 +1587,150 @@ button:disabled {
 
 .online-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  border: 1px solid var(--border);
+  border: 2px solid var(--line);
   background: transparent;
   flex: 0 0 auto;
 }
 
 .online-dot-on {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--win);
+  border-color: var(--win);
+  box-shadow: 0 0 0 3px var(--win-wash);
 }
 
-/* Room invite toast - the system's second legitimate use of the Overlay
-   Lift shadow (see .guess-suggestions), a genuinely floating element. */
+/* Room invite toast — a genuinely floating element. */
 .room-invite-toast {
   position: fixed;
   bottom: 24px;
   right: 24px;
   z-index: 100;
   max-width: 320px;
-  padding: 16px;
-  border-radius: 10px;
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
   text-align: left;
+  animation: reveal-pop 0.4s var(--ease-bounce) both; /* impeccable-disable-line bounce-easing -- Bounce-Is-For-Arrivals-Only: sanctioned for the room-invite toast entrance, see DESIGN.md */
 }
 
 .room-invite-toast p {
-  color: var(--text-h);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-weight: 600;
   margin: 0 0 12px;
 }
 
 .room-invite-toast-actions {
   display: flex;
   gap: 8px;
+}
+
+/* ==========================================================================
+   Legal pages, site footer, misc auth additions
+   ========================================================================== */
+.legal-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+  line-height: 1.6;
+}
+
+.legal-page h1 {
+  margin-bottom: 4px;
+}
+
+.legal-page h2 {
+  margin-top: 32px;
+  font-size: 18px;
+}
+
+.legal-draft-banner {
+  margin: 12px 0 20px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--coral-wash);
+  color: var(--coral-dark);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.legal-todo {
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.legal-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.legal-table th,
+.legal-table td {
+  border: 1px solid var(--surface-sunk);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.site-footer {
+  border-top: 1px solid var(--surface-sunk);
+  margin-top: 48px;
+  padding: 20px;
+  text-align: center;
+}
+
+.site-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 18px;
+  margin-bottom: 8px;
+}
+
+.site-footer nav a {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.site-footer p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.checkbox-label {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.checkbox-label input {
+  width: auto;
+  margin-top: 3px;
+}
+
+.auth-forgot {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.danger-zone {
+  margin-top: 40px;
+  padding: 20px;
+  border: 1px solid var(--coral);
+  border-radius: var(--radius-md);
+}
+
+.danger-zone h2 {
+  margin-top: 0;
+  color: var(--coral-dark);
 }

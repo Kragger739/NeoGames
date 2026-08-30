@@ -2,6 +2,7 @@
 
 namespace App\Events;
 
+use App\Models\RoomPlayer;
 use App\Models\Round;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PresenceChannel;
@@ -19,8 +20,8 @@ class BattleRoyaleRoundResolved implements ShouldBroadcastNow
     use Dispatchable, InteractsWithSockets;
 
     /**
-     * @param  Collection<int, array{id: int, nickname: string}>  $survivors
-     * @param  Collection<int, array{id: int, nickname: string}>  $eliminated
+     * @param  Collection<int, RoomPlayer>  $survivors  selectForSummary()'d - carries `level`
+     * @param  Collection<int, RoomPlayer>  $eliminated  selectForSummary()'d - carries `level`
      */
     public function __construct(
         public Round $round,
@@ -49,10 +50,12 @@ class BattleRoyaleRoundResolved implements ShouldBroadcastNow
                 'artist' => $this->round->song->artist,
                 'album_art_url' => $this->round->song->album_art_url,
                 'artist_fan_count' => $this->round->song->artist_fan_count,
+                'deezer_track_id' => $this->round->song->deezer_track_id,
             ],
             'scoreboard' => $this->round->room->players()
                 ->orderByDesc('score')
-                ->get(['id', 'nickname', 'score', 'is_eliminated']),
+                ->selectForSummary()
+                ->get(),
         ];
     }
 }

@@ -56,6 +56,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend URL
+    |--------------------------------------------------------------------------
+    |
+    | The public origin of the React SPA. Used to build links that must open
+    | in the SPA rather than the API - e.g. the password-reset email link.
+    | May be a comma-separated list (matching FRONTEND_URL used by CORS /
+    | Sanctum); the first entry is treated as canonical.
+    |
+    */
+
+    'frontend_url' => explode(',', (string) env('FRONTEND_URL', env('APP_URL', 'http://localhost')))[0],
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

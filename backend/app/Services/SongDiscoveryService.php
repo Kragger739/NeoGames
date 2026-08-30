@@ -5,11 +5,13 @@ namespace App\Services;
 use App\Enums\DifficultyTier;
 use App\Enums\SongEra;
 use App\Enums\SongGenre;
+use App\Models\DatasetTrack;
 use App\Models\Song;
 use App\Services\Deezer\DeezerClient;
 use App\Support\SongFilter;
 use App\Support\SongSelectionContext;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -125,6 +127,25 @@ class SongDiscoveryService
 
     private const CHART_LIMIT = 50;
 
+    /**
+     * Iconic's seed playlist ("Top 100 most recognizable songs of
+     * all-time") has ~100 tracks - Iconic sources exclusively from this
+     * one list (see discoverFromPlaylist()), so the fetch has to cover the
+     * whole thing, not just a CHART_LIMIT-sized slice of it.
+     */
+    private const ICONIC_PLAYLIST_LIMIT = 100;
+
+    /**
+     * Per-artist top-tracks fetch limit for Artist/MultiArtist's relative-
+     * ranking pool (ensureArtistPoolReady()) - smaller than CHART_LIMIT to
+     * bound worst-case latency, since a MultiArtist room fetches one batch
+     * per artist rather than one batch total.
+     */
+    private const ARTIST_POOL_LIMIT = 30;
+
+    /** How long ensureArtistPoolReady() treats an artist's fetched pool as still fresh. */
+    private const ARTIST_POOL_FRESH_HOURS = 24;
+
     private const MAX_DISCOVERY_ATTEMPTS = 4;
 
     /** How many never-used, era/artist-matching candidates to randomize among, favoring higher recognizability without being fully predictable. */
@@ -172,6 +193,18 @@ class SongDiscoveryService
     public function findRandomSongForTier(SongFilter $filter, ?SongSelectionContext $context = null): ?Song
     {
         $context ??= SongSelectionContext::empty();
+
+        // A custom Workshop dataset is a self-contained, deliberately-chosen
+        // pool: no discovery, no popularity bands, no year floor, no genre
+        // filtering - just pick a track the user imported.
+        if ($filter->datasetId !== null) {
+            return $this->pickFromDataset($filter, $context);
+        }
+
+        if (in_array($filter->genre, [SongGenre::Artist, SongGenre::MultiArtist], true)) {
+            return $this->findRandomSongForRelativeTier($filter, $context);
+        }
+
         $targetEra = $context->neediestEra();
 
         $candidate = $this->pickFromCache($filter, $context);
@@ -194,6 +227,39 @@ class SongDiscoveryService
     }
 
     /**
+     * Pick a track from a Workshop Songle dataset. Returns a Song row (the
+     * throwaway play cache), created on demand from the dataset_tracks entry;
+     * RoundService::pickPlayableSong() then refreshes its preview via
+     * ensurePlayable() exactly as for any other song, so a dead Deezer id is
+     * excluded and retried. Falls back to allowing repeats once every track
+     * has already been used this game.
+     */
+    private function pickFromDataset(SongFilter $filter, SongSelectionContext $context): ?Song
+    {
+        $track = DatasetTrack::where('dataset_id', $filter->datasetId)
+            ->whereNotIn('deezer_track_id', $context->excludeTrackIds)
+            ->inRandomOrder()
+            ->first()
+            ?? DatasetTrack::where('dataset_id', $filter->datasetId)->inRandomOrder()->first();
+
+        if (! $track) {
+            return null;
+        }
+
+        return Song::firstOrCreate(
+            ['deezer_track_id' => $track->deezer_track_id],
+            [
+                'title' => $track->title,
+                'artist' => $track->artist,
+                'album_art_url' => $track->album_art_url,
+                'preview_url' => $track->preview_url ?? '',
+                'popularity' => 50,
+                'release_year' => null,
+            ],
+        );
+    }
+
+    /**
      * Guaranteed-song fallback, only reached once real discovery has
      * already exhausted every attempt: a room should virtually never come
      * up completely empty just because this exact tier's popularity band
@@ -210,17 +276,232 @@ class SongDiscoveryService
     /**
      * Same genre/release-year constraints as pickFromCache(), but ignoring
      * the tier's own popularity band - picks whichever cached song is
-     * numerically closest to the tier's midpoint instead.
+     * numerically closest to the tier's midpoint instead. Falls back to
+     * allowing reuse of an already-excluded song as an explicit last resort
+     * when every match is already excluded (a small Artist/MultiArtist pool
+     * fully used this game) - same graceful-degrade spirit as the rest of
+     * this chain never leaving a room without a song.
      */
     private function closestByPopularity(SongFilter $filter, array $exclude): ?Song
     {
-        [$min, $max] = $filter->tier->popularityRange();
-        $midpoint = intdiv($min + $max, 2);
+        $midpoint = $this->popularityMidpoint($filter);
 
         return Song::query()->matchingFilterIgnoringPopularity($filter)
             ->when($exclude !== [], fn ($query) => $query->whereNotIn('deezer_track_id', $exclude))
             ->orderByRaw('ABS(popularity - ?)', [$midpoint])
+            ->first()
+            ?? Song::query()->matchingFilterIgnoringPopularity($filter)
+                ->orderByRaw('ABS(popularity - ?)', [$midpoint])
+                ->first();
+    }
+
+    private function popularityMidpoint(SongFilter $filter): int
+    {
+        if (in_array($filter->genre, [SongGenre::Artist, SongGenre::MultiArtist], true)) {
+            return $this->relativeTierMidpoint($filter);
+        }
+
+        [$min, $max] = $filter->tier->popularityRange();
+
+        return intdiv($min + $max, 2);
+    }
+
+    /**
+     * Same "which nth of the range" position as relativeTierBucket()'s
+     * row-count split, expressed as a popularity value instead of a row
+     * offset, computed from THIS room's own pool - not the meaningless
+     * global band - so a niche artist's Easy target still lands near the
+     * top of *their* catalog, not near 85-100 globally.
+     */
+    private function relativeTierMidpoint(SongFilter $filter): int
+    {
+        $tiers = $filter->enabledTiers !== [] ? $filter->enabledTiers : DifficultyTier::ordered();
+        $bucketIndex = array_search($filter->tier, $tiers, true);
+        $n = max(count($tiers), 1);
+
+        $stats = Song::query()->matchingFilterIgnoringPopularity($filter)
+            ->selectRaw('MIN(popularity) as min_pop, MAX(popularity) as max_pop')
             ->first();
+
+        if ($stats === null || $stats->min_pop === null) {
+            [$min, $max] = $filter->tier->popularityRange();
+
+            return intdiv($min + $max, 2);
+        }
+
+        $position = $bucketIndex === false ? 0 : $bucketIndex;
+        $fraction = $n > 1 ? 1 - ($position / ($n - 1)) : 1;
+
+        return (int) round($stats->min_pop + $fraction * ($stats->max_pop - $stats->min_pop));
+    }
+
+    /**
+     * Artist/MultiArtist's selection path - ranks this room's own artist-
+     * filtered candidate pool by popularity and picks from the bucket
+     * matching the current tier's relative position, instead of the global
+     * absolute popularity bands the rest of this class uses (see class
+     * docblock and DifficultyTier::popularityRange() - a single artist's
+     * whole catalog can sit entirely below Easy's [85,100] band).
+     *
+     * RoundService::start() and PrimeArtistSongPool already warm the pool
+     * eagerly (so this is normally a cache hit with zero HTTP calls), but
+     * this method stays self-sufficient - same "always ends in a song, real
+     * discovery genuinely attempted first" guarantee every other genre's
+     * path has - rather than depending on an external caller having primed
+     * it first.
+     */
+    private function findRandomSongForRelativeTier(SongFilter $filter, SongSelectionContext $context): ?Song
+    {
+        if ($filter->genre === SongGenre::MultiArtist) {
+            return $this->findRandomSongForMultiArtist($filter, $context);
+        }
+
+        $candidate = $this->pickFromBucket($this->relativeTierBucket($filter), $context->excludeTrackIds);
+
+        if ($candidate) {
+            return $candidate;
+        }
+
+        $this->ensureArtistPoolReady($filter);
+        $candidate = $this->pickFromBucket($this->relativeTierBucket($filter), $context->excludeTrackIds);
+
+        return $candidate ?? $this->pickFallback($filter, $context->excludeTrackIds);
+    }
+
+    /**
+     * MultiArtist deliberately skips relativeTierBucket()'s popularity
+     * banding: partitioning several artists' combined catalog by rank
+     * consistently let whichever named artist happened to have the most
+     * absolute-popularity songs dominate the easy buckets while starving
+     * the others out of the harder ones, so "difficulty" ended up really
+     * meaning "which artist" rather than an actual difficulty signal, and
+     * every enabled tier kept drawing near-identical picks. Instead, every
+     * tier draws a genuinely uniform-random pick from the FULL combined
+     * pool (every named artist, every song, popularity ignored entirely) -
+     * "which artist plays next" and "which of their songs" are both left
+     * to chance rather than being shaped by the room's current tier.
+     */
+    private function findRandomSongForMultiArtist(SongFilter $filter, SongSelectionContext $context): ?Song
+    {
+        $candidate = $this->pickRandomFromPool(
+            Song::query()->matchingFilterIgnoringPopularity($filter)->get(),
+            $context->excludeTrackIds,
+        );
+
+        if ($candidate) {
+            return $candidate;
+        }
+
+        $this->ensureArtistPoolReady($filter);
+
+        $candidate = $this->pickRandomFromPool(
+            Song::query()->matchingFilterIgnoringPopularity($filter)->get(),
+            $context->excludeTrackIds,
+        );
+
+        return $candidate ?? $this->pickFallback($filter, $context->excludeTrackIds);
+    }
+
+    /**
+     * @param  Collection<int, Song>  $pool
+     * @param  array<int, string>  $excludeTrackIds
+     */
+    private function pickRandomFromPool(Collection $pool, array $excludeTrackIds): ?Song
+    {
+        $neverUsed = $pool->whereNull('last_used_at')->whereNotIn('deezer_track_id', $excludeTrackIds);
+
+        if ($neverUsed->isNotEmpty()) {
+            return $neverUsed->random();
+        }
+
+        $notExcludedThisGame = $pool->whereNotIn('deezer_track_id', $excludeTrackIds);
+
+        if ($notExcludedThisGame->isNotEmpty()) {
+            return $notExcludedThisGame->sortBy('last_used_at')->first();
+        }
+
+        return null;
+    }
+
+    /**
+     * Splits the full matching pool (ignoring popularity), ranked by
+     * popularity descending, into N buckets - N = however many tiers are
+     * enabled for this room (Part A). Bucket 0 (most popular) is this
+     * room's easiest enabled tier, bucket N-1 (least popular) its hardest.
+     *
+     * @return Collection<int, Song>
+     */
+    private function relativeTierBucket(SongFilter $filter): Collection
+    {
+        $tiers = $filter->enabledTiers !== [] ? $filter->enabledTiers : DifficultyTier::ordered();
+        $bucketIndex = array_search($filter->tier, $tiers, true);
+        $n = count($tiers);
+
+        if ($bucketIndex === false) {
+            return collect();
+        }
+
+        $total = Song::query()->matchingFilterIgnoringPopularity($filter)->count();
+
+        if ($total === 0) {
+            return collect();
+        }
+
+        [$offset, $size] = $this->bucketOffsetAndSize($total, $n, $bucketIndex);
+
+        return Song::query()->matchingFilterIgnoringPopularity($filter)
+            ->orderByDesc('popularity')
+            // Stable tiebreak so equal-popularity songs don't reshuffle
+            // bucket membership between calls.
+            ->orderBy('id')
+            ->skip($offset)
+            ->take($size)
+            ->get();
+    }
+
+    /**
+     * Splits `$total` ranked songs into `$n` roughly-equal buckets. Any
+     * leftover from integer division goes to the EARLIEST (most popular /
+     * easiest) buckets first, so Easy is never the one left short when the
+     * pool doesn't divide evenly - e.g. 32 songs / 5 tiers -> sizes
+     * [7, 7, 6, 6, 6], not [6, 6, 6, 6, 8].
+     *
+     * @return array{0: int, 1: int} [$offset, $size]
+     */
+    private function bucketOffsetAndSize(int $total, int $n, int $bucketIndex): array
+    {
+        $base = intdiv($total, $n);
+        $remainder = $total % $n;
+
+        $size = $base + ($bucketIndex < $remainder ? 1 : 0);
+        $offset = ($bucketIndex * $base) + min($bucketIndex, $remainder);
+
+        return [$offset, $size];
+    }
+
+    /**
+     * @param  Collection<int, Song>  $bucket
+     * @param  array<int, string>  $excludeTrackIds
+     */
+    private function pickFromBucket(Collection $bucket, array $excludeTrackIds): ?Song
+    {
+        $neverUsed = $bucket->whereNull('last_used_at')->whereNotIn('deezer_track_id', $excludeTrackIds);
+
+        if ($neverUsed->isNotEmpty()) {
+            // Same top-N-random spirit as the global path, just scaled to a
+            // much smaller pool - no era/artist relaxation ladder here: with
+            // a pool already restricted to a handful of named artists,
+            // "avoid repeating an artist" would be actively counterproductive.
+            return $neverUsed->sortByDesc('popularity')->take(self::TOP_N_RANDOM_POOL)->random();
+        }
+
+        $notExcludedThisGame = $bucket->whereNotIn('deezer_track_id', $excludeTrackIds);
+
+        if ($notExcludedThisGame->isNotEmpty()) {
+            return $notExcludedThisGame->sortBy('last_used_at')->first();
+        }
+
+        return null;
     }
 
     /**
@@ -298,6 +579,12 @@ class SongDiscoveryService
      */
     public function topUpTier(SongFilter $filter, int $attempts = self::MAX_DISCOVERY_ATTEMPTS): int
     {
+        if (in_array($filter->genre, [SongGenre::Artist, SongGenre::MultiArtist], true)) {
+            $this->ensureArtistPoolReady($filter);
+
+            return Song::query()->matchingFilterIgnoringPopularity($filter)->count();
+        }
+
         for ($attempt = 0; $attempt < $attempts; $attempt++) {
             $this->discoverAndCache($filter);
         }
@@ -436,15 +723,10 @@ class SongDiscoveryService
     {
         [$min, $max] = $filter->tier->popularityRange();
 
-        // Artist always sources from that one act's own top tracks,
-        // regardless of tier or era target - checked first so it can never
-        // fall through to a chart or generic search, exactly like German
-        // Rap's override below.
-        if ($filter->genre === SongGenre::Artist) {
-            $this->discoverFromArtist($filter, $min, $max);
-
-            return;
-        }
+        // Artist/MultiArtist never reach this method at all - see
+        // findRandomSongForTier()'s early branch to
+        // findRandomSongForRelativeTier(), which sources exclusively via
+        // ensureArtistPoolReady() instead.
 
         // Deezer's chart endpoint only ever reflects current
         // popularity - there is no "chart as of N years ago" to source
@@ -460,6 +742,18 @@ class SongDiscoveryService
         // already, naturally supplies.
         if ($targetEra === SongEra::Classic || $targetEra === SongEra::Mainstream) {
             $this->discoverFromWordSearch($filter, $min, $max, seekingEra: $targetEra);
+
+            return;
+        }
+
+        // Iconic sources exclusively from its seed playlist's actual
+        // tracklist - no word-search expansion, no other candidates. This
+        // is a deliberate "only real playlist tracks, nothing else"
+        // guarantee, not a discovery-volume shortcut. Checked ahead of the
+        // German Rap / chart-sourced-tier branches below since neither
+        // applies to a playlist-backed genre.
+        if ($filter->genre === SongGenre::Iconic) {
+            $this->discoverFromPlaylist($filter, $min, $max);
 
             return;
         }
@@ -500,6 +794,39 @@ class SongDiscoveryService
     }
 
     /**
+     * Iconic's ONLY source - the actual curated Deezer playlists this
+     * genre is built around (see SongGenre::deezerPlaylistIds()), merged
+     * into one shared pool, and nothing else. Fetches each playlist's
+     * whole tracklist (ICONIC_PLAYLIST_LIMIT) rather than a partial slice,
+     * since there's no other discovery path to fall back on for filling
+     * out the pool.
+     */
+    private function discoverFromPlaylist(SongFilter $filter, int $min, int $max): void
+    {
+        $playlistIds = $filter->genre->deezerPlaylistIds();
+
+        if ($playlistIds === []) {
+            return;
+        }
+
+        // Keyed by deezer_track_id so a track appearing on more than one
+        // of these playlists (a real risk now that there are ten) is only
+        // ever processed once per pass, not once per playlist it happens
+        // to be on - Song::updateOrCreate() would dedupe at the DB layer
+        // regardless, but this also avoids redundant trackDetails()/
+        // artistFanCount() calls for the same track.
+        $candidates = [];
+
+        foreach ($playlistIds as $playlistId) {
+            foreach ($this->deezer->playlistTracks($playlistId, self::ICONIC_PLAYLIST_LIMIT) as $track) {
+                $candidates[$track['deezer_track_id']] = $track;
+            }
+        }
+
+        $this->processCandidates($filter, array_values($candidates), $min, $max);
+    }
+
+    /**
      * Fallback for Hard/Extreme, where no legitimate chart ever lists
      * anything this obscure - candidates come from a generic Deezer search
      * instead, with the same non-original-recording filter applied.
@@ -514,27 +841,60 @@ class SongDiscoveryService
     }
 
     /**
-     * Artist genre's dedicated discovery path - see class docblock. Resolves
-     * the host's typed name to a Deezer artist id (cached 30 days; a cached
-     * null is treated as a cache miss by Cache::remember and simply retries
-     * the lookup next call, not a bug), then pulls that artist's own top
-     * tracks and runs them through the same per-candidate pipeline as the
-     * chart/word-search paths. A name that resolves to nothing (Deezer has
-     * literally no matching artist) leaves the cache untouched for this
-     * pass - findRandomSongForTier()'s retry loop and eventual fallback
-     * still apply exactly as for any other genre that comes up empty.
+     * Populates the local cache with the full usable catalog (no popularity-
+     * band restriction - the 0-100 range) for every artist a room's filter
+     * names, one Deezer /artist/{id}/top call per artist. Artist/MultiArtist
+     * rank tiers relative to this pool at query time (see
+     * relativeTierBucket()) rather than by the global absolute bands, so
+     * nothing should ever be discarded here for being "too popular" or "too
+     * obscure" - only the usual preview/cover/year-floor checks in
+     * processCandidates() apply. Guarded by a 24h per-artist-id freshness
+     * cache so repeat calls (the safety net in RoundService::start(), the
+     * background PrimeArtistSongPool job, a redo()) are near-free once warm.
      */
-    private function discoverFromArtist(SongFilter $filter, int $min, int $max): void
+    public function ensureArtistPoolReady(SongFilter $filter): void
     {
-        $artistId = $this->resolveArtistId($filter->artistName);
+        foreach ($this->artistNamesFor($filter) as $artistName) {
+            $this->fetchArtistCatalogIfStale($filter, $artistName);
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function artistNamesFor(SongFilter $filter): array
+    {
+        return match ($filter->genre) {
+            SongGenre::MultiArtist => $filter->artistNames ?? [],
+            SongGenre::Artist => array_filter([$filter->artistName]),
+            default => [],
+        };
+    }
+
+    private function fetchArtistCatalogIfStale(SongFilter $filter, string $artistName): void
+    {
+        $artistId = $this->resolveArtistId($artistName);
 
         if ($artistId === null) {
             return;
         }
 
-        $candidates = $this->deezer->artistTopTracks($artistId, self::CHART_LIMIT);
+        $freshKey = "deezer:artist-pool-fresh:{$artistId}";
 
-        $this->processCandidates($filter, $candidates, $min, $max);
+        if (Cache::has($freshKey)) {
+            return;
+        }
+
+        // A smaller limit than the global CHART_LIMIT - bounds worst-case
+        // latency for a many-artist MultiArtist room on a cold cache (the
+        // synchronous safety net in RoundService::start()), since this is
+        // one HTTP call per artist rather than one call total.
+        $candidates = $this->deezer->artistTopTracks($artistId, self::ARTIST_POOL_LIMIT);
+
+        // No band restriction (0-100) - see this method's docblock.
+        $this->processCandidates($filter, $candidates, 0, 100);
+
+        Cache::put($freshKey, true, now()->addHours(self::ARTIST_POOL_FRESH_HOURS));
     }
 
     private function resolveArtistId(?string $artistName): ?string
@@ -562,6 +922,16 @@ class SongDiscoveryService
      */
     private function processCandidates(SongFilter $filter, array $candidates, int $min, int $max): void
     {
+        // Every candidate that survives the three cheap in-memory checks
+        // below then costs two sequential Deezer calls (trackDetails +
+        // artistFanCount). Cap how many we spend per pass so a cold-cache
+        // round start - a full 50-track chart, or all ten of Iconic's seed
+        // playlists at once - can't run the web request past its
+        // execution-time limit. ExpandSongPool tops the rest up in the
+        // background (config('songs.min_pool_size')) once the round is away.
+        $spendLimit = (int) config('songs.discovery_pass_limit');
+        $spent = 0;
+
         foreach ($candidates as $candidate) {
             if (! $candidate['preview_url']) {
                 continue;
@@ -574,6 +944,12 @@ class SongDiscoveryService
             if ($this->looksLikeNonOriginalRecording($candidate['title'], $candidate['artist'])) {
                 continue;
             }
+
+            if ($spendLimit > 0 && $spent >= $spendLimit) {
+                break;
+            }
+
+            $spent++;
 
             $details = $this->deezer->trackDetails($candidate['deezer_track_id']);
 
@@ -714,7 +1090,9 @@ class SongDiscoveryService
             // Same relaxed floor as Classics - a host naming a pre-2000 act
             // (Elvis, The Beatles) must not have their whole catalog
             // filtered out by a floor that makes no sense for this mode.
-            SongGenre::Classics, SongGenre::Artist => (int) config('songs.classics_min_release_year'),
+            // Iconic needs the same relaxation - its seed playlist itself
+            // starts in the 1950s (e.g. "Jailhouse Rock").
+            SongGenre::Classics, SongGenre::Artist, SongGenre::MultiArtist, SongGenre::Iconic => (int) config('songs.classics_min_release_year'),
             SongGenre::Year => $filter->yearFrom ?? (int) config('songs.min_release_year'),
             default => (int) config('songs.min_release_year'),
         };

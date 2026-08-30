@@ -11,8 +11,11 @@ use App\Events\TierAdvanced;
 use App\Jobs\AdvanceRoundStage;
 use App\Jobs\ExpandSongPool;
 use App\Models\GameRoom;
+use App\Models\RoomPlayer;
 use App\Models\Song;
 use App\Models\User;
+use App\Services\GuessService;
+use App\Services\RoundService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -65,6 +68,24 @@ class RoundLifecycleTest extends TestCase
         Event::assertDispatched(RoundStarted::class);
     }
 
+    public function test_round_started_broadcasts_the_round_number_and_total_rounds(): void
+    {
+        Event::fake([RoundStarted::class]);
+
+        $this->seedSongsForAllTiers();
+        $host = User::factory()->create();
+        $room = GameRoom::factory()->for($host, 'host')->create(['songs_per_tier' => 2]);
+
+        $this->actingAs($host)->postJson("/api/rooms/{$room->code}/start")->assertOk();
+
+        Event::assertDispatched(RoundStarted::class, function (RoundStarted $event) {
+            $payload = $event->broadcastWith();
+
+            // First round of Easy, out of 2 tiers-worth (2 * 5 tiers) total.
+            return $payload['round_number'] === 1 && $payload['total_rounds'] === 10;
+        });
+    }
+
     public function test_starting_a_room_fails_when_no_matching_song_can_be_found(): void
     {
         // No songs seeded, and the live chart returns nothing usable either.
@@ -108,7 +129,7 @@ class RoundLifecycleTest extends TestCase
         $host = User::factory()->create();
         $room = GameRoom::factory()->for($host, 'host')->create(['songs_per_tier' => 1]);
 
-        app(\App\Services\RoundService::class)->start($room);
+        app(RoundService::class)->start($room);
 
         $this->assertSame('https://example.com/freshly-refreshed.mp3', $stale->fresh()->preview_url);
 
@@ -148,7 +169,7 @@ class RoundLifecycleTest extends TestCase
         $host = User::factory()->create();
         $room = GameRoom::factory()->for($host, 'host')->create(['songs_per_tier' => 1]);
 
-        $round = app(\App\Services\RoundService::class)->start($room);
+        $round = app(RoundService::class)->start($room);
 
         $this->assertSame($alive->id, $round->song_id);
         $this->assertSame('https://example.com/alive-fresh.mp3', $alive->fresh()->preview_url);
@@ -173,12 +194,12 @@ class RoundLifecycleTest extends TestCase
         $this->seedSongsForAllTiers(count: 2);
         $host = User::factory()->create();
         $room = GameRoom::factory()->for($host, 'host')->create(['songs_per_tier' => 2]);
-        app(\App\Services\RoundService::class)->start($room);
+        app(RoundService::class)->start($room);
 
         $round = $room->rounds()->first();
         $player = $room->players()->create([
             'nickname' => 'Alice',
-            'connection_token' => \App\Models\RoomPlayer::generateConnectionToken(),
+            'connection_token' => RoomPlayer::generateConnectionToken(),
         ]);
 
         $response = $this->withHeader('X-Player-Token', $player->connection_token)
@@ -235,7 +256,7 @@ class RoundLifecycleTest extends TestCase
 
         $player = $room->players()->create([
             'nickname' => 'Alice',
-            'connection_token' => \App\Models\RoomPlayer::generateConnectionToken(),
+            'connection_token' => RoomPlayer::generateConnectionToken(),
         ]);
 
         $this->withHeader('X-Player-Token', $player->connection_token)
@@ -282,7 +303,7 @@ class RoundLifecycleTest extends TestCase
 
         $player = $room->players()->create([
             'nickname' => 'Alice',
-            'connection_token' => \App\Models\RoomPlayer::generateConnectionToken(),
+            'connection_token' => RoomPlayer::generateConnectionToken(),
         ]);
 
         $this->withHeader('X-Player-Token', $player->connection_token)
@@ -296,6 +317,80 @@ class RoundLifecycleTest extends TestCase
         $this->assertSame(5_194_479, $song->fresh()->artist_fan_count);
     }
 
+    public function test_round_won_broadcasts_the_songs_deezer_track_id(): void
+    {
+        // See test_round_won_broadcasts_the_songs_album_art() above for why
+        // TierAdvanced needs its own explicit fake here too.
+        Event::fake([RoundWon::class, TierAdvanced::class]);
+        Queue::fake();
+
+        $host = User::factory()->create();
+        $room = GameRoom::factory()->for($host, 'host')->create(['songs_per_tier' => 1]);
+        $song = Song::factory()->forTier(DifficultyTier::Easy)->create([
+            'deezer_track_id' => '123456789',
+        ]);
+        $room->update(['current_tier' => DifficultyTier::Easy->value]);
+        $round = $room->rounds()->create([
+            'song_id' => $song->id,
+            'tier' => DifficultyTier::Easy->value,
+            'snippet_stage' => 0.1,
+            'stage_started_at' => now(),
+            'status' => 'playing',
+            'stage_version' => 1,
+        ]);
+
+        $player = $room->players()->create([
+            'nickname' => 'Alice',
+            'connection_token' => RoomPlayer::generateConnectionToken(),
+        ]);
+
+        $this->withHeader('X-Player-Token', $player->connection_token)
+            ->postJson("/api/rounds/{$round->id}/guess", ['guess' => $song->title])
+            ->assertOk();
+
+        Event::assertDispatched(
+            RoundWon::class,
+            fn (RoundWon $event) => $event->broadcastWith()['answer']['deezer_track_id'] === '123456789',
+        );
+    }
+
+    public function test_round_won_broadcasts_the_winners_level(): void
+    {
+        // See test_round_won_broadcasts_the_songs_album_art() above for why
+        // TierAdvanced needs its own explicit fake here too.
+        Event::fake([RoundWon::class, TierAdvanced::class]);
+        Queue::fake();
+
+        $host = User::factory()->create();
+        $room = GameRoom::factory()->for($host, 'host')->create(['songs_per_tier' => 1]);
+        $song = Song::factory()->forTier(DifficultyTier::Easy)->create();
+        $room->update(['current_tier' => DifficultyTier::Easy->value]);
+        $round = $room->rounds()->create([
+            'song_id' => $song->id,
+            'tier' => DifficultyTier::Easy->value,
+            'snippet_stage' => 0.1,
+            'stage_started_at' => now(),
+            'status' => 'playing',
+            'stage_version' => 1,
+        ]);
+
+        $winner = User::factory()->create(['xp' => 300]);
+        $player = $room->players()->create([
+            'user_id' => $winner->id,
+            'nickname' => 'Leveled',
+            'connection_token' => RoomPlayer::generateConnectionToken(),
+        ]);
+
+        $this->withHeader('X-Player-Token', $player->connection_token)
+            ->postJson("/api/rounds/{$round->id}/guess", ['guess' => $song->title])
+            ->assertOk();
+
+        Event::assertDispatched(
+            RoundWon::class,
+            fn (RoundWon $event) => $event->broadcastWith()['winner_level'] === 3,
+        );
+    }
+
     public function test_a_wrong_guess_does_not_win_and_the_round_stays_open(): void
     {
         Event::fake();
@@ -303,12 +398,12 @@ class RoundLifecycleTest extends TestCase
         $this->seedSongsForAllTiers();
         $host = User::factory()->create();
         $room = GameRoom::factory()->for($host, 'host')->create(['songs_per_tier' => 1]);
-        app(\App\Services\RoundService::class)->start($room);
+        app(RoundService::class)->start($room);
         $round = $room->rounds()->first();
 
         $player = $room->players()->create([
             'nickname' => 'Alice',
-            'connection_token' => \App\Models\RoomPlayer::generateConnectionToken(),
+            'connection_token' => RoomPlayer::generateConnectionToken(),
         ]);
 
         $response = $this->withHeader('X-Player-Token', $player->connection_token)
@@ -328,13 +423,13 @@ class RoundLifecycleTest extends TestCase
         $this->seedSongsForAllTiers();
         $host = User::factory()->create();
         $room = GameRoom::factory()->for($host, 'host')->create(['songs_per_tier' => 1]);
-        app(\App\Services\RoundService::class)->start($room);
+        app(RoundService::class)->start($room);
         $round = $room->rounds()->first();
 
         $otherRoom = GameRoom::factory()->create();
         $player = $otherRoom->players()->create([
             'nickname' => 'Eve',
-            'connection_token' => \App\Models\RoomPlayer::generateConnectionToken(),
+            'connection_token' => RoomPlayer::generateConnectionToken(),
         ]);
 
         $response = $this->withHeader('X-Player-Token', $player->connection_token)
@@ -350,12 +445,12 @@ class RoundLifecycleTest extends TestCase
         $this->seedSongsForAllTiers();
         $host = User::factory()->create();
         $room = GameRoom::factory()->for($host, 'host')->create(['songs_per_tier' => 1]);
-        app(\App\Services\RoundService::class)->start($room);
+        app(RoundService::class)->start($room);
 
         $round = $room->rounds()->first();
         $player = $room->players()->create([
             'nickname' => 'Alice',
-            'connection_token' => \App\Models\RoomPlayer::generateConnectionToken(),
+            'connection_token' => RoomPlayer::generateConnectionToken(),
         ]);
 
         $this->withHeader('X-Player-Token', $player->connection_token)
@@ -364,7 +459,11 @@ class RoundLifecycleTest extends TestCase
 
         $room->refresh();
         $this->assertSame('intermediate', $room->current_tier->value);
-        Event::assertDispatched(TierAdvanced::class);
+        Event::assertDispatched(
+            TierAdvanced::class,
+            // songs_per_tier=1, so Intermediate's first round is round 2.
+            fn (TierAdvanced $event) => $event->broadcastWith()['round_number'] === 2,
+        );
     }
 
     public function test_the_game_finishes_after_the_last_tiers_last_song_is_won(): void
@@ -374,11 +473,11 @@ class RoundLifecycleTest extends TestCase
         $this->seedSongsForAllTiers();
         $host = User::factory()->create();
         $room = GameRoom::factory()->for($host, 'host')->create(['songs_per_tier' => 1]);
-        app(\App\Services\RoundService::class)->start($room);
+        app(RoundService::class)->start($room);
 
         $player = $room->players()->create([
             'nickname' => 'Alice',
-            'connection_token' => \App\Models\RoomPlayer::generateConnectionToken(),
+            'connection_token' => RoomPlayer::generateConnectionToken(),
         ]);
 
         foreach (DifficultyTier::ordered() as $tier) {
@@ -401,18 +500,18 @@ class RoundLifecycleTest extends TestCase
         $this->seedSongsForAllTiers();
         $host = User::factory()->create();
         $room = GameRoom::factory()->for($host, 'host')->create(['songs_per_tier' => 1]);
-        app(\App\Services\RoundService::class)->start($room);
+        app(RoundService::class)->start($room);
 
         $player = $room->players()->create([
             'nickname' => 'Alice',
-            'connection_token' => \App\Models\RoomPlayer::generateConnectionToken(),
+            'connection_token' => RoomPlayer::generateConnectionToken(),
         ]);
 
         // Guesses submitted directly through the service, not HTTP - mixing
         // a real 'player'-guard HTTP call with the later 'sanctum'-guard
         // actingAs() call in the same test hits the same guard-caching
         // gotcha documented in GuessRaceConditionTest/LevelingTest.
-        $guessService = app(\App\Services\GuessService::class);
+        $guessService = app(GuessService::class);
 
         foreach (DifficultyTier::ordered() as $tier) {
             $round = $room->fresh()->rounds()->where('status', 'playing')->firstOrFail();

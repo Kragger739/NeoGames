@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\SongGenre;
 use App\Models\Song;
 use App\Services\SongDiscoveryService;
 use App\Support\SongFilter;
@@ -23,8 +24,14 @@ class ExpandSongPool implements ShouldQueue
     public function handle(SongDiscoveryService $songDiscovery): void
     {
         // Cheap early-exit: most dispatches resolve instantly with zero
-        // HTTP calls once a filter's pool is already healthy.
-        if (Song::query()->matchingFilter($this->filter)->count() >= config('songs.min_pool_size')) {
+        // HTTP calls once a filter's pool is already healthy. Skipped for
+        // Artist/MultiArtist - matchingFilter()'s global popularity band is
+        // meaningless for these two (they rank relatively, see
+        // SongDiscoveryService::relativeTierBucket()) - topUpTier()'s own
+        // 24h per-artist freshness cache decides whether there's real work.
+        $isRelative = in_array($this->filter->genre, [SongGenre::Artist, SongGenre::MultiArtist], true);
+
+        if (! $isRelative && Song::query()->matchingFilter($this->filter)->count() >= config('songs.min_pool_size')) {
             return;
         }
 

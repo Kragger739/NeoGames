@@ -24,6 +24,24 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+
+        // Deployed behind a PaaS load balancer / Cloudflare tunnel (see
+        // Dockerfile). Without this, Laravel sees plain HTTP: secure-cookie
+        // flagging fails, generated URLs are http://, and per-IP rate
+        // limiting keys on the proxy's address instead of the client's.
+        $middleware->trustProxies(
+            at: '*',
+            headers: Request::HEADER_X_FORWARDED_FOR
+                | Request::HEADER_X_FORWARDED_HOST
+                | Request::HEADER_X_FORWARDED_PORT
+                | Request::HEADER_X_FORWARDED_PROTO,
+        );
+
+        // A blanket ceiling on the whole API surface (the "api" rate
+        // limiter is defined in AppServiceProvider). Auth-sensitive routes
+        // (login, register, password reset, email verification) set their
+        // own tighter throttles on top of this in routes/api.php.
+        $middleware->throttleApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
