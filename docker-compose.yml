@@ -1,0 +1,180 @@
+# NeoGames - production stack for Dokploy (Docker Compose app type).
+#
+# Services
+#   postgres  - database (sessions / cache / queue / broadcasting all use it)
+#   backend   - Laravel API + nginx + Reverb websockets + queue worker, all
+#               in one container via supervisord (see backend/Dockerfile).
+#               nginx is the only public port; it fastcgi's PHP and proxies
+#               the /app/ websocket path to the loopback-only Reverb process.
+#   frontend  - the built React SPA served as static files by nginx.
+#
+# Ingress is Dokploy's Traefik. It joins `dokploy-network`, terminates TLS,
+# and routes by Host() using the labels below. Set the two domains + all
+# secrets in Dokploy's "Environment" tab (see .env.example for the full list).
+#
+# Reverb note: the browser reaches Reverb over the public API domain
+# (VITE_REVERB_* build args -> wss://${API_DOMAIN}/app/...), while Laravel
+# itself publishes events to Reverb over the container loopback
+# (REVERB_HOST=127.0.0.1 below). Those are two different code paths and must
+# stay split for the single-container layout to work.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-neogames}
+      POSTGRES_USER: ${POSTGRES_USER:-neogames}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neogames} -d ${POSTGRES_DB:-neogames}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # --- core ---
+      APP_NAME: ${APP_NAME:-NeoGames}
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: "${APP_KEY:?set APP_KEY - run php artisan key:generate --show}"
+      APP_URL: https://${API_DOMAIN:?set API_DOMAIN}
+      # nginx inside the container listens on this port; the Traefik label
+      # below points at the same number.
+      PORT: "8000"
+
+      # --- logging: straight to stdout/stderr so `dokploy logs` shows it ---
+      LOG_CHANNEL: stderr
+      LOG_STACK: stderr
+      LOG_LEVEL: ${LOG_LEVEL:-warning}
+
+      # --- database ---
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: ${POSTGRES_DB:-neogames}
+      DB_USERNAME: ${POSTGRES_USER:-neogames}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+
+      # --- session / auth (SPA + API on sibling subdomains of one root) ---
+      SESSION_DRIVER: database
+      SESSION_LIFETIME: "120"
+      SESSION_ENCRYPT: "true"
+      SESSION_SECURE_COOKIE: "true"
+      SESSION_SAME_SITE: lax
+      # e.g. ".example.com" - the leading dot shares the cookie between
+      # ${APP_DOMAIN} and ${API_DOMAIN}. Leave unset only if you serve both
+      # from the exact same host.
+      SESSION_DOMAIN: ${SESSION_DOMAIN:-}
+      FRONTEND_URL: https://${APP_DOMAIN:?set APP_DOMAIN}
+      SANCTUM_STATEFUL_DOMAINS: ${APP_DOMAIN}
+
+      # --- queue / cache / broadcasting / files ---
+      QUEUE_CONNECTION: database
+      CACHE_STORE: database
+      BROADCAST_CONNECTION: reverb
+      FILESYSTEM_DISK: local
+
+      # --- Reverb: shared app credentials (must match the frontend build
+      #     args) + the loopback target Laravel uses to publish events ---
+      REVERB_APP_ID: ${REVERB_APP_ID:?set REVERB_APP_ID}
+      REVERB_APP_KEY: ${REVERB_APP_KEY:?set REVERB_APP_KEY}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET:?set REVERB_APP_SECRET}
+      REVERB_HOST: "127.0.0.1"
+      REVERB_PORT: "8080"
+      REVERB_SCHEME: http
+
+      # --- mail (verification codes, password resets) ---
+      MAIL_MAILER: ${MAIL_MAILER:-smtp}
+      MAIL_SCHEME: ${MAIL_SCHEME:-tls}
+      MAIL_HOST: ${MAIL_HOST:?set MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:?set MAIL_FROM_ADDRESS}
+      MAIL_FROM_NAME: ${APP_NAME:-NeoGames}
+
+      # --- social login (optional - leave blank to disable a provider) ---
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: https://${API_DOMAIN}/api/auth/google/callback
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+      DISCORD_REDIRECT_URI: https://${API_DOMAIN}/api/auth/discord/callback
+    volumes:
+      # Uploaded avatars etc. `storage/app` only - keeps the image's
+      # storage/framework (compiled views, etc.) intact.
+      - backend_storage:/var/www/html/storage/app
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/up >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    expose:
+      - "8000"
+    networks:
+      - internal
+      - dokploy-network
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      # HTTPS router
+      - traefik.http.routers.neogames-api.rule=Host(`${API_DOMAIN}`)
+      - traefik.http.routers.neogames-api.entrypoints=websecure
+      - traefik.http.routers.neogames-api.tls=true
+      - traefik.http.routers.neogames-api.tls.certresolver=letsencrypt
+      - traefik.http.services.neogames-api.loadbalancer.server.port=8000
+      # HTTP -> HTTPS
+      - traefik.http.routers.neogames-api-web.rule=Host(`${API_DOMAIN}`)
+      - traefik.http.routers.neogames-api-web.entrypoints=web
+      - traefik.http.routers.neogames-api-web.middlewares=neogames-https
+      - traefik.http.middlewares.neogames-https.redirectscheme.scheme=https
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: https://${API_DOMAIN:?set API_DOMAIN}
+        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:?set REVERB_APP_KEY}
+        VITE_REVERB_HOST: ${API_DOMAIN}
+        VITE_REVERB_PORT: "443"
+        VITE_REVERB_SCHEME: https
+    restart: unless-stopped
+    networks:
+      - dokploy-network
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      - traefik.http.routers.neogames-web.rule=Host(`${APP_DOMAIN}`)
+      - traefik.http.routers.neogames-web.entrypoints=websecure
+      - traefik.http.routers.neogames-web.tls=true
+      - traefik.http.routers.neogames-web.tls.certresolver=letsencrypt
+      - traefik.http.services.neogames-web.loadbalancer.server.port=80
+      - traefik.http.routers.neogames-web-http.rule=Host(`${APP_DOMAIN}`)
+      - traefik.http.routers.neogames-web-http.entrypoints=web
+      - traefik.http.routers.neogames-web-http.middlewares=neogames-web-https
+      - traefik.http.middlewares.neogames-web-https.redirectscheme.scheme=https
+
+volumes:
+  pgdata:
+  backend_storage:
+
+networks:
+  # Pre-created by Dokploy; Traefik lives here.
+  dokploy-network:
+    external: true
+  internal:
