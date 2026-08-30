@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Hammer, Trophy, UserRound, Users2 } from "lucide-react";
+import { Hammer, ShieldCheck, Trophy, UserRound, Users2 } from "lucide-react";
 
 import { PLAYABLE_GAMES, LOCKED_GAMES } from "../lib/games";
 import { useAuthStore } from "../stores/authStore";
@@ -88,6 +88,12 @@ export function HomePage() {
           Friends
           {pendingRequestCount > 0 && <Badge tone="coral">{pendingRequestCount}</Badge>}
         </Link>
+        {host?.is_admin && (
+          <Link to="/admin">
+            <ShieldCheck size={16} strokeWidth={2.25} />
+            Admin
+          </Link>
+        )}
       </nav>
       <Button variant="ghost" onClick={handleLogout}>
         Log out

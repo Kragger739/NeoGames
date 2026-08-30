@@ -1,8 +1,11 @@
 import { Route, Routes } from "react-router-dom";
 
+import { RequireAdmin } from "./components/RequireAdmin";
 import { RequireHost } from "./components/RequireHost";
 import { RoomInviteToast } from "./components/RoomInviteToast";
 import { SiteFooter } from "./components/SiteFooter";
+import { AdminUserDetailPage } from "./pages/AdminUserDetailPage";
+import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { DdfGmPanelPage } from "./pages/DdfGmPanelPage";
 import { DdfLandingPage } from "./pages/DdfLandingPage";
 import { DdfLobbyPage } from "./pages/DdfLobbyPage";
@@ -111,6 +114,22 @@ function App() {
             <RequireHost>
               <FriendsPage />
             </RequireHost>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <RequireAdmin>
+              <AdminUsersPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/admin/users/:id"
+          element={
+            <RequireAdmin>
+              <AdminUserDetailPage />
+            </RequireAdmin>
           }
         />
         <Route path="/play/:code" element={<JoinPage />} />
