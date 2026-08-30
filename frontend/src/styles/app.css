@@ -1792,3 +1792,69 @@ button:disabled {
   gap: 12px;
   margin-top: 16px;
 }
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 28rem;
+  margin: 20px 0 32px;
+}
+
+.admin-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.admin-form input[type="text"],
+.admin-form input[type="email"] {
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.admin-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.admin-moderation {
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 28rem;
+}
+
+.admin-moderation h2 {
+  margin: 0;
+  color: var(--ink);
+}
+
+.admin-moderation .hint {
+  color: var(--ink-soft);
+}
+
+.admin-ban-box {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-ban-box input {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
