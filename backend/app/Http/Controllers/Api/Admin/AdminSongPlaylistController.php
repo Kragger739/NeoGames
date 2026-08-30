@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Console\Commands\SyncSongsCommand;
 use App\Enums\SongGenre;
 use App\Http\Controllers\Controller;
-use App\Jobs\SyncSongPool;
 use App\Models\SeedPlaylist;
 use App\Models\Song;
+use App\Services\Music\IncrementalSongSync;
 use App\Services\Music\SpotifyClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -16,8 +16,9 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Admin CRUD for the curated Spotify playlists that seed each genre's song
- * pool, plus a "Sync now" trigger. Under the same auth:sanctum + admin
- * middleware group as the rest of the admin dashboard.
+ * pool, plus the browser-driven "Sync now" flow (IncrementalSongSync - no
+ * queue worker involved). Under the same auth:sanctum + admin middleware
+ * group as the rest of the admin dashboard.
  */
 class AdminSongPlaylistController extends Controller
 {
@@ -30,7 +31,7 @@ class AdminSongPlaylistController extends Controller
         ));
     }
 
-    public function index()
+    public function index(IncrementalSongSync $sync)
     {
         return response()->json([
             'genres' => array_map(fn (SongGenre $g) => $g->value, $this->playlistGenres()),
@@ -43,6 +44,9 @@ class AdminSongPlaylistController extends Controller
                 ]),
             'pool_size' => Song::count(),
             'last_sync' => Cache::get(SyncSongsCommand::STATUS_CACHE_KEY),
+            // Non-null while a browser-driven sync is mid-run (lets the page
+            // resume the loop after a reload).
+            'sync_progress' => $sync->current(),
         ]);
     }
 
@@ -82,28 +86,18 @@ class AdminSongPlaylistController extends Controller
         return response()->noContent();
     }
 
-    public function sync()
+    /**
+     * Drives the browser-driven sync. `POST {"start": true}` begins a run
+     * (optionally `"fresh": true` to wipe the pool first); a bare `POST`
+     * advances it by one small slice. The client keeps calling until the
+     * response `phase` is "done" or "error". No queue worker involved.
+     */
+    public function sync(Request $request, IncrementalSongSync $sync)
     {
-        if (SeedPlaylist::query()->doesntExist() && config('music.german_rap_artists', []) === []) {
-            throw ValidationException::withMessages([
-                'playlist' => ['Add at least one Spotify playlist before syncing.'],
-            ]);
+        if ($request->boolean('start')) {
+            return response()->json($sync->start($request->boolean('fresh')));
         }
 
-        $status = Cache::get(SyncSongsCommand::STATUS_CACHE_KEY);
-        $running = in_array($status['state'] ?? null, ['queued', 'running'], true)
-            && isset($status['started_at'])
-            && now()->diffInMinutes($status['started_at']) < 60;
-
-        if ($running) {
-            return response()->json(['queued' => false, 'reason' => 'already_running', 'last_sync' => $status], 202);
-        }
-
-        // Mark it queued right away so the dashboard reflects the request
-        // even before the queue worker picks the job up.
-        SyncSongsCommand::putStatus('queued');
-        SyncSongPool::dispatch();
-
-        return response()->json(['queued' => true, 'last_sync' => Cache::get(SyncSongsCommand::STATUS_CACHE_KEY)], 202);
+        return response()->json($sync->step());
     }
 }

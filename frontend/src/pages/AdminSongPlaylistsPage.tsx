@@ -16,21 +16,20 @@ const GENRE_LABELS: Record<string, string> = {
 };
 
 export function AdminSongPlaylistsPage() {
-  const { genres, playlists, poolSize, lastSync, status, syncError, pollNote, fetch, add, remove, sync, stopPolling } =
+  const { genres, playlists, poolSize, lastSync, progress, running, status, syncError, fetch, add, remove, startSync, stopSync } =
     useAdminPlaylistsStore();
-
-  const syncing = (lastSync?.state === "queued" || lastSync?.state === "running") && !pollNote;
 
   const [genre, setGenre] = useState("");
   const [playlist, setPlaylist] = useState("");
   const [label, setLabel] = useState("");
+  const [fresh, setFresh] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     void fetch();
-    return () => stopPolling();
-  }, [fetch, stopPolling]);
+    return () => stopSync();
+  }, [fetch, stopSync]);
 
   useEffect(() => {
     if (!genre && genres.length > 0) setGenre(genres[0]);
@@ -70,31 +69,50 @@ export function AdminSongPlaylistsPage() {
       <p className="hint">
         Curated <strong>public, user-made</strong> Spotify playlists that seed each genre&rsquo;s
         song pool. Spotify&rsquo;s own editorial playlists (Today&rsquo;s Top Hits, RapCaviar…)
-        can&rsquo;t be read via the API. After changing these, run a sync.
+        can&rsquo;t be read via the API. The sync runs right here in your browser — keep this tab
+        open until it finishes (a large pool can take several minutes).
       </p>
 
       <div className="admin-sync-bar">
-        <Button onClick={() => void sync()} disabled={syncing}>
-          {syncing ? "Syncing…" : "Sync now"}
+        <Button onClick={() => void startSync(fresh)} disabled={running}>
+          {running ? "Syncing…" : "Sync now"}
         </Button>
-        <Button variant="ghost" onClick={() => void fetch()}>
-          Refresh
-        </Button>
+        {running && (
+          <Button variant="ghost" onClick={() => stopSync()}>
+            Stop
+          </Button>
+        )}
+        {!running && (
+          <label className="admin-check">
+            <input type="checkbox" checked={fresh} onChange={(e) => setFresh(e.target.checked)} />
+            Replace the whole pool
+          </label>
+        )}
         <span className="hint">Pool: {poolSize} songs</span>
       </div>
+
       {syncError && <p className="form-error">{syncError}</p>}
-      {pollNote && <p className="form-error">{pollNote}</p>}
-      {lastSync && !pollNote && (
-        <p className="hint">
-          {lastSync.state === "queued" && "Sync queued — waiting for the worker to pick it up…"}
-          {lastSync.state === "running" &&
-            `Sync running${lastSync.started_at ? ` (started ${new Date(lastSync.started_at).toLocaleTimeString()})` : ""} — this takes a few minutes for a large pool.`}
-          {lastSync.state === "done" &&
-            `Last sync ${new Date(lastSync.at).toLocaleString()} — ${lastSync.summary}.`}
-          {lastSync.state === "error" && `Last sync failed: ${lastSync.summary}`}
+      {progress && (
+        <p className={progress.phase === "error" ? "form-error" : "hint"}>
+          {progress.phase === "prepare" &&
+            `Reading playlists ${progress.prepared_count} / ${progress.total_playlists}…`}
+          {progress.phase === "seed" &&
+            `Adding songs ${progress.seeded + progress.skipped} / ${progress.total_items} (${progress.seeded} added, ${progress.skipped} had no preview)…`}
+          {progress.phase === "done" &&
+            `Done — ${progress.summary}. Pool now holds ${progress.pool_size} songs.`}
+          {progress.phase === "error" && `Sync failed: ${progress.error}`}
         </p>
       )}
-      {!lastSync && <p className="hint">Never synced.</p>}
+      {!progress && lastSync && (
+        <p className="hint">
+          {lastSync.state === "done"
+            ? `Last sync ${new Date(lastSync.at).toLocaleString()} — ${lastSync.summary}.`
+            : lastSync.state === "error"
+              ? `Last sync failed: ${lastSync.summary}`
+              : "A sync is in progress."}
+        </p>
+      )}
+      {!progress && !lastSync && <p className="hint">Never synced.</p>}
 
       <form className="admin-form" onSubmit={handleAdd}>
         <label>

@@ -87,7 +87,7 @@ class SongPoolSeeder
 
         try {
             if (! $disk->exists($path)) {
-                $response = Http::timeout(15)->get($appleUrl);
+                $response = Http::timeout(8)->get($appleUrl);
 
                 if (! $response->successful() || $response->body() === '') {
                     return $appleUrl;

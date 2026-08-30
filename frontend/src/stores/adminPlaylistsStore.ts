@@ -10,86 +10,65 @@ export interface SeedPlaylist {
   label: string | null;
 }
 
-export interface SyncStatus {
+export interface SyncProgress {
+  phase: "idle" | "prepare" | "seed" | "done" | "error";
+  prepared_count: number;
+  total_playlists: number;
+  seeded: number;
+  skipped: number;
+  total_items: number;
+  error: string | null;
+  summary: string | null;
+  pool_size: number;
+}
+
+interface LastSync {
   state: "queued" | "running" | "done" | "error";
   summary: string | null;
-  started_at: string | null;
-  finished_at: string | null;
   at: string;
-  pool_size: number;
 }
 
 interface AdminPlaylistsState {
   genres: string[];
   playlists: SeedPlaylist[];
   poolSize: number;
-  lastSync: SyncStatus | null;
+  lastSync: LastSync | null;
+  progress: SyncProgress | null;
+  running: boolean;
   status: "idle" | "loading" | "ready";
   syncError: string | null;
-  /** Set when polling gives up, e.g. the queue worker never picked the job up. */
-  pollNote: string | null;
   fetch: () => Promise<void>;
   add: (genre: string, playlist: string, label: string) => Promise<void>;
   remove: (id: number) => Promise<void>;
-  sync: () => Promise<void>;
-  stopPolling: () => void;
+  startSync: (fresh: boolean) => Promise<void>;
+  stopSync: () => void;
 }
 
-const POLL_MS = 6000;
-// Give up watching after this long overall (a big pool can genuinely take a
-// while, but we shouldn't poll forever).
-const MAX_POLLS = 150; // ~15 min
-// If it never leaves "queued", the worker isn't consuming the job.
-const QUEUED_STALL_POLLS = 6; // ~36 s
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-let pollTimer: ReturnType<typeof setTimeout> | null = null;
-let pollCount = 0;
-let sawRunning = false;
+// A run is browser-driven: this flag stops the loop if the admin navigates
+// away or clicks Stop. Module-scoped so it survives re-renders.
+let abort = false;
 
 export const useAdminPlaylistsStore = create<AdminPlaylistsState>((set, get) => {
-  function stop() {
-    if (pollTimer) clearTimeout(pollTimer);
-    pollTimer = null;
-  }
-
-  function schedulePoll() {
-    stop();
-    pollTimer = setTimeout(() => {
-      pollTimer = null;
-      pollCount += 1;
-      void get()
-        .fetch()
-        .then(() => {
-          const s = get().lastSync?.state;
-
-          if (s === "running") sawRunning = true;
-
-          if (s !== "queued" && s !== "running") return; // done / error - settled
-
-          if (!sawRunning && pollCount >= QUEUED_STALL_POLLS) {
-            set({
-              pollNote:
-                "The sync was queued but hasn't started — the background queue worker may be down. " +
-                "Run `php artisan songs:sync` in the backend container, or check `supervisorctl status`.",
-            });
-            return;
-          }
-
-          if (pollCount >= MAX_POLLS) {
-            set({ pollNote: "Still running — reload the page later to see the result." });
-            return;
-          }
-
-          schedulePoll();
-        });
-    }, POLL_MS);
-  }
-
-  function beginPolling() {
-    pollCount = 0;
-    sawRunning = false;
-    set({ pollNote: null });
-    schedulePoll();
+  async function runLoop() {
+    while (!abort) {
+      let res: SyncProgress;
+      try {
+        res = (await api.post("/api/admin/song-playlists/sync")).data;
+      } catch (err) {
+        set({ syncError: firstValidationError(err), running: false });
+        return;
+      }
+      set({ progress: res });
+      if (res.phase === "done" || res.phase === "error" || res.phase === "idle") {
+        set({ running: false });
+        await get().fetch();
+        return;
+      }
+      await sleep(res.phase === "prepare" ? 400 : 900);
+    }
+    set({ running: false });
   }
 
   return {
@@ -97,11 +76,10 @@ export const useAdminPlaylistsStore = create<AdminPlaylistsState>((set, get) => 
     playlists: [],
     poolSize: 0,
     lastSync: null,
+    progress: null,
+    running: false,
     status: "idle",
     syncError: null,
-    pollNote: null,
-
-    stopPolling: stop,
 
     fetch: async () => {
       if (get().status === "idle") set({ status: "loading" });
@@ -111,13 +89,15 @@ export const useAdminPlaylistsStore = create<AdminPlaylistsState>((set, get) => 
         playlists: data.playlists,
         poolSize: data.pool_size,
         lastSync: data.last_sync ?? null,
+        progress: data.sync_progress ?? get().progress,
         status: "ready",
       });
-      // Resume a bounded watch if a sync is still in flight (e.g. after
-      // navigating back to the page) and we're not already watching.
-      const s = data.last_sync?.state;
-      if ((s === "queued" || s === "running") && !pollTimer && !get().pollNote) {
-        beginPolling();
+      // A sync was left mid-run (e.g. page reload) - pick the loop back up.
+      const p = data.sync_progress?.phase;
+      if ((p === "prepare" || p === "seed") && !get().running) {
+        abort = false;
+        set({ running: true, syncError: null });
+        void runLoop();
       }
     },
 
@@ -131,15 +111,23 @@ export const useAdminPlaylistsStore = create<AdminPlaylistsState>((set, get) => 
       set({ playlists: get().playlists.filter((p) => p.id !== id) });
     },
 
-    sync: async () => {
-      set({ syncError: null, pollNote: null });
+    startSync: async (fresh) => {
+      set({ syncError: null, progress: null });
+      abort = false;
       try {
-        const { data } = await api.post("/api/admin/song-playlists/sync");
-        if (data.last_sync) set({ lastSync: data.last_sync });
-        beginPolling();
+        const { data } = await api.post("/api/admin/song-playlists/sync", { start: true, fresh });
+        set({ progress: data });
+        if (data.phase === "error") return;
+        set({ running: true });
+        void runLoop();
       } catch (err) {
         set({ syncError: firstValidationError(err) });
       }
+    },
+
+    stopSync: () => {
+      abort = true;
+      set({ running: false });
     },
   };
 });
