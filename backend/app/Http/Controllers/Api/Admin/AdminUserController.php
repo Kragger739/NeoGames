@@ -16,7 +16,9 @@ class AdminUserController extends Controller
 
         $users = User::query()
             ->when($search !== '', function ($query) use ($search) {
-                $like = '%'.$search.'%';
+                // Bindings are parameterised (injection-safe either way); escaping
+                // %/_ just stops a literal one in the query acting as a wildcard.
+                $like = '%'.addcslashes($search, '%_\\').'%';
                 $query->where(function ($q) use ($like) {
                     $q->where('name', 'like', $like)
                         ->orWhere('username', 'like', $like)
@@ -24,6 +26,7 @@ class AdminUserController extends Controller
                 });
             })
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->paginate(25);
 
         return response()->json([
@@ -65,6 +68,12 @@ class AdminUserController extends Controller
     {
         abort_if($user->is($request->user()), 422, 'You cannot delete your own account here.');
 
+        // FK cascades clear the relational rows, but the uploaded avatar
+        // file, the sessions table (no FK) and morphed notifications don't
+        // cascade - same cleanup ProfileController::destroy() runs for a
+        // self-delete.
+        $user->purgeArtifacts();
+
         $user->delete();
 
         return response()->noContent();
@@ -81,6 +90,10 @@ class AdminUserController extends Controller
         $user->forceFill([
             'banned_at' => now(),
             'ban_reason' => $validated['reason'] ?? null,
+            // Kill the recaller too: otherwise the remember-me cookie
+            // silently re-authenticates the banned user on any route that
+            // isn't behind `not-banned`.
+            'remember_token' => null,
         ])->save();
 
         DB::table('sessions')->where('user_id', $user->id)->delete();
@@ -119,7 +132,7 @@ class AdminUserController extends Controller
             'xp' => (int) ($user->xp ?? 0),
             'level' => $user->level,
             'is_admin' => (bool) $user->is_admin,
-            'banned_at' => optional($user->banned_at)->toIso8601String(),
+            'banned_at' => $user->banned_at?->toIso8601String(),
             'ban_reason' => $user->ban_reason,
             'created_at' => $user->created_at?->toIso8601String(),
             'avatar' => $user->avatarPayload(),

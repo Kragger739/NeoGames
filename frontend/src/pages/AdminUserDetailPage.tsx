@@ -50,6 +50,17 @@ export function AdminUserDetailPage() {
     });
   }, [selected]);
 
+  if (!Number.isFinite(userId)) {
+    return (
+      <div className="admin-page">
+        <p>
+          <Link to="/admin">← Users</Link>
+        </p>
+        <p className="hint">User not found.</p>
+      </div>
+    );
+  }
+
   if (selectedStatus !== "ready" || !selected) {
     return (
       <div className="admin-page">
@@ -140,9 +151,11 @@ export function AdminUserDetailPage() {
           <input
             type="checkbox"
             checked={form.emailVerified}
+            disabled={isSelf}
+            title={isSelf ? "You can't unverify your own email" : undefined}
             onChange={(e) => setForm((f) => ({ ...f, emailVerified: e.target.checked }))}
           />
-          Email verified
+          Email verified{isSelf ? " (can't unverify your own)" : ""}
         </label>
         <label className="admin-check">
           <input

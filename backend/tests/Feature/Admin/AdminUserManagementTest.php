@@ -6,6 +6,7 @@ use App\Models\Season;
 use App\Models\SeasonProgress;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AdminUserManagementTest extends TestCase
@@ -53,9 +54,14 @@ class AdminUserManagementTest extends TestCase
         $this->assertCount(25, $first->json('data'));
         $first->assertJsonPath('meta.last_page', 2);
 
-        $this->actingAs($admin)->getJson('/api/admin/users?page=2')
+        $second = $this->actingAs($admin)->getJson('/api/admin/users?page=2')
             ->assertOk()
             ->assertJsonCount(1, 'data');
+
+        // Same-second created_at rows are common in tests; the id tiebreak
+        // must give a stable full walk with no dupes and no gaps.
+        $ids = collect($first->json('data'))->merge($second->json('data'))->pluck('id');
+        $this->assertCount(26, $ids->unique());
     }
 
     public function test_list_search_matches_name_username_or_email(): void
@@ -177,6 +183,21 @@ class AdminUserManagementTest extends TestCase
         $this->assertTrue($admin->refresh()->is_admin);
     }
 
+    public function test_admin_cannot_unverify_their_own_email(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->patchJson("/api/admin/users/{$admin->id}", [
+            'name' => $admin->name,
+            'username' => $admin->username,
+            'email' => $admin->email,
+            'email_verified' => false,
+            'is_admin' => true,
+        ])->assertUnprocessable()->assertJsonValidationErrors('email_verified');
+
+        $this->assertNotNull($admin->refresh()->email_verified_at);
+    }
+
     public function test_admin_can_delete_a_user(): void
     {
         $admin = $this->admin();
@@ -185,6 +206,22 @@ class AdminUserManagementTest extends TestCase
         $this->actingAs($admin)->deleteJson("/api/admin/users/{$target->id}")
             ->assertNoContent();
 
+        $this->assertDatabaseMissing('users', ['id' => $target->id]);
+    }
+
+    public function test_admin_delete_removes_the_users_avatar_file(): void
+    {
+        Storage::fake('public');
+        $admin = $this->admin();
+        $target = User::factory()->create();
+        $path = 'avatars/pic.png';
+        Storage::disk('public')->put($path, 'x');
+        $target->update(['avatar_path' => $path]);
+
+        $this->actingAs($admin)->deleteJson("/api/admin/users/{$target->id}")
+            ->assertNoContent();
+
+        Storage::disk('public')->assertMissing($path);
         $this->assertDatabaseMissing('users', ['id' => $target->id]);
     }
 
@@ -221,6 +258,18 @@ class AdminUserManagementTest extends TestCase
             ->assertJsonPath('ban_reason', null);
 
         $this->assertNull($target->refresh()->banned_at);
+    }
+
+    public function test_ban_nulls_the_remember_token(): void
+    {
+        $admin = $this->admin();
+        $target = User::factory()->create();
+        $target->forceFill(['remember_token' => 'abc123def456ghi789'])->save();
+
+        $this->actingAs($admin)->postJson("/api/admin/users/{$target->id}/ban")
+            ->assertOk();
+
+        $this->assertNull($target->fresh()->remember_token);
     }
 
     public function test_ban_reason_is_optional(): void

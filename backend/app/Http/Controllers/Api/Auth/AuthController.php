@@ -37,7 +37,9 @@ class AuthController extends Controller
             ]);
         }
 
-        return response()->json($user, 201);
+        // refresh() so the response carries DB-populated columns the
+        // in-memory model never had - notably is_admin (default false).
+        return response()->json($user->refresh(), 201);
     }
 
     public function login(LoginRequest $request)

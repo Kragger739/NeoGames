@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class AdminUpdateUserRequest extends FormRequest
 {
@@ -34,12 +35,24 @@ class AdminUpdateUserRequest extends FormRequest
         ];
     }
 
-    public function withValidator($validator): void
+    public function withValidator(Validator $validator): void
     {
-        $validator->after(function ($validator) {
+        $validator->after(function (Validator $validator) {
             $target = $this->route('user');
-            if ($target->is($this->user()) && $this->boolean('is_admin') === false) {
+
+            if (! $target->is($this->user())) {
+                return;
+            }
+
+            // The admin route group requires `verified` - an admin who
+            // unverifies their own email 403s themselves out of /admin on
+            // the very next request. Mirror the is_admin self-guard.
+            if ($this->boolean('is_admin') === false) {
                 $validator->errors()->add('is_admin', 'You cannot remove your own admin access.');
+            }
+
+            if ($this->boolean('email_verified') === false) {
+                $validator->errors()->add('email_verified', 'You cannot unverify your own email.');
             }
         });
     }
