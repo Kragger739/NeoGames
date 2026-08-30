@@ -4,8 +4,15 @@ import { Link, useNavigate } from "react-router-dom";
 import { firstValidationError } from "../lib/errors";
 import { levelProgress } from "../lib/leveling";
 import { useAuthStore } from "../stores/authStore";
+import { useThemeStore, type ThemePref } from "../stores/themeStore";
 import { Avatar } from "../components/ui/Avatar";
 import { Button } from "../components/ui/Button";
+
+const THEME_OPTIONS: { value: ThemePref; label: string }[] = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
 
 export function ProfilePage() {
   const host = useAuthStore((state) => state.host);
@@ -14,6 +21,8 @@ export function ProfilePage() {
   const uploadAvatar = useAuthStore((state) => state.uploadAvatar);
   const removeAvatar = useAuthStore((state) => state.removeAvatar);
   const deleteAccount = useAuthStore((state) => state.deleteAccount);
+  const themePref = useThemeStore((state) => state.pref);
+  const setThemePref = useThemeStore((state) => state.setPref);
 
   const isOAuthAccount = Boolean(host?.provider);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -176,6 +185,29 @@ export function ProfilePage() {
           {progress.xpIntoLevel} / {progress.xpForNextLevel} XP to level {host.level + 1}
         </p>
       </div>
+
+      <section className="theme-section">
+        <h2>Appearance</h2>
+        <p className="hint">
+          Dark mode follows your device while set to System.
+        </p>
+        <div className="theme-toggle" role="group" aria-label="Theme">
+          {THEME_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={
+                "theme-toggle-option" +
+                (themePref === opt.value ? " is-active" : "")
+              }
+              aria-pressed={themePref === opt.value}
+              onClick={() => setThemePref(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className="danger-zone">
         <h2>Delete account</h2>

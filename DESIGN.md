@@ -83,7 +83,7 @@ components:
 
 This is a record of the shipped reskin, not the plan for it: a warm-cream party-game hub where five saturated candy hues each own whole regions of a screen — a button, a card, a badge, a full ticket — rather than existing as a single accent sprinkled over a neutral system. The direction contract calls this out explicitly: "game night, not a dashboard — every screen commits to loud color and bounce instead of a tool's restraint." The build delivers on that thesis directly: colored glossy shadows under every elevated surface, pill and chunky radii everywhere, and a Space Grotesk display face carrying every heading and score number at full weight.
 
-The system is one committed world, not an auto light/dark pair — `index.css` states this directly ("Confetti Pop is one committed world, not an auto light/dark pair"). There is no dark mode and none is planned; the warm cream ground is the only ground.
+The warm cream ground is the canonical world and the default everyone sees. A dark mode ships alongside it as an **opt-in parallel world**, not an equal light/dark pair: same five candy hues, same colored-shadow elevation model, on a warm plum ground (`#191320`) instead of cream. It is a token-only override — `index.css` redefines the ground/ink/wash/shadow custom properties under `:root[data-theme="dark"]`; no component CSS forks. Resolution: `themeStore` (frontend) reads a `neo-theme` localStorage value (`light` \| `dark`, absent = follow the OS `prefers-color-scheme`, live) and stamps `data-theme` onto `<html>`; an inline script in `index.html` applies the same resolution before first paint. The preference is client-only — no backend column, no cross-device sync. The control lives on the profile page (System / Light / Dark). The DDF broadcast overlay (`DdfPlayOverlayPage`, an OBS source) is exempt and stays fixed.
 
 **Key Characteristics:**
 - Five candy hues (coral, turquoise, sunflower, grape, bubblegum) each carry whole regions — buttons, card tints, badges — never a single shared accent.
@@ -122,6 +122,17 @@ Each hue is a full-strength/dark/wash trio, and each owns *regions*, not trim:
 **The Verdict-Color Rule.** Win green and fail red appear in exactly one place each: the round-reveal overlay (card ring, pulse/shake, outcome line) and, for fail only, form-validation text and the leave-button's hover intent. They are not decorative candy-palette members and should never be reached for as a sixth "hue" for a non-verdict UI element.
 
 **Every elevated surface gets a shadow tinted to its own fill**, not a neutral gray — `--shadow-coral`/`--shadow-turquoise`/`--shadow-grape` exist specifically so a colored button's shadow reads as a glow of that same color, not a generic drop shadow (see Elevation).
+
+### Dark Mode
+
+Opt-in, token-only. `index.css` redefines a small set of custom properties under `:root[data-theme="dark"]`; every component rule keeps its `var(--…)` reference unchanged.
+
+- **Ground** flips to a warm plum, not neutral black: Bg `#191320`, Surface `#241b31` (lighter than Bg — this carries card separation, since colored shadows read weakly on a dark ground), Surface Sunk `#140f1c`.
+- **Ink** inverts to a warm off-white: Ink `#f6f1ff`, Ink Soft `#b3a9c7`, Ink Faint `#7d7391`.
+- **Candy hues and their `dark` variants are unchanged** — they carry regions and must stay recognizable. Only the pale **washes** flip to deep same-hue tints (`--coral-wash` `#3a1f28`, `--turquoise-wash` `#123230`, `--sunflower-wash` `#332a12`, `--grape-wash` `#241a3d`, `--bubblegum-wash` `#341f2c`; `--win-wash` `#123020`, `--fail-wash` `#3a1c20`).
+- **Shadows:** the neutral tiers (`--shadow-sm`/`--shadow-card`/`--shadow-float`) go black and wider; the **colored glow shadows stay** at slightly higher opacity — a coral glow off a coral button is *more* at home on dark, and keeping them is what makes dark mode still read as Confetti Pop.
+- **Borders** (`--line`/`--line-soft`) become low-opacity white hairlines.
+- Two overlay tokens (`--scrim` full-screen modal dim, `--track` progress-bar groove) exist so those two spots — previously hardcoded — flip too. `color-scheme: dark` is set on the same selector so native controls and scrollbars follow.
 
 ## Typography
 
@@ -212,7 +223,7 @@ Two eases, used for two different jobs — this distinction is load-bearing and 
 - The lobby's room code renders as a torn-edge event ticket (`.room-ticket`): Sunflower fill with a radial-gradient perforation pattern simulating a ticket stub edge, a slight `-1.5deg` rotation, and its own sunflower-tinted shadow. This is a one-off, named treatment — not a generalized "torn edge" utility — reserved for the single piece of information every page exists to help players find and share.
 
 ### Round Reveal
-- A fixed, full-viewport scrim (`rgba(33,28,51,0.55)`, blurred) centers a 380px card (Shadow Float, 24px radius) that pops in via `reveal-pop`/`--ease-bounce`. Won/failed state adds a 4px hue ring (Win/Fail) plus a state-specific animation: a two-cycle green pulse for a win, a single shake for a fail. A failed round also flashes the overlay scrim itself from red to neutral once (`red-screen-glow`, single decay, explicitly not a repeating strobe — the in-code comment flags this as a deliberate photosensitivity consideration). Album art renders at 220px, 24px radius, Shadow Card.
+- A fixed, full-viewport scrim (`--scrim`, `rgba(33,28,51,0.55)` in light, blurred) centers a 380px card (Shadow Float, 24px radius) that pops in via `reveal-pop`/`--ease-bounce`. Won/failed state adds a 4px hue ring (Win/Fail) plus a state-specific animation: a two-cycle green pulse for a win, a single shake for a fail. A failed round also flashes the overlay scrim itself from red to neutral once (`red-screen-glow`, single decay, explicitly not a repeating strobe — the in-code comment flags this as a deliberate photosensitivity consideration). Album art renders at 220px, 24px radius, Shadow Card.
 
 ### Lists (players / scoreboard / miss feed)
 - Surface fill, Shadow SM, 16px radius, space-between flex, 14px/18px padding. Scoreboard rows render their trailing score in Space Grotesk 800 Coral — the one place the primary hue appears inside an otherwise neutral row. Results-page ranked lists add numbered/medaled `::before` badges (gold/silver/bronze gradients for 1st-3rd) and a sunflower ring on the first-place row.

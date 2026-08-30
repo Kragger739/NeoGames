@@ -43,6 +43,11 @@
   --shadow-grape: 0 10px 24px rgba(139, 92, 246, 0.32);
   --shadow-float: 0 20px 48px rgba(33, 28, 51, 0.18);
 
+  /* Overlays - full-screen modal dim, and the empty track behind a
+     progress bar. Tokenized so dark mode can flip them (see below). */
+  --scrim: rgba(33, 28, 51, 0.55);
+  --track: rgba(255, 255, 255, 0.6);
+
   /* Shape */
   --radius-sm: 12px;
   --radius-md: 16px;
@@ -70,8 +75,57 @@
   }
 }
 
-/* Confetti Pop is one committed world, not an auto light/dark pair - see
-   DESIGN.md. */
+/* --------------------------------------------------------------------------
+   Dark mode - opt-in parallel world (see DESIGN.md). Light stays the
+   default and the canonical Confetti Pop identity; this block only
+   redefines tokens under :root[data-theme="dark"]. themeStore stamps that
+   attribute onto <html> at runtime, and index.html's inline script sets
+   it before first paint so there's no flash. Same candy hues, same
+   colored-shadow elevation model - a warm plum ground instead of cream.
+   -------------------------------------------------------------------------- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Ground */
+  --bg: #191320;
+  --surface: #241b31;
+  --surface-sunk: #140f1c;
+
+  /* Ink */
+  --ink: #f6f1ff;
+  --ink-soft: #b3a9c7;
+  --ink-faint: #7d7391;
+
+  /* The candy hues themselves are unchanged - only the pale washes flip
+     to deep tints so wash-filled pills and cards read on the dark ground. */
+  --coral-wash: #3a1f28;
+  --turquoise-wash: #123230;
+  --sunflower-wash: #332a12;
+  --grape-wash: #241a3d;
+  --bubblegum-wash: #341f2c;
+
+  /* Verdicts */
+  --win-wash: #123020;
+  --fail-wash: #3a1c20;
+
+  /* Borders */
+  --line: rgba(255, 255, 255, 0.09);
+  --line-soft: rgba(255, 255, 255, 0.05);
+
+  /* Neutral shadows go black and wider to carry through the darker
+     ground; the colored ones stay (a coral glow off a coral button reads
+     even better on dark) and lift slightly in opacity. */
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-card: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --shadow-coral: 0 8px 28px rgba(255, 92, 122, 0.5);
+  --shadow-turquoise: 0 8px 28px rgba(23, 195, 178, 0.45);
+  --shadow-grape: 0 8px 28px rgba(139, 92, 246, 0.5);
+  --shadow-float: 0 24px 60px rgba(0, 0, 0, 0.7);
+
+  /* Overlays */
+  --scrim: rgba(0, 0, 0, 0.72);
+  --track: rgba(255, 255, 255, 0.14);
+}
 
 ::selection {
   background: var(--coral);

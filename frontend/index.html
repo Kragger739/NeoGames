@@ -10,6 +10,25 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;800&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,600&display=swap" rel="stylesheet" />
     <title>NeoGames — Game Night</title>
+    <script>
+      // Resolve the effective theme before first paint so there's no flash.
+      // Mirrors themeStore's logic; keep the two in sync. System (no stored
+      // value) follows the OS; an explicit 'light'/'dark' always wins.
+      (function () {
+        try {
+          var p = localStorage.getItem("neo-theme");
+          var t =
+            p === "light" || p === "dark"
+              ? p
+              : window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+          document.documentElement.dataset.theme = t;
+        } catch (e) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
   </head>
   <body>
     <!--

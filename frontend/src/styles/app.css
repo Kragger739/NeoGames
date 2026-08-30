@@ -1147,7 +1147,7 @@ button:disabled {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(33, 28, 51, 0.55);
+  background: var(--scrim);
   backdrop-filter: blur(3px);
   box-sizing: border-box;
 }
@@ -1311,7 +1311,7 @@ button:disabled {
     background: rgba(255, 71, 87, 0.55);
   }
   100% {
-    background: rgba(33, 28, 51, 0.55);
+    background: var(--scrim);
   }
 }
 
@@ -1545,7 +1545,7 @@ button:disabled {
 .level-bar {
   height: 12px;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--track);
   overflow: hidden;
 }
 
@@ -1721,6 +1721,57 @@ button:disabled {
 .auth-forgot {
   margin-top: 12px;
   text-align: center;
+}
+
+.theme-section {
+  margin-top: 24px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+}
+
+.theme-section h2 {
+  margin-top: 0;
+}
+
+.theme-section .hint {
+  margin: 0 0 14px;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunk);
+}
+
+.theme-toggle-option {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 18px;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: transparent;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.theme-toggle-option:hover:not(.is-active) {
+  color: var(--ink);
+}
+
+.theme-toggle-option.is-active {
+  color: #fff;
+  background: var(--grape);
+  box-shadow: var(--shadow-grape);
 }
 
 .danger-zone {
