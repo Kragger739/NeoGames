@@ -102,13 +102,13 @@ services:
       # times out, set MAIL_MAILER=resend + RESEND_API_KEY (HTTPS, port 443),
       # or MAIL_MAILER=log to dump the code into the container logs.
       MAIL_MAILER: ${MAIL_MAILER:-log}
-      # Plain SMTP: no STARTTLS, no implicit TLS. Set MAIL_AUTO_TLS=true
-      # only if the provider refuses an unencrypted session.
+      # TLS on by default: port 465 = implicit TLS, else STARTTLS when
+      # offered. MAIL_PASSWORD is required for SMTP auth.
       MAIL_HOST: ${MAIL_HOST:-}
-      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_PORT: ${MAIL_PORT:-465}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
-      MAIL_AUTO_TLS: ${MAIL_AUTO_TLS:-false}
+      MAIL_AUTO_TLS: ${MAIL_AUTO_TLS:-true}
       MAIL_TIMEOUT: ${MAIL_TIMEOUT:-15}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-no-reply@${APP_DOMAIN}}

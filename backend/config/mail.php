@@ -43,10 +43,11 @@ return [
             'port' => env('MAIL_PORT', 587),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            // Plain SMTP by default: no opportunistic STARTTLS upgrade, and
-            // no implicit TLS (that path only exists on port 465). Set
-            // MAIL_AUTO_TLS=true to allow STARTTLS when the server offers it.
-            'auto_tls' => env('MAIL_AUTO_TLS', false),
+            // TLS on by default. Port 465 -> implicit TLS (Laravel derives
+            // the "smtps" scheme from the port). Any other port -> STARTTLS
+            // upgrade whenever the server advertises it. Set MAIL_AUTO_TLS=false
+            // only to force a plaintext session against a local relay.
+            'auto_tls' => env('MAIL_AUTO_TLS', true),
             // Finite so a blocked outbound SMTP port fails the queued job
             // fast instead of pinning the worker for the OS socket timeout.
             'timeout' => env('MAIL_TIMEOUT', 15),
