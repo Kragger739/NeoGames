@@ -4,36 +4,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Seed playlists
+    | Song pool
     |--------------------------------------------------------------------------
     |
-    | Songle's song pool is no longer discovered live per room - the
-    | `songs:sync` artisan command pre-populates the local `songs` table from
-    | these Spotify playlists (track list + popularity), resolving each
-    | track's 30-second preview + artwork through Apple's iTunes Search API.
-    | Round-time selection then reads only from the DB.
+    | Songle's pool is not discovered live per room - `php artisan songs:sync`
+    | pre-populates the local `songs` table from curated Spotify playlists
+    | (track list + popularity), caching each track's 30-second preview via
+    | Apple's iTunes Search API. Round-time selection then reads only the DB.
     |
-    | Use PUBLIC, USER-MADE playlists. Spotify's own editorial / algorithmic
-    | playlists ("Today's Top Hits", "RapCaviar", "This Is <artist>", Discover
-    | Weekly, ...) return 404 from the Web API since Spotify's Nov 2024
-    | changes and cannot be used here.
-    |
-    | Accepts a bare base-62 playlist id or a full open.spotify.com URL. Keys
-    | are SongGenre values; Artist / MultiArtist are not listed (they source
-    | live from the named artist's Spotify top tracks). German Rap can use a
-    | playlist and/or the artist term pool below.
+    | The playlists themselves are managed from the admin dashboard
+    | (seed_playlists table), not here - use PUBLIC, USER-MADE playlists:
+    | Spotify's own editorial / algorithmic playlists ("Today's Top Hits",
+    | "RapCaviar", "This Is <artist>", ...) return 404 from the Web API since
+    | Spotify's Nov 2024 changes.
     |
     */
-
-    'seed_playlists' => [
-        'normal' => array_filter(explode(',', (string) env('MUSIC_PLAYLISTS_NORMAL', ''))),
-        'pop' => array_filter(explode(',', (string) env('MUSIC_PLAYLISTS_POP', ''))),
-        'hip_hop' => array_filter(explode(',', (string) env('MUSIC_PLAYLISTS_HIP_HOP', ''))),
-        'german_rap' => array_filter(explode(',', (string) env('MUSIC_PLAYLISTS_GERMAN_RAP', ''))),
-        'classics' => array_filter(explode(',', (string) env('MUSIC_PLAYLISTS_CLASSICS', ''))),
-        'iconic' => array_filter(explode(',', (string) env('MUSIC_PLAYLISTS_ICONIC', ''))),
-        'year' => array_filter(explode(',', (string) env('MUSIC_PLAYLISTS_YEAR', ''))),
-    ],
 
     /*
     | German Rap has no reliable single playlist; `songs:sync` also resolves

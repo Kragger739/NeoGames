@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\AdminSongPlaylistController;
 use App\Http\Controllers\Api\Admin\AdminUserController;
 use App\Http\Controllers\Api\ArtistSearchController;
 use App\Http\Controllers\Api\Auth\AuthController;
@@ -189,4 +190,9 @@ Route::middleware(['auth:sanctum', 'not-banned', 'verified', 'admin'])
         Route::post('/users/{user}/ban', [AdminUserController::class, 'ban']);
         Route::post('/users/{user}/unban', [AdminUserController::class, 'unban']);
         Route::post('/users/{user}/reset-xp', [AdminUserController::class, 'resetXp']);
+
+        Route::get('/song-playlists', [AdminSongPlaylistController::class, 'index']);
+        Route::post('/song-playlists', [AdminSongPlaylistController::class, 'store']);
+        Route::delete('/song-playlists/{songPlaylist}', [AdminSongPlaylistController::class, 'destroy']);
+        Route::post('/song-playlists/sync', [AdminSongPlaylistController::class, 'sync']);
     });

@@ -32,6 +32,8 @@ export function AdminUsersPage() {
     <div className="admin-page">
       <p>
         <Link to="/">← Home</Link>
+        {"  ·  "}
+        <Link to="/admin/song-playlists">Song playlists</Link>
       </p>
       <h1>Users</h1>
 

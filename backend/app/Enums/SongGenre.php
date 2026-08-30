@@ -33,21 +33,10 @@ enum SongGenre: string
     }
 
     /**
-     * The curated Spotify playlists `songs:sync` seeds this genre's pool
-     * from, taken from config/music.php (env-driven). Empty for Artist /
-     * MultiArtist (they source live from the named artist's Spotify top
-     * tracks) and for any genre left unconfigured.
-     *
-     * @return array<int, string>
-     */
-    public function spotifyPlaylistIds(): array
-    {
-        return array_values(config('music.seed_playlists.'.$this->value, []));
-    }
-
-    /**
      * Whether this genre is seeded per-room from live artist top tracks
-     * rather than from a fixed playlist pool.
+     * rather than from a fixed playlist pool. The curated playlists for
+     * every other genre live in the seed_playlists table (managed from the
+     * admin dashboard) - see App\Models\SeedPlaylist.
      */
     public function isArtistSourced(): bool
     {

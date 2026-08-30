@@ -1861,13 +1861,31 @@ button:disabled {
 }
 
 .admin-form input[type="text"],
-.admin-form input[type="email"] {
+.admin-form input[type="email"],
+.admin-form select {
   padding: 9px 12px;
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink);
   font: inherit;
+}
+
+.admin-sync-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 0 4px;
+}
+
+.admin-playlist-group {
+  text-align: left;
+  margin-top: 20px;
+}
+
+.admin-playlist-group h2 {
+  margin-bottom: 8px;
 }
 
 .admin-check {

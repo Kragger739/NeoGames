@@ -3,12 +3,20 @@
 namespace App\Services\Music;
 
 use App\Models\Song;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 /**
  * Turns a Spotify track (metadata + popularity) into a playable row in the
  * `songs` pool by resolving its 30-second preview + artwork through Apple's
  * iTunes Search API. Shared by the `songs:sync` command (bulk playlist
  * seeding) and SongDiscoveryService's Artist-genre pool priming.
+ *
+ * The preview clip itself is downloaded and cached on the 'public' disk
+ * (song-previews/) so playback never depends on Apple's CDN staying up or
+ * reachable; the stored preview_url points at NeoGames' own copy. A failed
+ * download falls back to the direct Apple URL rather than dropping the song.
  *
  * The iTunes Search API rate-limits around 20 req/min, so every path that
  * loops over tracks sleeps `throttleMs` between preview lookups. `songs:sync`
@@ -17,6 +25,8 @@ use App\Models\Song;
  */
 class SongPoolSeeder
 {
+    private const PREVIEW_DIR = 'song-previews';
+
     public function __construct(
         private SpotifyClient $spotify,
         private AppleMusicClient $apple,
@@ -42,7 +52,10 @@ class SongPoolSeeder
             'artist' => $spotifyTrack['artist'],
             'artist_provider_id' => $spotifyTrack['artist_provider_id'] ?? null,
             'artist_follower_count' => $followerCount,
-            'preview_url' => $preview['preview_url'],
+            'preview_url' => $this->cachePreview(
+                $spotifyTrack['provider_track_id'],
+                $preview['preview_url'],
+            ),
             'album_art_url' => $spotifyTrack['album_art_url'] ?? $preview['album_art_url'],
             'popularity' => (int) ($spotifyTrack['popularity'] ?? 0),
             'release_year' => $spotifyTrack['release_year'] ?? $preview['release_year'],
@@ -59,6 +72,34 @@ class SongPoolSeeder
             ['provider_track_id' => $spotifyTrack['provider_track_id']],
             $attributes,
         );
+    }
+
+    /**
+     * Download the Apple preview clip to the 'public' disk once and return a
+     * host-relative URL to our own copy. Re-sync of an already-cached track
+     * skips the download. Any failure falls back to the direct Apple URL so
+     * the song is still playable.
+     */
+    private function cachePreview(string $providerTrackId, string $appleUrl): string
+    {
+        $path = self::PREVIEW_DIR.'/'.$providerTrackId.'.m4a';
+        $disk = Storage::disk('public');
+
+        try {
+            if (! $disk->exists($path)) {
+                $response = Http::timeout(15)->get($appleUrl);
+
+                if (! $response->successful() || $response->body() === '') {
+                    return $appleUrl;
+                }
+
+                $disk->put($path, $response->body());
+            }
+
+            return parse_url($disk->url($path), PHP_URL_PATH) ?: $appleUrl;
+        } catch (Throwable) {
+            return $appleUrl;
+        }
     }
 
     /**

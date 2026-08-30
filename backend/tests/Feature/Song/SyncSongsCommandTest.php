@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\Song;
 
+use App\Models\SeedPlaylist;
 use App\Models\Song;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class SyncSongsCommandTest extends TestCase
@@ -24,12 +26,14 @@ class SyncSongsCommandTest extends TestCase
         $this->artisan('songs:sync')->assertExitCode(1);
     }
 
-    public function test_it_seeds_the_pool_from_a_playlist_with_spotify_popularity_and_an_itunes_preview(): void
+    public function test_it_seeds_the_pool_from_a_playlist_with_spotify_popularity_and_a_cached_preview(): void
     {
-        config(['music.seed_playlists.pop' => ['abcdefghijABCDEFGHIJ12']]);
+        Storage::fake('public');
+        SeedPlaylist::create(['genre' => 'pop', 'spotify_playlist_id' => 'abcdefghijABCDEFGHIJ12']);
         $this->fakeSpotifyToken();
 
         Http::fake([
+            'audio-ssl.itunes.apple.com/*' => Http::response('fake-m4a-bytes', 200),
             'api.spotify.com/v1/playlists/*/tracks*' => Http::response(['next' => null, 'items' => [
                 ['track' => [
                     'id' => 'sp-hit', 'name' => 'Hit Song', 'popularity' => 78,
@@ -71,10 +75,11 @@ class SyncSongsCommandTest extends TestCase
             'provider_track_id' => 'sp-hit',
             'genre' => 'pop',
             'popularity' => 78,
-            'preview_url' => 'https://audio-ssl.itunes.apple.com/hit.m4a',
+            'preview_url' => '/storage/song-previews/sp-hit.m4a',
             'artist_follower_count' => 3_000_000,
             'release_year' => 2012,
         ]);
+        Storage::disk('public')->assertExists('song-previews/sp-hit.m4a');
         $this->assertDatabaseMissing('songs', ['provider_track_id' => 'sp-nopreview']);
         $this->assertSame(1, Song::count());
     }

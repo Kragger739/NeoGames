@@ -3,28 +3,34 @@
 namespace App\Console\Commands;
 
 use App\Enums\SongGenre;
+use App\Models\SeedPlaylist;
 use App\Models\Song;
 use App\Services\Music\SongPoolSeeder;
 use App\Services\Music\SpotifyClient;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 /**
- * Rebuilds the local `songs` pool from the curated Spotify playlists in
- * config/music.php, resolving each track's 30-second preview through Apple's
- * iTunes Search API. This is the only thing that touches a music API - game
- * rounds read the pool directly. Run it manually or on a schedule (see
- * routes/console.php).
+ * Rebuilds the local `songs` pool from the curated Spotify playlists in the
+ * seed_playlists table (managed from the admin dashboard), resolving each
+ * track's 30-second preview through Apple's iTunes Search API and caching the
+ * clip on the 'public' disk. This is the only thing that touches a music API
+ * - game rounds read the pool directly. Run it from the admin "Sync now"
+ * button, `php artisan songs:sync`, or the weekly schedule.
  *
- *   php artisan songs:sync                 # every configured genre
+ *   php artisan songs:sync                       # every configured genre
  *   php artisan songs:sync --genre=iconic --genre=pop
- *   php artisan songs:sync --fresh         # wipe the pool first
+ *   php artisan songs:sync --fresh               # wipe pool + cached clips first
  */
 class SyncSongsCommand extends Command
 {
-    protected $signature = 'songs:sync {--genre=* : Genre value(s) to sync; defaults to all configured} {--fresh : Delete the whole songs pool before seeding}';
+    protected $signature = 'songs:sync {--genre=* : Genre value(s) to sync; defaults to all configured} {--fresh : Delete the whole songs pool and cached preview clips before seeding}';
 
-    protected $description = 'Seed the Songle song pool from Spotify playlists (+ iTunes previews)';
+    protected $description = 'Seed the Songle song pool from the admin-managed Spotify playlists (+ cached iTunes previews)';
+
+    public const STATUS_CACHE_KEY = 'songs:last-sync';
 
     public function handle(SpotifyClient $spotify, SongPoolSeeder $seeder): int
     {
@@ -37,49 +43,57 @@ class SyncSongsCommand extends Command
         $genres = $this->targetGenres();
 
         if ($genres === []) {
-            $this->warn('No genres to sync - configure MUSIC_PLAYLISTS_* in the environment.');
+            $this->warn('No genres to sync - add Spotify playlists in the admin dashboard first.');
 
             return self::SUCCESS;
         }
 
         if ($this->option('fresh')) {
             $count = Song::query()->delete();
-            $this->line("Wiped {$count} existing rows.");
+            Storage::disk('public')->deleteDirectory('song-previews');
+            $this->line("Wiped {$count} existing rows and cached clips.");
         }
 
         $throttle = (int) config('music.itunes_throttle_ms', 3200);
-        $totalSeeded = 0;
-        $totalSkipped = 0;
+        $seeded = 0;
+        $skipped = 0;
 
         foreach ($genres as $genre) {
             $this->info("── {$genre->value} ──");
 
-            foreach ($genre->spotifyPlaylistIds() as $playlistRef) {
+            foreach (SeedPlaylist::idsFor($genre) as $playlistId) {
                 try {
                     $result = $seeder->seedPlaylist(
-                        $playlistRef,
+                        $playlistId,
                         $genre->cacheTag(),
                         $throttle,
                         fn (string $line) => $this->line($line),
                     );
                 } catch (RuntimeException $e) {
-                    $this->error("  playlist {$playlistRef}: {$e->getMessage()}");
+                    $this->error("  playlist {$playlistId}: {$e->getMessage()}");
 
                     continue;
                 }
 
-                $this->line("  playlist {$playlistRef}: +{$result['seeded']} seeded, {$result['skipped']} without a preview");
-                $totalSeeded += $result['seeded'];
-                $totalSkipped += $result['skipped'];
+                $this->line("  playlist {$playlistId}: +{$result['seeded']} seeded, {$result['skipped']} without a preview");
+                $seeded += $result['seeded'];
+                $skipped += $result['skipped'];
             }
 
             if ($genre === SongGenre::GermanRap) {
-                $totalSeeded += $this->seedGermanRapArtists($spotify, $seeder, $throttle);
+                $seeded += $this->seedGermanRapArtists($spotify, $seeder, $throttle);
             }
         }
 
+        $summary = "{$seeded} tracks seeded, {$skipped} skipped for no iTunes preview";
+        Cache::forever(self::STATUS_CACHE_KEY, [
+            'at' => now()->toIso8601String(),
+            'summary' => $summary,
+            'pool_size' => Song::count(),
+        ]);
+
         $this->newLine();
-        $this->info("Done. {$totalSeeded} tracks in the pool from this run, {$totalSkipped} skipped for no iTunes preview.");
+        $this->info("Done. {$summary}. Pool now holds ".Song::count().' songs.');
 
         return self::SUCCESS;
     }
@@ -89,20 +103,23 @@ class SyncSongsCommand extends Command
      */
     private function targetGenres(): array
     {
+        $configured = SeedPlaylist::configuredGenres();
+
+        // German Rap can also seed from its artist term pool even with no
+        // playlist row.
+        if (! in_array(SongGenre::GermanRap, $configured, true)
+            && config('music.german_rap_artists', []) !== []) {
+            $configured[] = SongGenre::GermanRap;
+        }
+
         $requested = $this->option('genre');
 
-        $all = array_filter(
-            SongGenre::cases(),
-            fn (SongGenre $g) => ! $g->isArtistSourced()
-                && ($g->spotifyPlaylistIds() !== [] || $g === SongGenre::GermanRap),
-        );
-
         if ($requested === []) {
-            return array_values($all);
+            return $configured;
         }
 
         return array_values(array_filter(
-            $all,
+            $configured,
             fn (SongGenre $g) => in_array($g->value, $requested, true),
         ));
     }
