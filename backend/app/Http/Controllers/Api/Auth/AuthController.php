@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
-use App\Services\EmailVerificationService;
+use App\Support\EmailVerification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Session;
 
 class AuthController extends Controller
 {
-    public function register(RegisterRequest $request, EmailVerificationService $verification)
+    public function register(RegisterRequest $request)
     {
         $user = User::create([
             'name' => $request->validated('name'),
@@ -29,7 +29,7 @@ class AuthController extends Controller
         // Fail-open: a transient SMTP hiccup must not 500 the registration.
         // The user lands on the verify screen and can hit "Resend" from there.
         try {
-            $verification->sendCode($user);
+            EmailVerification::issue($user);
         } catch (\Throwable $e) {
             Log::warning('Failed to send verification code on registration', [
                 'user_id' => $user->id,
