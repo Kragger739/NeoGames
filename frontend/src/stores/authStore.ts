@@ -11,6 +11,8 @@ export interface Host {
   email_verified: boolean;
   /** Set when the account was created via Google/Discord OAuth. */
   provider: string | null;
+  /** Grants the /admin area and the public admin badge. */
+  is_admin: boolean;
   xp: number;
   level: number;
   avatar_url: string | null;

@@ -105,3 +105,41 @@
     animation: none;
   }
 }
+
+/* Public "this user is an admin" marker, lower-right of the avatar circle.
+   Shown on every surface a user appears, to every visitor.
+   NOTE: `.avatar` is `position: relative` AND `overflow: hidden` (it masks the
+   photo + cosmetic layers to a circle), so this child is clipped to that same
+   circle. It therefore sits just inside the lower-right of the disc rather than
+   overhanging the edge - a negative offset would be sliced off by the mask. */
+.avatar-admin-badge {
+  position: absolute;
+  right: 8%;
+  bottom: 8%;
+  display: grid;
+  place-items: center;
+  width: 38%;
+  height: 38%;
+  border-radius: 999px;
+  background: var(--grape);
+  color: #fff;
+  /* Ring in the surface colour so the chip reads against busy avatars. */
+  box-shadow: 0 0 0 2px var(--surface);
+  z-index: 40;
+}
+
+.avatar-admin-badge-icon {
+  display: block;
+  width: 70%;
+  height: 70%;
+}
+
+/* Keep the chip from swamping the smallest avatars: a touch smaller, tighter
+   to the edge, with a thinner ring. */
+.avatar-xs .avatar-admin-badge {
+  width: 34%;
+  height: 34%;
+  right: 6%;
+  bottom: 6%;
+  box-shadow: 0 0 0 1.5px var(--surface);
+}

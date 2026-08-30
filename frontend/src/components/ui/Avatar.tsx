@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { ShieldCheck } from "lucide-react";
 
 import type { AvatarData, CosmeticSlot } from "../../lib/avatarData";
 import { COSMETIC_SVGS, SLOT_Z } from "../../lib/cosmetics/registry";
@@ -41,6 +42,12 @@ export function Avatar({ data, size = "sm", animated = true, className }: Avatar
       <CosmeticLayer slot="hat" data={data} />
       <CosmeticLayer slot="badge" data={data} />
       {animated && <CosmeticLayer slot="effect" data={data} />}
+
+      {data.is_admin && (
+        <span className="avatar-admin-badge" aria-label="Admin" title="Admin">
+          <ShieldCheck className="avatar-admin-badge-icon" strokeWidth={2.5} />
+        </span>
+      )}
     </span>
   );
 }
