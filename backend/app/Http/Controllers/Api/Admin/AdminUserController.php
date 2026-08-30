@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AdminUpdateUserRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AdminUserController extends Controller
 {
@@ -67,6 +68,32 @@ class AdminUserController extends Controller
         $user->delete();
 
         return response()->noContent();
+    }
+
+    public function ban(Request $request, User $user)
+    {
+        abort_if($user->is($request->user()), 422, 'You cannot ban your own account.');
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $user->forceFill([
+            'banned_at' => now(),
+            'ban_reason' => $validated['reason'] ?? null,
+        ])->save();
+
+        DB::table('sessions')->where('user_id', $user->id)->delete();
+        $user->tokens()->delete();
+
+        return response()->json($this->toAdminArray($user));
+    }
+
+    public function unban(User $user)
+    {
+        $user->forceFill(['banned_at' => null, 'ban_reason' => null])->save();
+
+        return response()->json($this->toAdminArray($user));
     }
 
     /**

@@ -181,4 +181,6 @@ Route::middleware(['auth:sanctum', 'verified', 'admin'])
         Route::get('/users/{user}', [AdminUserController::class, 'show']);
         Route::patch('/users/{user}', [AdminUserController::class, 'update']);
         Route::delete('/users/{user}', [AdminUserController::class, 'destroy']);
+        Route::post('/users/{user}/ban', [AdminUserController::class, 'ban']);
+        Route::post('/users/{user}/unban', [AdminUserController::class, 'unban']);
     });

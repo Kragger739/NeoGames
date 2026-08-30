@@ -195,4 +195,49 @@ class AdminUserManagementTest extends TestCase
 
         $this->assertDatabaseHas('users', ['id' => $admin->id]);
     }
+
+    public function test_admin_can_ban_and_unban_a_user(): void
+    {
+        $admin = $this->admin();
+        $target = User::factory()->create();
+        \DB::table('sessions')->insert([
+            'id' => 'sess-1', 'user_id' => $target->id, 'ip_address' => '127.0.0.1',
+            'user_agent' => 'x', 'payload' => 'x', 'last_activity' => time(),
+        ]);
+
+        $this->actingAs($admin)->postJson("/api/admin/users/{$target->id}/ban", ['reason' => 'Spam'])
+            ->assertOk()
+            ->assertJsonPath('ban_reason', 'Spam')
+            ->assertJson(fn ($json) => $json->where('banned_at', fn ($v) => $v !== null)->etc());
+
+        $this->assertNotNull($target->refresh()->banned_at);
+        $this->assertDatabaseMissing('sessions', ['user_id' => $target->id]);
+
+        $this->actingAs($admin)->postJson("/api/admin/users/{$target->id}/unban")
+            ->assertOk()
+            ->assertJsonPath('banned_at', null)
+            ->assertJsonPath('ban_reason', null);
+
+        $this->assertNull($target->refresh()->banned_at);
+    }
+
+    public function test_ban_reason_is_optional(): void
+    {
+        $admin = $this->admin();
+        $target = User::factory()->create();
+
+        $this->actingAs($admin)->postJson("/api/admin/users/{$target->id}/ban")
+            ->assertOk()
+            ->assertJsonPath('ban_reason', null);
+    }
+
+    public function test_admin_cannot_ban_themselves(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->postJson("/api/admin/users/{$admin->id}/ban")
+            ->assertStatus(422);
+
+        $this->assertNull($admin->refresh()->banned_at);
+    }
 }
