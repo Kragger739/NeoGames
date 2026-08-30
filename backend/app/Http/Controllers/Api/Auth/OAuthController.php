@@ -102,6 +102,15 @@ class OAuthController extends Controller
             $user->markEmailAsVerified();
         }
 
+        // A banned account must not be able to slip in through the OAuth
+        // path - mirror the password-login ban gate (LoginRequest) and the
+        // `not-banned` middleware: don't authenticate, bounce back to the
+        // SPA login with an error, same shape as the InvalidStateException
+        // redirect above.
+        if ($user->isBanned()) {
+            return redirect($origin.'/login?error=banned');
+        }
+
         // Same pairing AuthController::login() uses, so this session is
         // indistinguishable from a normal email/password login afterward.
         Auth::login($user, remember: true);

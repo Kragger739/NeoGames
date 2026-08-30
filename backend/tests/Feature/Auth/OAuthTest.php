@@ -112,6 +112,21 @@ class OAuthTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_a_banned_user_is_redirected_to_login_and_not_authenticated(): void
+    {
+        $banned = User::factory()->create(['email' => 'banned@example.com']);
+        $banned->forceFill(['banned_at' => now(), 'ban_reason' => 'Cheating'])->save();
+
+        Socialite::shouldReceive('driver->redirectUrl->user')
+            ->once()
+            ->andReturn($this->fakeSocialiteUser('google-777', 'banned@example.com'));
+
+        $this->get('/api/auth/google/callback')
+            ->assertRedirect('http://localhost:5173/login?error=banned');
+
+        $this->assertGuest();
+    }
+
     /**
      * The actual bug this controller works around: a browser starting the
      * flow from a second configured origin (e.g. a Cloudflare tunnel used

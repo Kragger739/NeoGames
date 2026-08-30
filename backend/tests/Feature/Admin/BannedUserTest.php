@@ -41,6 +41,15 @@ class BannedUserTest extends TestCase
             ->assertJsonPath('reason', 'Spam');
     }
 
+    public function test_a_banned_user_cannot_hit_a_ddf_room_write_route(): void
+    {
+        $user = User::factory()->create();
+        $user->forceFill(['banned_at' => now(), 'ban_reason' => 'Cheating'])->save();
+
+        $this->actingAs($user)->postJson('/api/ddf-rooms', ['rounds_per_voting' => 3])
+            ->assertForbidden();
+    }
+
     public function test_a_banned_user_can_still_log_out(): void
     {
         $user = User::factory()->create();

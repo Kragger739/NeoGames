@@ -84,7 +84,7 @@ Route::middleware('auth:player')->group(function () {
     Route::post('/ddf-rooms/{code}/vote', [DdfVoteController::class, 'store']);
 });
 
-Route::middleware(['auth:sanctum', 'verified'])->group(function () {
+Route::middleware(['auth:sanctum', 'not-banned', 'verified'])->group(function () {
     Route::post('/ddf-rooms', [DdfGameController::class, 'store']);
     Route::get('/ddf-rooms/{code}/gm-state', [DdfGameController::class, 'gmState']);
     Route::post('/ddf-rooms/{code}/start', [DdfGameController::class, 'start']);
