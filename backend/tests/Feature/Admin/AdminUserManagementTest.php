@@ -69,4 +69,32 @@ class AdminUserManagementTest extends TestCase
         $res2 = $this->actingAs($admin)->getJson('/api/admin/users?search=other@example')->assertOk();
         $this->assertCount(1, $res2->json('data'));
     }
+
+    public function test_admin_can_view_a_single_user(): void
+    {
+        $admin = $this->admin();
+        $target = User::factory()->create(['name' => 'Target', 'xp' => 300]);
+
+        $this->actingAs($admin)->getJson("/api/admin/users/{$target->id}")
+            ->assertOk()
+            ->assertJsonPath('id', $target->id)
+            ->assertJsonPath('name', 'Target')
+            ->assertJsonPath('level', 3)
+            ->assertJsonPath('is_admin', false);
+    }
+
+    public function test_show_404s_for_an_unknown_user(): void
+    {
+        $this->actingAs($this->admin())
+            ->getJson('/api/admin/users/999999')
+            ->assertNotFound();
+    }
+
+    public function test_non_admin_cannot_view_a_user(): void
+    {
+        $target = User::factory()->create();
+        $this->actingAs(User::factory()->create())
+            ->getJson("/api/admin/users/{$target->id}")
+            ->assertForbidden();
+    }
 }

@@ -34,6 +34,11 @@ class AdminUserController extends Controller
         ]);
     }
 
+    public function show(User $user)
+    {
+        return response()->json($this->toAdminArray($user));
+    }
+
     /**
      * @return array<string, mixed>
      */
