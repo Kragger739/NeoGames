@@ -1734,3 +1734,61 @@ button:disabled {
   margin-top: 0;
   color: var(--coral-dark);
 }
+
+/* ==========================================================================
+   Admin dashboard
+   ========================================================================== */
+.admin-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 20px 80px;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.admin-search {
+  width: 100%;
+  margin: 12px 0 16px;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.admin-user-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-decoration: none;
+  color: inherit;
+}
+
+.admin-user-identity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.admin-user-identity .hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-user-tags {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
