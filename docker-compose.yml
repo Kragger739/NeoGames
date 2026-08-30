@@ -123,25 +123,15 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
+    # Routing is owned by Dokploy's "Domains" tab (add a domain there for
+    # this service: Host = your api domain, Service = backend, Port = 8000,
+    # HTTPS + Let's Encrypt). Do NOT also add traefik.* labels here - two
+    # routers on the same Host() rule cancel out and Traefik returns 404.
     expose:
       - "8000"
     networks:
       - internal
       - dokploy-network
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=dokploy-network
-      # HTTPS router
-      - traefik.http.routers.neogames-api.rule=Host(`${API_DOMAIN}`)
-      - traefik.http.routers.neogames-api.entrypoints=websecure
-      - traefik.http.routers.neogames-api.tls=true
-      - traefik.http.routers.neogames-api.tls.certresolver=letsencrypt
-      - traefik.http.services.neogames-api.loadbalancer.server.port=8000
-      # HTTP -> HTTPS
-      - traefik.http.routers.neogames-api-web.rule=Host(`${API_DOMAIN}`)
-      - traefik.http.routers.neogames-api-web.entrypoints=web
-      - traefik.http.routers.neogames-api-web.middlewares=neogames-https
-      - traefik.http.middlewares.neogames-https.redirectscheme.scheme=https
 
   frontend:
     build:
@@ -154,20 +144,13 @@ services:
         VITE_REVERB_PORT: "443"
         VITE_REVERB_SCHEME: https
     restart: unless-stopped
+    # Routing is owned by Dokploy's "Domains" tab (Host = your app domain,
+    # Service = frontend, Port = 80, HTTPS + Let's Encrypt). No traefik.*
+    # labels here - see the note on the backend service.
+    expose:
+      - "80"
     networks:
       - dokploy-network
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=dokploy-network
-      - traefik.http.routers.neogames-web.rule=Host(`${APP_DOMAIN}`)
-      - traefik.http.routers.neogames-web.entrypoints=websecure
-      - traefik.http.routers.neogames-web.tls=true
-      - traefik.http.routers.neogames-web.tls.certresolver=letsencrypt
-      - traefik.http.services.neogames-web.loadbalancer.server.port=80
-      - traefik.http.routers.neogames-web-http.rule=Host(`${APP_DOMAIN}`)
-      - traefik.http.routers.neogames-web-http.entrypoints=web
-      - traefik.http.routers.neogames-web-http.middlewares=neogames-web-https
-      - traefik.http.middlewares.neogames-web-https.redirectscheme.scheme=https
 
 volumes:
   pgdata:
