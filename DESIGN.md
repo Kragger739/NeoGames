@@ -81,13 +81,13 @@ components:
 
 **Creative North Star: "Confetti Pop"**
 
-This is a record of the shipped reskin, not the plan for it: a warm-cream party-game hub where five saturated candy hues each own whole regions of a screen — a button, a card, a badge, a full ticket — rather than existing as a single accent sprinkled over a neutral system. The direction contract calls this out explicitly: "game night, not a dashboard — every screen commits to loud color and bounce instead of a tool's restraint." The build delivers on that thesis directly: colored glossy shadows under every elevated surface, pill and chunky radii everywhere, and a Space Grotesk display face carrying every heading and score number at full weight.
+This is a record of the shipped reskin, not the plan for it: a warm-cream party-game hub where five saturated candy hues each own whole regions of a screen — a button, a card, a badge, a full ticket — rather than existing as a single accent sprinkled over a neutral system. The direction contract calls this out explicitly: "game night, not a dashboard — every screen commits to loud color and bounce instead of a tool's restraint." The build delivers on that thesis directly: soft glossy shadows under every elevated surface (neutral-toned under buttons and controls), pill and chunky radii everywhere, and a Space Grotesk display face carrying every heading and score number at full weight.
 
-The warm cream ground is the canonical world and the default everyone sees. A dark mode ships alongside it as an **opt-in parallel world**, not an equal light/dark pair: same five candy hues, same colored-shadow elevation model, on a warm plum ground (`#191320`) instead of cream. It is a token-only override — `index.css` redefines the ground/ink/wash/shadow custom properties under `:root[data-theme="dark"]`; no component CSS forks. Resolution: `themeStore` (frontend) reads a `neo-theme` localStorage value (`light` \| `dark`, absent = follow the OS `prefers-color-scheme`, live) and stamps `data-theme` onto `<html>`; an inline script in `index.html` applies the same resolution before first paint. The preference is client-only — no backend column, no cross-device sync. The control lives on the profile page (System / Light / Dark). The DDF broadcast overlay (`DdfPlayOverlayPage`, an OBS source) is exempt and stays fixed.
+The warm cream ground is the canonical world and the default everyone sees. A dark mode ships alongside it as an **opt-in parallel world**, not an equal light/dark pair: same five candy hues, same shadow-based elevation model, on a warm plum ground (`#191320`) instead of cream. It is a token-only override — `index.css` redefines the ground/ink/wash/shadow custom properties under `:root[data-theme="dark"]`; no component CSS forks. Resolution: `themeStore` (frontend) reads a `neo-theme` localStorage value (`light` \| `dark`, absent = follow the OS `prefers-color-scheme`, live) and stamps `data-theme` onto `<html>`; an inline script in `index.html` applies the same resolution before first paint. The preference is client-only — no backend column, no cross-device sync. The control lives on the profile page (System / Light / Dark). The DDF broadcast overlay (`DdfPlayOverlayPage`, an OBS source) is exempt and stays fixed.
 
 **Key Characteristics:**
 - Five candy hues (coral, turquoise, sunflower, grape, bubblegum) each carry whole regions — buttons, card tints, badges — never a single shared accent.
-- Every elevated surface gets a soft, colored, glossy shadow tinted to match its hue; flat/shadowless surfaces are rare and deliberate (form inputs, the page ground).
+- Every elevated surface gets a soft, glossy shadow; buttons and controls cast a neutral ink shadow (the hue-named `--shadow-*` tokens all resolve to it), while a signature one-off like the room-code ticket keeps a hue-tinted shadow. Flat/shadowless surfaces are rare and deliberate (form inputs, the page ground).
 - Pill and chunky radii throughout (12-24px on surfaces, full pill on buttons/badges/progress bars); no sharp corners.
 - Space Grotesk (700/800) for every heading, score, and badge digit; Plus Jakarta Sans for all running/body copy — a real display/body pairing, not a single stack.
 - Motion is used sparingly and by role: a snappy `ease-out` for every routine hover/press, and a bouncier `ease-bounce` overshoot reserved for a small, named set of celebratory entrances (see Motion).
@@ -117,11 +117,11 @@ Each hue is a full-strength/dark/wash trio, and each owns *regions*, not trim:
 - **Fail** (`#ff4757`, wash `#ffe1e3`): round-reveal "failed" card ring + shake, form-validation error text, danger button, leave-button hover, the full-screen red decay flash on a failed round.
 
 ### Named Rules
-**The Region-Not-Accent Rule.** A candy hue is assigned to a whole component instance (a button's full fill, a card's full tint, a badge's full fill), never used as a thin trim line or a single sprinkled dot the way a restrained system would use an accent. If a new component needs a hue, give it the fill, the matching wash, and the matching colored shadow together — not just the color alone.
+**The Region-Not-Accent Rule.** A candy hue is assigned to a whole component instance (a button's full fill, a card's full tint, a badge's full fill), never used as a thin trim line or a single sprinkled dot the way a restrained system would use an accent. If a new component needs a hue, give it the fill and the matching wash together — not just the color alone.
 
 **The Verdict-Color Rule.** Win green and fail red appear in exactly one place each: the round-reveal overlay (card ring, pulse/shake, outcome line) and, for fail only, form-validation text and the leave-button's hover intent. They are not decorative candy-palette members and should never be reached for as a sixth "hue" for a non-verdict UI element.
 
-**Every elevated surface gets a shadow tinted to its own fill**, not a neutral gray — `--shadow-coral`/`--shadow-turquoise`/`--shadow-grape` exist specifically so a colored button's shadow reads as a glow of that same color, not a generic drop shadow (see Elevation).
+**Buttons and controls cast a neutral ink shadow**, not one tinted to their fill. `--shadow-coral`/`--shadow-turquoise`/`--shadow-grape` are kept as token names (too many call sites to rename) but all resolve to the same neutral `0 8px 20px rgba(33,28,51,0.14)` — no button glows in its own color. A hue-tinted shadow survives only as a deliberate one-off on the room-code ticket (see Elevation).
 
 ### Dark Mode
 
@@ -130,7 +130,7 @@ Opt-in, token-only. `index.css` redefines a small set of custom properties under
 - **Ground** flips to a warm plum, not neutral black: Bg `#191320`, Surface `#241b31` (lighter than Bg — this carries card separation, since colored shadows read weakly on a dark ground), Surface Sunk `#140f1c`.
 - **Ink** inverts to a warm off-white: Ink `#f6f1ff`, Ink Soft `#b3a9c7`, Ink Faint `#7d7391`.
 - **Candy hues and their `dark` variants are unchanged** — they carry regions and must stay recognizable. Only the pale **washes** flip to deep same-hue tints (`--coral-wash` `#3a1f28`, `--turquoise-wash` `#123230`, `--sunflower-wash` `#332a12`, `--grape-wash` `#241a3d`, `--bubblegum-wash` `#341f2c`; `--win-wash` `#123020`, `--fail-wash` `#3a1c20`).
-- **Shadows:** the neutral tiers (`--shadow-sm`/`--shadow-card`/`--shadow-float`) go black and wider; the **colored glow shadows stay** at slightly higher opacity — a coral glow off a coral button is *more* at home on dark, and keeping them is what makes dark mode still read as Confetti Pop.
+- **Shadows:** every tier goes black and wider to carry through the darker ground. The hue-named tokens are neutral here too — no colored button glow in either theme.
 - **Borders** (`--line`/`--line-soft`) become low-opacity white hairlines.
 - Two overlay tokens (`--scrim` full-screen modal dim, `--track` progress-bar groove) exist so those two spots — previously hardcoded — flip too. `color-scheme: dark` is set on the same selector so native controls and scrollbars follow.
 
@@ -163,16 +163,16 @@ Spacing has a loose but consistent rhythm rather than a strict 4/8 grid: 8px for
 
 ## Elevation & Depth
 
-Every lifted surface gets a shadow, and the shadow is colored to match the surface's own fill — this is the load-bearing elevation idea in Confetti Pop, the opposite of a flat-and-outlined system. A card, a filled button, an icon button, and a list row are each visually "sitting above" the cream ground via a soft, wide, low-opacity shadow rather than a border or a fill-contrast trick.
+Every lifted surface gets a shadow — a soft, wide, low-opacity ink shadow rather than a border or a fill-contrast trick — so a card, a filled button, an icon button, and a list row each read as "sitting above" the cream ground. Shadows are neutral-toned; hue lives in the fill and wash, not the shadow (the room-code ticket is the one deliberate exception).
 
 ### Shadow Vocabulary
 - **Shadow SM** (`0 4px 12px rgba(33,28,51,0.08)`): the resting elevation for neutral (non-hued) surfaces — nav pills, list rows, ghost buttons, icon buttons in their ghost variant, the avatar-preview-small frame.
 - **Shadow Card** (`0 10px 28px rgba(33,28,51,0.1)`): the `.card` primitive's resting shadow, and the hover target for nav pills/ghost buttons/mode-options stepping up from Shadow SM.
-- **Shadow Coral / Turquoise / Grape** (`0 10px 24px rgba(<hue>,0.32-0.35)`): the resting shadow for any surface filled with that hue — primary/turquoise/grape buttons, matching icon-button variants, the room ticket (sunflower-tinted inline), the volume-slider thumb.
+- **Shadow Coral / Turquoise / Grape** (token names retained; all resolve to `0 8px 20px rgba(33,28,51,0.14)`): the resting shadow for filled buttons, matching icon-button variants, tabs, interactive tiles, and the volume-slider thumb. Neutral, not hue-tinted. The room-code ticket keeps a sunflower-tinted shadow inline as a one-off.
 - **Shadow Float** (`0 20px 48px rgba(33,28,51,0.18)`): reserved for genuinely floating, overlapping-the-page elements — the guess-autocomplete dropdown, the round-reveal card, the room-invite toast.
 
 ### Named Rules
-**The Hue-Matched Shadow Rule.** A hued surface's shadow uses that hue's own shadow token, never the neutral Shadow SM/Card. If a new component introduces a sixth candy-adjacent fill, it needs its own `--shadow-<hue>` token rather than borrowing coral's.
+**The Neutral Shadow Rule.** Shadows carry elevation, not hue. A hued fill gets its color from the fill and its matching wash; its shadow stays the neutral ink shadow. The room-code ticket's sunflower-tinted shadow is the single sanctioned exception — a new component does not get to add a second one.
 
 **The Float Tier Is Reserved.** Shadow Float only applies to elements that overlap other in-flow content (dropdown, modal card, toast). A panel that is part of normal page flow — even a prominent one like the level-card or a mode-option — stays on Shadow SM/Card, never Float.
 
@@ -199,7 +199,7 @@ Two eases, used for two different jobs — this distinction is load-bearing and 
 - **Primary** (`btn-primary`, default): solid Coral fill, white text, Shadow Coral. This is the system's default/expected button.
 - **Turquoise / Grape** (`btn-turquoise`/`btn-grape`): equal-weight alternates to primary, same shape/shadow pattern in their own hue — used to differentiate a secondary primary action (e.g. a different room action) rather than to indicate lower importance.
 - **Ghost** (`btn-ghost`): the only outlined-at-rest-adjacent option — Surface fill (not transparent), Ink Soft text, Shadow SM. Used next to a primary/hued action for a non-primary, non-destructive choice (copy-invite, leave, dashboard logout), never as a replacement for a primary action.
-- **Danger** (`btn-danger`): solid Fail fill, white text, red-tinted shadow — reserved for destructive actions.
+- **Danger** (`btn-danger`): solid Fail fill, white text, neutral shadow — reserved for destructive actions.
 - **Hover:** every hued/ghost button lifts (`translateY(-2px) scale(1.02)`) and deepens its shadow on `:hover:not(:disabled)`, via `--ease-out`. Press (`:active`) settles to `translateY(0) scale(0.98)`.
 - **Focus:** every input/select/button shares one focus treatment — Coral border + `0 0 0 4px` Coral Wash ring, no per-component variation.
 - **Disabled:** 0.45 opacity, `cursor: not-allowed`, shadow removed.
@@ -217,7 +217,7 @@ Two eases, used for two different jobs — this distinction is load-bearing and 
 - Pill radius, Space Grotesk 800, 12px, tight (22px-tall) footprint. Hue variants (`coral`/`turquoise`/`sunflower`/`grape`) are solid fills; `gold`/`silver`/`bronze` are diagonal metallic gradients reserved for rank/medal contexts (results podium, avatar frames).
 
 ### Game Tiles
-- The Home page's game picker (`.game-grid`) is a `minmax(220px,1fr)` auto-fill grid of `.game-tile` elements, each carrying the same base `card` classes as the Cards primitive above. A playable tile adds `card-tint-<hue>` (Songle uses turquoise, deliberately distinct from the page's coral buttons/badges) and is itself the navigation link (`<Link>` wearing the card classes, not a card nested inside a link). Its hover state is bespoke rather than `card-interactive`: a `translateY(-3px)` lift paired with that tile's own hue-matched shadow token (e.g. `--shadow-turquoise`) — `card-interactive`'s Shadow Float hover does not apply here, since an in-flow grid tile isn't a floating/overlapping element (see Elevation → Float Tier Is Reserved). A locked "Coming soon" tile (not yet a built game) gets no `tint`, a Lucide icon in place of an illustration, and the same dimmed/no-lift treatment as `.mode-option-locked` — a second, named instance of that pattern, not a one-off.
+- The Home page's game picker (`.game-grid`) is a `minmax(220px,1fr)` auto-fill grid of `.game-tile` elements, each carrying the same base `card` classes as the Cards primitive above. A playable tile adds `card-tint-<hue>` (Songle uses turquoise, deliberately distinct from the page's coral buttons/badges) and is itself the navigation link (`<Link>` wearing the card classes, not a card nested inside a link). Its hover state is bespoke rather than `card-interactive`: a `translateY(-3px)` lift paired with the neutral `--shadow-turquoise` token (a name only now; see Elevation) — `card-interactive`'s Shadow Float hover does not apply here, since an in-flow grid tile isn't a floating/overlapping element (see Elevation → Float Tier Is Reserved). A locked "Coming soon" tile (not yet a built game) gets no `tint`, a Lucide icon in place of an illustration, and the same dimmed/no-lift treatment as `.mode-option-locked` — a second, named instance of that pattern, not a one-off.
 
 ### Room Ticket
 - The lobby's room code renders as a torn-edge event ticket (`.room-ticket`): Sunflower fill with a radial-gradient perforation pattern simulating a ticket stub edge, a slight `-1.5deg` rotation, and its own sunflower-tinted shadow. This is a one-off, named treatment — not a generalized "torn edge" utility — reserved for the single piece of information every page exists to help players find and share.
@@ -240,7 +240,7 @@ Short synthesized tones (`lib/sounds.ts`) via raw Web Audio oscillators + gain e
 ## Do's and Don'ts
 
 ### Do:
-- **Do** give every hued fill (button, icon-button, card tint, ticket) its own matching wash and matching colored shadow token together — a hue without its shadow reads unfinished in this system.
+- **Do** give every hued fill (button, icon-button, card tint, ticket) its own matching wash — a hue without its wash reads unfinished in this system. Shadows stay neutral (the ticket's tinted shadow aside).
 - **Do** carry every number that matters (scores, ranks, badge digits, level) in Space Grotesk 800, even at small sizes.
 - **Do** reserve `--ease-bounce` for entrance animations of genuinely new/celebratory elements (modal card, toast); use `--ease-out` for all routine hover/press/focus motion.
 - **Do** keep the page shell centered and capped (640px standard, 920px only for the two-column game-play screen).

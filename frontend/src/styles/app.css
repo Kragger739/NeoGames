@@ -349,7 +349,7 @@ button {
 
 button:hover:not(:disabled) {
   transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 14px 28px rgba(255, 92, 122, 0.4);
+  box-shadow: 0 12px 24px rgba(33, 28, 51, 0.2);
 }
 
 button:active:not(:disabled) {
@@ -399,7 +399,7 @@ button:disabled {
 .btn-danger {
   background: var(--fail);
   color: #fff;
-  box-shadow: 0 10px 24px rgba(255, 71, 87, 0.32);
+  box-shadow: 0 8px 20px rgba(33, 28, 51, 0.14);
 }
 
 .btn-ghost {
@@ -451,7 +451,7 @@ button:disabled {
 .icon-btn-danger {
   background: var(--fail);
   color: #fff;
-  box-shadow: 0 10px 24px rgba(255, 71, 87, 0.32);
+  box-shadow: 0 8px 20px rgba(33, 28, 51, 0.14);
 }
 
 .form-error {
@@ -722,7 +722,7 @@ button:disabled {
 
 .leave-button:hover:not(:disabled) {
   color: var(--fail);
-  box-shadow: 0 10px 24px rgba(255, 71, 87, 0.22);
+  box-shadow: 0 8px 20px rgba(33, 28, 51, 0.16);
 }
 
 .room-settings-form {

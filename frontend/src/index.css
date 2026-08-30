@@ -35,12 +35,15 @@
   --line: #f0dfc8;
   --line-soft: #f5ebd9;
 
-  /* Shadows - soft, colored, glossy. Every elevated surface gets one. */
+  /* Shadows - soft and glossy. Every elevated surface gets one.
+     The three hue-named tokens are kept as names only (many call sites)
+     but now resolve to the same neutral ink shadow: buttons and controls
+     no longer glow in their own color. */
   --shadow-sm: 0 4px 12px rgba(33, 28, 51, 0.08);
   --shadow-card: 0 10px 28px rgba(33, 28, 51, 0.1);
-  --shadow-coral: 0 10px 24px rgba(255, 92, 122, 0.35);
-  --shadow-turquoise: 0 10px 24px rgba(23, 195, 178, 0.32);
-  --shadow-grape: 0 10px 24px rgba(139, 92, 246, 0.32);
+  --shadow-coral: 0 8px 20px rgba(33, 28, 51, 0.14);
+  --shadow-turquoise: 0 8px 20px rgba(33, 28, 51, 0.14);
+  --shadow-grape: 0 8px 20px rgba(33, 28, 51, 0.14);
   --shadow-float: 0 20px 48px rgba(33, 28, 51, 0.18);
 
   /* Overlays - full-screen modal dim, and the empty track behind a
@@ -112,14 +115,14 @@
   --line: rgba(255, 255, 255, 0.09);
   --line-soft: rgba(255, 255, 255, 0.05);
 
-  /* Neutral shadows go black and wider to carry through the darker
-     ground; the colored ones stay (a coral glow off a coral button reads
-     even better on dark) and lift slightly in opacity. */
+  /* Shadows go black and wider to carry through the darker ground. The
+     hue-named tokens are neutral here too (see :root) - no colored button
+     glow in either theme. */
   --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.45);
   --shadow-card: 0 12px 32px rgba(0, 0, 0, 0.55);
-  --shadow-coral: 0 8px 28px rgba(255, 92, 122, 0.5);
-  --shadow-turquoise: 0 8px 28px rgba(23, 195, 178, 0.45);
-  --shadow-grape: 0 8px 28px rgba(139, 92, 246, 0.5);
+  --shadow-coral: 0 8px 22px rgba(0, 0, 0, 0.5);
+  --shadow-turquoise: 0 8px 22px rgba(0, 0, 0, 0.5);
+  --shadow-grape: 0 8px 22px rgba(0, 0, 0, 0.5);
   --shadow-float: 0 24px 60px rgba(0, 0, 0, 0.7);
 
   /* Overlays */
