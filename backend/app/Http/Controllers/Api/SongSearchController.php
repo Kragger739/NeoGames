@@ -3,32 +3,44 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\Music\SpotifyClient;
+use App\Models\Song;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 /**
- * Live search for the guess-box autocomplete. Deliberately searches Spotify
- * directly rather than the room's song pool, so results never hint at which
- * songs are actually in play this game. Only title / artist / art are
- * needed here - no preview audio (the guess box never plays anything).
+ * Live search for the guess-box autocomplete. Matches against the local
+ * `songs` pool (the Spotify search API is 403-blocked for app tokens), most
+ * recognizable first. Only title / artist / art are returned - the guess
+ * box never plays audio.
  */
 class SongSearchController extends Controller
 {
-    public function search(Request $request, SpotifyClient $spotify)
+    public function search(Request $request)
     {
         $request->validate([
             'q' => ['required', 'string', 'min:2', 'max:100'],
         ]);
 
-        $results = $spotify->searchTrack($request->string('q')->toString(), limit: 8);
+        $term = trim((string) $request->query('q'));
+        // Escape LIKE wildcards so a literal % or _ in the query isn't a wildcard.
+        $like = '%'.addcslashes($term, '%_\\').'%';
+
+        $results = Song::query()
+            ->where('excluded', false)
+            ->where(fn (Builder $q) => $q
+                ->where('title', 'like', $like)
+                ->orWhere('artist', 'like', $like))
+            ->orderByDesc('popularity')
+            ->limit(8)
+            ->get(['provider_track_id', 'title', 'artist', 'album_art_url']);
 
         return response()->json([
-            'results' => array_values(array_map(fn (array $track) => [
-                'provider_track_id' => $track['provider_track_id'],
-                'title' => $track['title'],
-                'artist' => $track['artist'],
-                'album_art_url' => $track['album_art_url'],
-            ], $results)),
+            'results' => $results->map(fn (Song $song) => [
+                'provider_track_id' => $song->provider_track_id,
+                'title' => $song->title,
+                'artist' => $song->artist,
+                'album_art_url' => $song->album_art_url,
+            ])->values(),
         ]);
     }
 }
