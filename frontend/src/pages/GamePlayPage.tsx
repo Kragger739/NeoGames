@@ -316,7 +316,6 @@ export function GamePlayPage() {
                   <span className="friend-name">
                     <Avatar data={player.avatar ?? EMPTY_AVATAR} size="xs" animated={false} />
                     {player.nickname}
-                    {player.level !== null && <span className="player-level">Lvl {player.level}</span>}
                     {player.is_eliminated && " (out)"}
                   </span>
                   <span>{player.score}</span>
