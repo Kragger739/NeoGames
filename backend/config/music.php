@@ -65,12 +65,4 @@ return [
     'itunes_country' => env('MUSIC_ITUNES_COUNTRY', 'US'),
     'spotify_market' => env('MUSIC_SPOTIFY_MARKET', 'US'),
 
-    /*
-    | Optional: a directory of `<genre>.txt` files, one "Artist - Title" per
-    | line, used when `songs:sync --source=list` is passed instead of the
-    | Spotify playlists above. Each line is resolved via Spotify search (for
-    | popularity) then iTunes (for the preview).
-    */
-    'curated_list_path' => storage_path('app/song-seeds'),
-
 ];
