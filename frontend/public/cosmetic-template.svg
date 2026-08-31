@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  NeoGames cosmetic template
+  ==========================
+  Coordinate system: 100 x 100 units. This is exactly how the game positions a
+  cosmetic layer over an avatar, so what you draw here is what shows up.
+
+  How to use:
+    1. Open in Figma / Inkscape / Illustrator (or any SVG editor).
+    2. Draw your cosmetic inside the "YOUR-ART" group.
+    3. Delete the "GUIDES" group.
+    4. Export as a TRANSPARENT PNG (or WebP), square, e.g. 512 x 512.
+    5. Upload it in Admin -> Seasons & Battlepass -> Cosmetic library.
+
+  Rules of thumb:
+    * The avatar is a CIRCLE and everything outside radius 50 is clipped away -
+      keep detail inside the teal "safe" circle (radius 45).
+    * Transparent background. Only your shape should be opaque.
+    * One cosmetic = one slot. Draw only that slot's piece:
+        background  fills the whole circle, sits BEHIND the photo
+        frame       a ring hugging the edge (roughly radius 40-50)
+        hat         a cap across the top
+        accessory   a chain / collar across the lower third
+        badge       a small emblem, lower-right
+        effect      a light full-circle overlay (kept sparse; may spin)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
+  <title>NeoGames cosmetic template</title>
+  <desc>100x100 authoring guide for avatar cosmetic layers. Delete the GUIDES group before exporting.</desc>
+
+  <style>
+    .g-canvas { fill: none; stroke: #b7b7c9; stroke-width: 0.5; stroke-dasharray: 2 2; }
+    .g-clip   { fill: none; stroke: #ff5c7a; stroke-width: 0.7; stroke-dasharray: 2.5 2; }
+    .g-safe   { fill: none; stroke: #17c3b2; stroke-width: 0.6; stroke-dasharray: 2 2; }
+    .g-photo  { fill: #000000; opacity: 0.06; }
+    .g-zone   { fill: none; stroke: #8a7fff; stroke-width: 0.6; stroke-dasharray: 1.5 1.5; }
+    .g-label  { fill: #6b6b7b; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 3.4px; font-weight: 700; }
+    .g-tick   { stroke: #b7b7c9; stroke-width: 0.4; }
+  </style>
+
+  <!-- ================= GUIDES  (delete this whole group before exporting) ================= -->
+  <g id="GUIDES">
+    <!-- canvas bounds -->
+    <rect class="g-canvas" x="0.5" y="0.5" width="99" height="99" />
+
+    <!-- the visible circle: anything outside is clipped -->
+    <circle class="g-clip" cx="50" cy="50" r="49.5" />
+    <text class="g-label" x="50" y="4.2" text-anchor="middle">clip edge — nothing shows outside</text>
+
+    <!-- safe area for important detail -->
+    <circle class="g-safe" cx="50" cy="50" r="45" />
+
+    <!-- where the user's photo roughly sits (behind frame/hat/badge/effect) -->
+    <circle class="g-photo" cx="50" cy="50" r="33" />
+    <text class="g-label" x="50" y="51" text-anchor="middle">photo area</text>
+
+    <!-- center ticks -->
+    <line class="g-tick" x1="50" y1="46" x2="50" y2="54" />
+    <line class="g-tick" x1="46" y1="50" x2="54" y2="50" />
+
+    <!-- FRAME band -->
+    <circle class="g-zone" cx="50" cy="50" r="40" />
+    <text class="g-label" x="50" y="12" text-anchor="middle">FRAME · ring r40–50</text>
+
+    <!-- HAT cap -->
+    <path class="g-zone" d="M26 30 Q26 6 50 6 Q74 6 74 30" />
+    <text class="g-label" x="50" y="24" text-anchor="middle">HAT</text>
+
+    <!-- ACCESSORY / chain -->
+    <path class="g-zone" d="M16 66 Q50 100 84 66" />
+    <text class="g-label" x="50" y="82" text-anchor="middle">ACCESSORY / CHAIN</text>
+
+    <!-- BADGE -->
+    <circle class="g-zone" cx="74" cy="74" r="13" />
+    <text class="g-label" x="74" y="75" text-anchor="middle">BADGE</text>
+
+    <!-- BACKGROUND / EFFECT notes -->
+    <text class="g-label" x="50" y="94" text-anchor="middle">BACKGROUND fills the circle · EFFECT = light full overlay</text>
+  </g>
+
+  <!-- ================= YOUR-ART  (draw your cosmetic here) ================= -->
+  <g id="YOUR-ART">
+    <!-- Example: a simple 3px frame ring. Delete or replace. -->
+    <circle cx="50" cy="50" r="46" fill="none" stroke="#ffc93c" stroke-width="3" opacity="0.35" />
+  </g>
+</svg>

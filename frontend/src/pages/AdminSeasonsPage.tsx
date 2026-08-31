@@ -345,6 +345,13 @@ export function AdminSeasonsPage() {
 
       {/* ---- Cosmetic library ---- */}
       <h2>Cosmetic library</h2>
+      <p className="hint">
+        <a href="/cosmetic-template.svg" download>
+          Download the cosmetic template (SVG)
+        </a>{" "}
+        — draw on the 100×100 guide, delete the GUIDES layer, export a transparent square PNG/WebP, then
+        upload it below.
+      </p>
       <ul className="player-list">
         {cosmetics.map((c) => (
           <li key={c.id}>
