@@ -17,7 +17,14 @@ export function AdminNav() {
         Home
       </NavLink>
       {SECTIONS.map(({ to, label, icon: Icon }) => (
-        <NavLink key={to} to={to} className={({ isActive }) => (isActive ? "is-active" : undefined)}>
+        <NavLink
+          key={to}
+          to={to}
+          // "/admin" is a prefix of every admin route - without `end` the
+          // Users chip stays highlighted on every page.
+          end={to === "/admin"}
+          className={({ isActive }) => (isActive ? "is-active" : undefined)}
+        >
           <Icon size={16} strokeWidth={2.25} />
           {label}
         </NavLink>
