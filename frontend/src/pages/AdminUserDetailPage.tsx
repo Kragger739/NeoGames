@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { firstValidationError } from "../lib/errors";
 import { useAdminStore } from "../stores/adminStore";
 import { useAuthStore } from "../stores/authStore";
+import { AdminNav } from "../components/AdminNav";
 import { Button } from "../components/ui/Button";
 
 const EMPTY_FORM = {
@@ -53,9 +54,7 @@ export function AdminUserDetailPage() {
   if (!Number.isFinite(userId)) {
     return (
       <div className="admin-page">
-        <p>
-          <Link to="/admin">← Users</Link>
-        </p>
+        <AdminNav />
         <p className="hint">User not found.</p>
       </div>
     );
@@ -64,9 +63,7 @@ export function AdminUserDetailPage() {
   if (selectedStatus !== "ready" || !selected) {
     return (
       <div className="admin-page">
-        <p>
-          <Link to="/admin">← Users</Link>
-        </p>
+        <AdminNav />
         <p className="hint">Loading…</p>
       </div>
     );
@@ -107,9 +104,7 @@ export function AdminUserDetailPage() {
 
   return (
     <div className="admin-page">
-      <p>
-        <Link to="/admin">← Users</Link>
-      </p>
+      <AdminNav />
       <h1>{user.username ?? user.name}</h1>
       <p className="hint">
         Joined {user.created_at?.slice(0, 10) ?? "—"} · Level {user.level} · {user.xp} XP

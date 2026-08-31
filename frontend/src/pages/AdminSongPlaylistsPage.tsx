@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { firstValidationError } from "../lib/errors";
 import { useAdminPlaylistsStore } from "../stores/adminPlaylistsStore";
+import { AdminNav } from "../components/AdminNav";
 import { Button } from "../components/ui/Button";
 
 const GENRE_LABELS: Record<string, string> = {
@@ -60,15 +60,7 @@ export function AdminSongPlaylistsPage() {
 
   return (
     <div className="admin-page">
-      <p>
-        <Link to="/admin">← Users</Link>
-        {"  ·  "}
-        <Link to="/admin/unlocks">Unlocks &amp; Daily</Link>
-        {"  ·  "}
-        <Link to="/admin/seasons">Seasons &amp; Battlepass</Link>
-        {"  ·  "}
-        <Link to="/">Home</Link>
-      </p>
+      <AdminNav />
       <h1>Song playlists</h1>
       <p className="hint">
         Curated <strong>public, user-made</strong> Spotify playlists that seed each genre&rsquo;s

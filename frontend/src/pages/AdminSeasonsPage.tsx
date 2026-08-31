@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { cosmeticSvg } from "../lib/cosmetics/registry";
 import {
@@ -8,6 +7,7 @@ import {
   type SeasonTierRow,
   useAdminSeasonsStore,
 } from "../stores/adminSeasonsStore";
+import { AdminNav } from "../components/AdminNav";
 import { Button } from "../components/ui/Button";
 
 function CosmeticThumb({ item, size = 40 }: { item: CosmeticLibItem | undefined; size?: number }) {
@@ -127,15 +127,7 @@ export function AdminSeasonsPage() {
 
   return (
     <div className="admin-page">
-      <p>
-        <Link to="/admin">← Users</Link>
-        {"  ·  "}
-        <Link to="/admin/song-playlists">Song playlists</Link>
-        {"  ·  "}
-        <Link to="/admin/unlocks">Unlocks &amp; Daily</Link>
-        {"  ·  "}
-        <Link to="/">Home</Link>
-      </p>
+      <AdminNav />
       <h1>Seasons &amp; Battlepass</h1>
 
       {error && <p className="form-error">{error}</p>}

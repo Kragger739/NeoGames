@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { EMPTY_AVATAR } from "../lib/avatarData";
 import { useAdminStore } from "../stores/adminStore";
+import { AdminNav } from "../components/AdminNav";
 import { Avatar } from "../components/ui/Avatar";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -30,15 +31,7 @@ export function AdminUsersPage() {
 
   return (
     <div className="admin-page">
-      <p>
-        <Link to="/">← Home</Link>
-        {"  ·  "}
-        <Link to="/admin/song-playlists">Song playlists</Link>
-        {"  ·  "}
-        <Link to="/admin/unlocks">Unlocks &amp; Daily</Link>
-        {"  ·  "}
-        <Link to="/admin/seasons">Seasons &amp; Battlepass</Link>
-      </p>
+      <AdminNav />
       <h1>Users</h1>
 
       <input

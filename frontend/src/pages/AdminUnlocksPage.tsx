@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 
 import {
   type DailySong,
   type UnlockRow,
   useAdminUnlocksStore,
 } from "../stores/adminUnlocksStore";
+import { AdminNav } from "../components/AdminNav";
 import { Button } from "../components/ui/Button";
 
 const CATEGORY_LABELS: Record<UnlockRow["category"], string> = {
@@ -72,15 +72,7 @@ export function AdminUnlocksPage() {
 
   return (
     <div className="admin-page">
-      <p>
-        <Link to="/admin">← Users</Link>
-        {"  ·  "}
-        <Link to="/admin/song-playlists">Song playlists</Link>
-        {"  ·  "}
-        <Link to="/admin/seasons">Seasons &amp; Battlepass</Link>
-        {"  ·  "}
-        <Link to="/">Home</Link>
-      </p>
+      <AdminNav />
       <h1>Unlocks &amp; Daily</h1>
 
       {error && <p className="form-error">{error}</p>}
