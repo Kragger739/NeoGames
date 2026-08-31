@@ -57,6 +57,7 @@ interface GameState {
   artistNames: string[] | null;
   datasetId: number | null;
   datasetName: string | null;
+  dailyChallengeId: number | null;
   // False until the catch-up GET resolves at least once. `phase` defaults
   // to "lobby" before that, which is indistinguishable from a genuine
   // room.reset - consumers that navigate off of phase === "lobby" (e.g.
@@ -94,6 +95,7 @@ const initialState = {
   yearTo: null,
   datasetId: null,
   datasetName: null,
+  dailyChallengeId: null,
   artistName: null,
   artistNames: null,
   caughtUp: false,
@@ -140,6 +142,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         yearTo: state.year_to,
         datasetId: state.dataset_id,
         datasetName: state.dataset_name,
+        dailyChallengeId: state.daily_challenge_id ?? null,
         artistName: state.artist_name,
         artistNames: state.artist_names,
       });

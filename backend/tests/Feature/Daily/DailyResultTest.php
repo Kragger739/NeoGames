@@ -55,4 +55,23 @@ class DailyResultTest extends TestCase
             ->assertJsonPath('finished', true)
             ->assertJsonPath('best_score', 42);
     }
+
+    public function test_a_daily_room_cannot_be_redone(): void
+    {
+        Song::factory()->count(12)->create(['genre' => 'iconic']);
+        $host = User::factory()->create();
+
+        $this->actingAs($host)->postJson('/api/daily/start')->assertCreated();
+
+        $room = GameRoom::where('host_id', $host->id)->first();
+        $round = $room->rounds()->latest('id')->first();
+        $round->update(['status' => 'won']);
+        app(RoundService::class)->finishGame($room->fresh(), $round->id);
+
+        $this->actingAs($host)->postJson("/api/rooms/{$room->code}/redo")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('room');
+
+        $this->assertSame('finished', $room->fresh()->status->value);
+    }
 }

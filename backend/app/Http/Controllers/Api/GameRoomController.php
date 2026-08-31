@@ -220,6 +220,13 @@ class GameRoomController extends Controller
     {
         $room = GameRoom::where('code', strtoupper($code))->firstOrFail();
 
+        // The Daily challenge is once per day - there's no replaying it.
+        if ($room->daily_challenge_id !== null) {
+            throw ValidationException::withMessages([
+                'room' => ['The Daily challenge can only be played once a day.'],
+            ]);
+        }
+
         if ($room->host_id !== $request->user()->id) {
             abort(403);
         }

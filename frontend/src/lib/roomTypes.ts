@@ -76,6 +76,7 @@ export interface RoomState {
   guess_timeout_seconds: number;
   dataset_id: number | null;
   dataset_name: string | null;
+  daily_challenge_id: number | null;
   current_tier: string | null;
   current_song_index: number;
   players: RoomPlayerSummary[];

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { LogOut, RotateCcw } from "lucide-react";
+import { LogOut, RotateCcw, Trophy } from "lucide-react";
 
 import { api } from "../lib/api";
 import { firstValidationError } from "../lib/errors";
@@ -23,6 +23,7 @@ export function ResultsPage() {
   const phase = useGameStore((state) => state.phase);
   const caughtUp = useGameStore((state) => state.caughtUp);
   const hostId = useGameStore((state) => state.hostId);
+  const dailyChallengeId = useGameStore((state) => state.dailyChallengeId);
   const host = useAuthStore((state) => state.host);
   const fetchHost = useAuthStore((state) => state.fetchHost);
   const authStatus = useAuthStore((state) => state.status);
@@ -61,6 +62,8 @@ export function ResultsPage() {
   }, [phase, caughtUp, code, navigate]);
 
   const isHost = host !== null && hostId !== null && host.id === hostId;
+  // The Daily challenge is once per day - no replay; send them to the leaderboard.
+  const isDaily = dailyChallengeId != null;
 
   async function handleLeave() {
     if (code) await leaveRoomOnServer(code);
@@ -163,7 +166,12 @@ export function ResultsPage() {
         </>
       )}
 
-      {isHost ? (
+      {isDaily ? (
+        <Button size="lg" onClick={() => navigate("/leaderboard")}>
+          <Trophy size={20} strokeWidth={2.5} />
+          View leaderboard
+        </Button>
+      ) : isHost ? (
         <>
           {redoError && <p className="form-error">{redoError}</p>}
           <Button size="lg" onClick={handleRedo} disabled={redoing}>
