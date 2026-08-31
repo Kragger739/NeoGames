@@ -111,26 +111,29 @@ export function SonglePage() {
       </Button>
       <p className="hint">Five fixed songs, the same for everyone, solo. One run a day.</p>
 
-      <Button
-        variant="ghost"
-        size="lg"
-        onClick={() => void handleNewRoom()}
-        disabled={creating || gameNightLocked}
-      >
-        {creating ? (
-          "Setting up…"
-        ) : gameNightLocked ? (
-          <>
-            <Lock size={18} strokeWidth={2.5} />
-            Unlocks at level {gameNightLevel}
-          </>
-        ) : (
-          <>
-            <Gamepad2 size={20} strokeWidth={2.5} />
-            Start a game night
-          </>
+      <div className={gameNightLocked ? "songle-lock-wrap is-locked" : "songle-lock-wrap"}>
+        <Button
+          variant="ghost"
+          size="lg"
+          onClick={() => void handleNewRoom()}
+          disabled={creating || gameNightLocked}
+        >
+          {creating ? (
+            "Setting up…"
+          ) : (
+            <>
+              <Gamepad2 size={20} strokeWidth={2.5} />
+              Start a game night
+            </>
+          )}
+        </Button>
+        {gameNightLocked && (
+          <div className="songle-lock-overlay" aria-hidden="true">
+            <Lock size={22} strokeWidth={2.5} />
+            <span>Unlocks at level {gameNightLevel}</span>
+          </div>
         )}
-      </Button>
+      </div>
       {createError && <p className="form-error">{createError}</p>}
       <p className="hint">Songs are pulled automatically — no setup needed.</p>
     </div>

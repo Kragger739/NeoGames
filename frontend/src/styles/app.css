@@ -45,6 +45,35 @@
   justify-content: flex-start;
 }
 
+/* "Start a game night" when the host hasn't reached the required level -
+   the real button sits underneath as a faded backdrop and a lock overlay
+   carries the message. */
+.songle-lock-wrap {
+  position: relative;
+}
+
+.songle-lock-wrap.is-locked > .btn {
+  opacity: 0.5;
+  filter: grayscale(0.35);
+}
+
+.songle-lock-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(2px);
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--ink);
+  pointer-events: none;
+}
+
 .dashboard-hero {
   width: 160px;
   height: 160px;
