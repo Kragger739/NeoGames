@@ -22,6 +22,18 @@ class AdminSongPlaylistTest extends TestCase
         return tap(User::factory()->create(), fn ($u) => $u->forceFill(['is_admin' => true])->save());
     }
 
+    /** Clear both wait gates in the cached sync state so the next step() runs now. */
+    private function rewindSyncClock(): void
+    {
+        $state = Cache::get(IncrementalSongSync::PROGRESS_KEY);
+
+        if (is_array($state)) {
+            $state['rate_limited_until'] = null;
+            $state['throttle_until'] = null;
+            Cache::put(IncrementalSongSync::PROGRESS_KEY, $state);
+        }
+    }
+
     public function test_non_admins_are_rejected(): void
     {
         $this->getJson('/api/admin/song-playlists')->assertUnauthorized();
@@ -308,6 +320,144 @@ class AdminSongPlaylistTest extends TestCase
         }
 
         $res->assertJsonPath('phase', 'done')->assertJsonPath('seeded', 1);
+    }
+
+    public function test_the_seed_phase_paces_itself_between_tracks(): void
+    {
+        Storage::fake('public');
+        SeedPlaylist::create(['genre' => 'pop', 'spotify_playlist_id' => 'abcdefghijABCDEFGHIJ12']);
+        $this->fakeSpotifyToken();
+        $this->fakeSpotifyPlaylistPage([['Song A', 'Act'], ['Song B', 'Act']]);
+
+        $itunesCalls = 0;
+        Http::fake([
+            'api.spotify.com/v1/search*' => Http::response(['tracks' => ['items' => []]], 200),
+            'itunes.apple.com/search*' => function () use (&$itunesCalls) {
+                $itunesCalls++;
+
+                return Http::response(['results' => [
+                    ['kind' => 'song', 'trackId' => 1, 'trackName' => 'Song A', 'artistName' => 'Act',
+                        'previewUrl' => 'https://audio-ssl.itunes.apple.com/a.m4a',
+                        'artworkUrl100' => 'https://is1.mzstatic.com/100x100bb.jpg', 'releaseDate' => '2015-01-01T00:00:00Z'],
+                    ['kind' => 'song', 'trackId' => 2, 'trackName' => 'Song B', 'artistName' => 'Act',
+                        'previewUrl' => 'https://audio-ssl.itunes.apple.com/b.m4a',
+                        'artworkUrl100' => 'https://is1.mzstatic.com/100x100bb.jpg', 'releaseDate' => '2015-01-01T00:00:00Z'],
+                ]], 200);
+            },
+            'audio-ssl.itunes.apple.com/*' => Http::response('m4a', 200),
+        ]);
+
+        $admin = $this->admin();
+        $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync', ['start' => true]);
+
+        // Advance through prepare and seed exactly one track.
+        $res = null;
+        for ($i = 0; $i < 5; $i++) {
+            $res = $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync');
+            if ($res->json('seeded') === 1) {
+                break;
+            }
+        }
+
+        $res->assertJsonPath('phase', 'seed')->assertJsonPath('seeded', 1);
+        $this->assertGreaterThan(time(), $res->json('throttle_until'));
+        $this->assertSame(1, $itunesCalls);
+
+        // A step taken while the throttle window is still open does no work.
+        $res = $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync');
+        $res->assertJsonPath('phase', 'seed')->assertJsonPath('seeded', 1);
+        $this->assertSame(1, $itunesCalls, 'throttled step still hit iTunes');
+
+        // Once the window passes, the next track seeds and the run finishes.
+        $this->rewindSyncClock();
+        for ($i = 0; $i < 5; $i++) {
+            $res = $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync');
+            if (in_array($res->json('phase'), ['done', 'error'], true)) {
+                break;
+            }
+            $this->rewindSyncClock();
+        }
+
+        $res->assertJsonPath('phase', 'done')->assertJsonPath('seeded', 2);
+        $this->assertSame(2, $itunesCalls);
+    }
+
+    public function test_persistent_itunes_rate_limiting_makes_the_run_give_up(): void
+    {
+        Storage::fake('public');
+        SeedPlaylist::create(['genre' => 'pop', 'spotify_playlist_id' => 'abcdefghijABCDEFGHIJ12']);
+        $this->fakeSpotifyToken();
+        $this->fakeSpotifyPlaylistPage([['Song A', 'Act'], ['Song B', 'Act'], ['Song C', 'Act']]);
+        Http::fake([
+            'api.spotify.com/v1/search*' => Http::response(['tracks' => ['items' => []]], 200),
+            'itunes.apple.com/search*' => Http::response('rate limited', 403),
+        ]);
+
+        $admin = $this->admin();
+        $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync', ['start' => true]);
+
+        $res = null;
+        $terminated = false;
+        for ($i = 0; $i < 25; $i++) {
+            $res = $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync');
+            if (in_array($res->json('phase'), ['done', 'error'], true)) {
+                $terminated = true;
+                break;
+            }
+            $this->rewindSyncClock();
+        }
+
+        $this->assertTrue($terminated, 'the run never terminated');
+        $res->assertJsonPath('phase', 'error')->assertJsonPath('seeded', 0);
+        $this->assertStringContainsString('rate-limit', $res->json('error'));
+        $this->assertStringContainsString('Sync again', $res->json('error'));
+        $this->assertSame(0, Song::count());
+    }
+
+    public function test_rate_limit_strikes_reset_after_a_successful_seed(): void
+    {
+        Storage::fake('public');
+        SeedPlaylist::create(['genre' => 'pop', 'spotify_playlist_id' => 'abcdefghijABCDEFGHIJ12']);
+        $this->fakeSpotifyToken();
+        $this->fakeSpotifyPlaylistPage([['Song A', 'Act'], ['Song B', 'Act']]);
+
+        // iTunes 403s the first two lookups, then serves matches.
+        $itunesCalls = 0;
+        Http::fake([
+            'api.spotify.com/v1/search*' => Http::response(['tracks' => ['items' => []]], 200),
+            'itunes.apple.com/search*' => function () use (&$itunesCalls) {
+                $itunesCalls++;
+
+                if ($itunesCalls <= 2) {
+                    return Http::response('slow down', 403);
+                }
+
+                return Http::response(['results' => [
+                    ['kind' => 'song', 'trackId' => 1, 'trackName' => 'Song A', 'artistName' => 'Act',
+                        'previewUrl' => 'https://audio-ssl.itunes.apple.com/a.m4a',
+                        'artworkUrl100' => 'https://is1.mzstatic.com/100x100bb.jpg', 'releaseDate' => '2015-01-01T00:00:00Z'],
+                    ['kind' => 'song', 'trackId' => 2, 'trackName' => 'Song B', 'artistName' => 'Act',
+                        'previewUrl' => 'https://audio-ssl.itunes.apple.com/b.m4a',
+                        'artworkUrl100' => 'https://is1.mzstatic.com/100x100bb.jpg', 'releaseDate' => '2015-01-01T00:00:00Z'],
+                ]], 200);
+            },
+            'audio-ssl.itunes.apple.com/*' => Http::response('m4a', 200),
+        ]);
+
+        $admin = $this->admin();
+        $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync', ['start' => true]);
+
+        $res = null;
+        for ($i = 0; $i < 25; $i++) {
+            $res = $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync');
+            if (in_array($res->json('phase'), ['done', 'error'], true)) {
+                break;
+            }
+            $this->rewindSyncClock();
+        }
+
+        $res->assertJsonPath('phase', 'done')->assertJsonPath('seeded', 2);
+        $this->assertSame(2, Song::count());
     }
 
     public function test_one_unreadable_playlist_does_not_sink_the_whole_sync(): void

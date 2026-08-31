@@ -26,8 +26,19 @@ class IncrementalSongSync
 {
     public const PROGRESS_KEY = 'songs:sync-progress';
 
-    /** Tracks resolved+seeded per step() - each is a search + iTunes lookup + clip download. */
-    private const SEED_BATCH = 3;
+    /**
+     * Tracks resolved+seeded per step() - each is a search + iTunes lookup +
+     * clip download. One per step so the seed phase can pace itself: iTunes
+     * rate-limits around 20 req/min, so a burst of back-to-back lookups just
+     * gets 403'd.
+     */
+    private const SEED_BATCH = 1;
+
+    /** Consecutive rate-limit pauses with no forward progress before we give up. */
+    private const MAX_RL_STRIKES = 5;
+
+    /** Rate-limit retries on a single track before we drop it and move on. */
+    private const PER_TRACK_RL_CAP = 3;
 
     public function __construct(
         private SpotifyClient $spotify,
@@ -73,6 +84,8 @@ class IncrementalSongSync
             'skipped' => 0,
             'already' => 0,      // already in the pool before this run
             'rate_limited_until' => null,
+            'throttle_until' => null,  // gentle pacing between iTunes lookups
+            'rl_strikes' => 0,        // consecutive rate-limit pauses since last progress
             'started_at' => now()->toIso8601String(),
             'error' => null,
             'summary' => null,
@@ -103,6 +116,13 @@ class IncrementalSongSync
             return $this->clientState($state);
         }
         $state['rate_limited_until'] = null;
+
+        // Pacing between iTunes lookups - the client keeps polling, we just do
+        // nothing until the throttle window passes.
+        if (($state['throttle_until'] ?? null) && time() < $state['throttle_until']) {
+            return $this->clientState($state);
+        }
+        $state['throttle_until'] = null;
 
         try {
             match ($state['phase']) {
@@ -254,23 +274,62 @@ class IncrementalSongSync
                 $track = $this->spotify->resolveTrack($item['title'], $item['artist']);
                 $song = $this->seeder->persist($track, $item['genre_tag'], null);
                 $song ? $state['seeded']++ : $state['skipped']++;
+
+                // Progress made - reset the strike count and pace the next
+                // lookup so we stay under iTunes' ~20 req/min limit.
+                $state['rl_strikes'] = 0;
+                $state['throttle_until'] = time() + $this->throttleSeconds();
             } catch (RateLimitException) {
-                // Put the track back and pause ~60s; the client waits, then
-                // calls step() again and we pick up right here.
-                array_unshift($state['items'], $item);
-                $state['rate_limited_until'] = time() + 60;
+                $item['rl_attempts'] = ($item['rl_attempts'] ?? 0) + 1;
+                $state['rl_strikes']++;
+
+                // Repeatedly rate-limited with nothing getting through - stop
+                // and let the admin resume later (seeded songs persist, so a
+                // fresh run skips them via filterOutPooled()).
+                if ($state['rl_strikes'] >= self::MAX_RL_STRIKES) {
+                    $state['phase'] = 'error';
+                    $state['error'] = sprintf(
+                        'Spotify / iTunes kept rate-limiting this server (gave up after %d retries). '
+                        .'%d songs added, %d left - wait ~15 minutes, then hit Sync again to pick up '
+                        .'where it left off.',
+                        $state['rl_strikes'],
+                        $state['seeded'],
+                        count($state['items']) + 1,
+                    );
+
+                    return;
+                }
+
+                // Drop a single track we keep failing to fetch; otherwise put
+                // it back at the front and retry after the cooldown.
+                if ($item['rl_attempts'] >= self::PER_TRACK_RL_CAP) {
+                    $state['skipped']++;
+                } else {
+                    array_unshift($state['items'], $item);
+                }
+
+                $state['rate_limited_until'] = time() + min(60 * $state['rl_strikes'], 300);
 
                 return;
             } catch (Throwable) {
                 // A one-off failure (iTunes 5xx, a decode error) - skip this
-                // track rather than sinking the whole run.
+                // track rather than sinking the whole run. Not a rate limit,
+                // so clear the strike count and keep pacing.
                 $state['skipped']++;
+                $state['rl_strikes'] = 0;
+                $state['throttle_until'] = time() + $this->throttleSeconds();
             }
         }
 
         if ($state['items'] === []) {
             $state['phase'] = 'done';
         }
+    }
+
+    /** Seconds to wait between iTunes lookups (from music.itunes_throttle_ms). */
+    private function throttleSeconds(): int
+    {
+        return max(1, (int) ceil((int) config('music.itunes_throttle_ms', 3200) / 1000));
     }
 
     private function alreadyInPool(string $title, string $artist): bool
@@ -312,6 +371,8 @@ class IncrementalSongSync
             'total_items' => $state['total_items'] ?? 0,
             'failed_playlists' => array_values($state['failed_playlists'] ?? []),
             'rate_limited_until' => $state['rate_limited_until'] ?? null,
+            'throttle_until' => $state['throttle_until'] ?? null,
+            'rl_strikes' => $state['rl_strikes'] ?? 0,
             'error' => $state['error'] ?? null,
             'summary' => $state['summary'] ?? null,
             'pool_size' => Song::count(),

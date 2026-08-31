@@ -20,6 +20,8 @@ export interface SyncProgress {
   total_items: number;
   failed_playlists: string[];
   rate_limited_until: number | null;
+  throttle_until: number | null;
+  rl_strikes: number;
   error: string | null;
   summary: string | null;
   pool_size: number;
@@ -73,6 +75,9 @@ export const useAdminPlaylistsStore = create<AdminPlaylistsState>((set, get) => 
         // Spotify / iTunes rate limit - wait out the cooldown, then resume.
         const waitMs = Math.max(1000, res.rate_limited_until * 1000 - Date.now() + 500);
         await sleep(waitMs);
+      } else if (res.throttle_until) {
+        // Gentle pacing between iTunes lookups - wait out the throttle window.
+        await sleep(Math.max(300, res.throttle_until * 1000 - Date.now() + 200));
       } else {
         await sleep(res.phase === "prepare" ? 400 : 900);
       }

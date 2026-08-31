@@ -97,7 +97,9 @@ export function AdminSongPlaylistsPage() {
           {progress.phase === "prepare" &&
             `Reading playlists ${progress.prepared_count} / ${progress.total_playlists}…`}
           {progress.phase === "seed" && progress.rate_limited_until &&
-            "Rate limited by Spotify / iTunes — waiting 60s, then resuming…"}
+            `Rate limited by Spotify / iTunes — waiting ` +
+              `${Math.max(0, Math.ceil((progress.rate_limited_until * 1000 - Date.now()) / 1000))}s` +
+              `${progress.rl_strikes > 1 ? ` (retry ${progress.rl_strikes}/5)` : ""}…`}
           {progress.phase === "seed" && !progress.rate_limited_until &&
             `Adding songs ${progress.seeded + progress.skipped + progress.already} / ${progress.total_items} ` +
               `(${progress.seeded} added, ${progress.already} already in pool, ${progress.skipped} no preview)…`}
