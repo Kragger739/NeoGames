@@ -11,6 +11,22 @@ import { Button } from "../components/ui/Button";
 
 type Draft = Partial<Record<CosmeticSlot, number | null>>;
 
+/** An uploaded cosmetic renders from its image; otherwise from the registry SVG by key. */
+function CosmeticThumb({
+  cosmetic,
+  className = "cos-chip-svg",
+}: {
+  cosmetic: { key: string; image_url: string | null } | null;
+  className?: string;
+}) {
+  if (!cosmetic) return null;
+  if (cosmetic.image_url) {
+    return <img className={className} src={cosmetic.image_url} alt="" aria-hidden="true" />;
+  }
+  const Svg = cosmeticSvg(cosmetic.key);
+  return Svg ? <Svg className={className} /> : null;
+}
+
 function normalize(map: Draft): Record<string, number> {
   const out: Record<string, number> = {};
   for (const [slot, id] of Object.entries(map)) {
@@ -46,7 +62,13 @@ export function CosmeticsPage() {
     for (const [entrySlot, id] of Object.entries(draft) as [CosmeticSlot, number | null | undefined][]) {
       if (id == null) continue;
       const cosmetic = byId.get(id);
-      if (cosmetic) out[entrySlot] = { key: cosmetic.key, rarity: cosmetic.rarity };
+      if (cosmetic) {
+        out[entrySlot] = {
+          key: cosmetic.key,
+          rarity: cosmetic.rarity,
+          image_url: cosmetic.image_url,
+        };
+      }
     }
     return out;
   }, [draft, byId]);
@@ -59,6 +81,7 @@ export function CosmeticsPage() {
   const slotItems = data?.catalog.filter((cosmetic) => cosmetic.slot === slot) ?? [];
 
   const currentTier = data?.progress.current_tier ?? 0;
+  const hasPass = data?.progress.has_pass ?? false;
   const nextTier = data?.tiers.find((tier) => tier.tier === currentTier + 1);
   const floorXp = data?.tiers[currentTier - 1]?.threshold ?? 0;
   const progressPct = data && nextTier
@@ -108,7 +131,6 @@ export function CosmeticsPage() {
             </button>
 
             {slotItems.map((item) => {
-              const Svg = cosmeticSvg(item.key);
               return (
                 <button
                   key={item.id}
@@ -124,7 +146,9 @@ export function CosmeticsPage() {
                     .join(" ")}
                   onClick={() => item.owned && setDraft((prev) => ({ ...prev, [slot]: item.id }))}
                 >
-                  <span className="cos-chip-thumb">{Svg && <Svg className="cos-chip-svg" />}</span>
+                  <span className="cos-chip-thumb">
+                    <CosmeticThumb cosmetic={item} />
+                  </span>
                   <span className="cos-chip-label">
                     {item.owned ? item.name : `Tier ${item.tier ?? "?"}`}
                   </span>
@@ -163,26 +187,39 @@ export function CosmeticsPage() {
                 </p>
               </div>
 
+              {!hasPass && data.tiers.some((t) => t.premium) && (
+                <p className="hint">Premium rewards unlock with the season pass.</p>
+              )}
+
               <div className="cos-ladder">
-                {data.tiers.map((tier) => {
-                  const Svg = tier.cosmetic ? cosmeticSvg(tier.cosmetic.key) : null;
-                  return (
-                    <div
-                      key={tier.tier}
-                      className={[
-                        "cos-tier",
-                        tier.tier <= currentTier ? "is-reached" : "",
-                        tier.tier === currentTier ? "is-current" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    >
-                      <span className="cos-tier-n">Tier {tier.tier}</span>
-                      <span className="cos-tier-thumb">{Svg && <Svg className="cos-chip-svg" />}</span>
-                      <span className="hint">{tier.owned ? "Unlocked" : `${tier.threshold} XP`}</span>
-                    </div>
-                  );
-                })}
+                {data.tiers.map((tier) => (
+                  <div
+                    key={tier.tier}
+                    className={[
+                      "cos-tier",
+                      tier.tier <= currentTier ? "is-reached" : "",
+                      tier.tier === currentTier ? "is-current" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    <span className="cos-tier-n">Tier {tier.tier}</span>
+                    <span className="cos-tier-thumb">
+                      <CosmeticThumb cosmetic={tier.free} />
+                    </span>
+                    {tier.premium && (
+                      <span
+                        className="cos-tier-thumb cos-tier-premium"
+                        title={hasPass ? "Premium reward" : "Premium reward (needs the season pass)"}
+                      >
+                        <CosmeticThumb cosmetic={tier.premium} />
+                      </span>
+                    )}
+                    <span className="hint">
+                      {tier.free_owned ? "Unlocked" : `${tier.threshold} XP`}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           )}

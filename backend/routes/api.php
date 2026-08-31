@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\AdminCosmeticController;
 use App\Http\Controllers\Api\Admin\AdminDailyController;
+use App\Http\Controllers\Api\Admin\AdminSeasonController;
 use App\Http\Controllers\Api\Admin\AdminSongPlaylistController;
 use App\Http\Controllers\Api\Admin\AdminUnlockController;
 use App\Http\Controllers\Api\Admin\AdminUserController;
@@ -201,6 +203,18 @@ Route::middleware(['auth:sanctum', 'not-banned', 'verified', 'admin'])
         Route::post('/users/{user}/ban', [AdminUserController::class, 'ban']);
         Route::post('/users/{user}/unban', [AdminUserController::class, 'unban']);
         Route::post('/users/{user}/reset-xp', [AdminUserController::class, 'resetXp']);
+        Route::post('/users/{user}/season-pass', [AdminUserController::class, 'seasonPass']);
+
+        Route::get('/seasons', [AdminSeasonController::class, 'index']);
+        Route::post('/seasons', [AdminSeasonController::class, 'store']);
+        Route::patch('/seasons/{season}', [AdminSeasonController::class, 'update']);
+        Route::delete('/seasons/{season}', [AdminSeasonController::class, 'destroy']);
+        Route::put('/seasons/{season}/tiers', [AdminSeasonController::class, 'syncTiers']);
+
+        Route::get('/cosmetics', [AdminCosmeticController::class, 'index']);
+        Route::post('/cosmetics', [AdminCosmeticController::class, 'store']);
+        Route::post('/cosmetics/{cosmetic}', [AdminCosmeticController::class, 'update']);
+        Route::delete('/cosmetics/{cosmetic}', [AdminCosmeticController::class, 'destroy']);
 
         Route::get('/song-playlists', [AdminSongPlaylistController::class, 'index']);
         Route::post('/song-playlists', [AdminSongPlaylistController::class, 'store']);

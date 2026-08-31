@@ -4,6 +4,7 @@ import { RequireAdmin } from "./components/RequireAdmin";
 import { RequireHost } from "./components/RequireHost";
 import { RoomInviteToast } from "./components/RoomInviteToast";
 import { SiteFooter } from "./components/SiteFooter";
+import { AdminSeasonsPage } from "./pages/AdminSeasonsPage";
 import { AdminSongPlaylistsPage } from "./pages/AdminSongPlaylistsPage";
 import { AdminUnlocksPage } from "./pages/AdminUnlocksPage";
 import { AdminUserDetailPage } from "./pages/AdminUserDetailPage";
@@ -147,6 +148,14 @@ function App() {
           element={
             <RequireAdmin>
               <AdminUnlocksPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/admin/seasons"
+          element={
+            <RequireAdmin>
+              <AdminSeasonsPage />
             </RequireAdmin>
           }
         />

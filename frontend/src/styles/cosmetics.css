@@ -266,6 +266,19 @@
   overflow: hidden;
 }
 
+.cos-tier-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* The premium reward sits next to the free one; dimmed with a gold edge to
+   read as "locked behind the pass". */
+.cos-tier-premium {
+  outline: 2px solid var(--sun, #ffc93c);
+  outline-offset: -2px;
+}
+
 .cos-tier .hint {
   margin: 0;
   font-size: 11px;

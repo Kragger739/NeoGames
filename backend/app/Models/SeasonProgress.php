@@ -9,13 +9,14 @@ class SeasonProgress extends Model
 {
     protected $table = 'season_progress';
 
-    protected $fillable = ['season_id', 'user_id', 'xp', 'current_tier'];
+    protected $fillable = ['season_id', 'user_id', 'xp', 'current_tier', 'has_pass'];
 
     protected function casts(): array
     {
         return [
             'xp' => 'integer',
             'current_tier' => 'integer',
+            'has_pass' => 'boolean',
         ];
     }
 

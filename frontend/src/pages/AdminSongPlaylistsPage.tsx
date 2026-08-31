@@ -65,6 +65,8 @@ export function AdminSongPlaylistsPage() {
         {"  ·  "}
         <Link to="/admin/unlocks">Unlocks &amp; Daily</Link>
         {"  ·  "}
+        <Link to="/admin/seasons">Seasons &amp; Battlepass</Link>
+        {"  ·  "}
         <Link to="/">Home</Link>
       </p>
       <h1>Song playlists</h1>

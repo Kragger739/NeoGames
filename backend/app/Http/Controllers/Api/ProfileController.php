@@ -132,6 +132,7 @@ class ProfileController extends Controller
             'progress' => [
                 'xp' => (int) ($progress->xp ?? 0),
                 'current_tier' => (int) ($progress->current_tier ?? 0),
+                'has_pass' => (bool) ($progress->has_pass ?? false),
             ],
             'equipped' => (object) ($user->equipped_cosmetics ?? []),
             'catalog' => $catalog->map(fn (Cosmetic $c) => [
@@ -140,11 +141,14 @@ class ProfileController extends Controller
                 'key' => $c->key,
                 'name' => $c->name,
                 'rarity' => $c->rarity,
+                'image_url' => $c->image_url,
                 'source' => $c->source,
                 'tier' => $c->tier,
                 'owned' => $ownedIds->contains($c->id),
             ]),
-            'tiers' => $season ? $this->tierLadder($season, $ownedIds->all()) : [],
+            'tiers' => $season
+                ? $this->tierLadder($season, $ownedIds->all(), (bool) ($progress->has_pass ?? false))
+                : [],
         ]);
     }
 
@@ -167,13 +171,30 @@ class ProfileController extends Controller
     }
 
     /**
+     * The season's battlepass ladder. Prefers the admin-built season_tiers
+     * table; falls back to the legacy config thresholds + cosmetics.tier when
+     * a season has no rows there.
+     *
      * @param  list<int>  $ownedIds
-     * @return list<array{tier:int, threshold:int, cosmetic:array<string,mixed>|null, owned:bool}>
+     * @return list<array<string,mixed>>
      */
-    private function tierLadder(Season $season, array $ownedIds): array
+    private function tierLadder(Season $season, array $ownedIds, bool $hasPass): array
     {
-        $thresholds = config('seasons.tier_thresholds');
+        $tiers = $season->tiers()->with(['free', 'premium'])->get();
 
+        if ($tiers->isNotEmpty()) {
+            return $tiers->map(fn ($t) => [
+                'tier' => $t->tier,
+                'threshold' => $t->xp_threshold,
+                'free' => $this->cosmeticBrief($t->free),
+                'premium' => $this->cosmeticBrief($t->premium),
+                'free_owned' => $t->free_cosmetic_id ? in_array($t->free_cosmetic_id, $ownedIds, true) : false,
+                'premium_owned' => $t->premium_cosmetic_id ? in_array($t->premium_cosmetic_id, $ownedIds, true) : false,
+                'has_pass' => $hasPass,
+            ])->all();
+        }
+
+        // Legacy: one free reward per config threshold, keyed by cosmetics.tier.
         $byTier = Cosmetic::query()
             ->where('season_id', $season->id)
             ->where('source', 'track')
@@ -182,24 +203,36 @@ class ProfileController extends Controller
 
         $ladder = [];
 
-        foreach ($thresholds as $index => $threshold) {
+        foreach (config('seasons.tier_thresholds') as $index => $threshold) {
             $tier = $index + 1;
             $cosmetic = $byTier->get($tier);
 
             $ladder[] = [
                 'tier' => $tier,
                 'threshold' => (int) $threshold,
-                'cosmetic' => $cosmetic ? [
-                    'id' => $cosmetic->id,
-                    'slot' => $cosmetic->slot->value,
-                    'key' => $cosmetic->key,
-                    'name' => $cosmetic->name,
-                    'rarity' => $cosmetic->rarity,
-                ] : null,
-                'owned' => $cosmetic ? in_array($cosmetic->id, $ownedIds, true) : false,
+                'free' => $this->cosmeticBrief($cosmetic),
+                'premium' => null,
+                'free_owned' => $cosmetic ? in_array($cosmetic->id, $ownedIds, true) : false,
+                'premium_owned' => false,
+                'has_pass' => $hasPass,
             ];
         }
 
         return $ladder;
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private function cosmeticBrief(?Cosmetic $c): ?array
+    {
+        return $c ? [
+            'id' => $c->id,
+            'slot' => $c->slot->value,
+            'key' => $c->key,
+            'name' => $c->name,
+            'rarity' => $c->rarity,
+            'image_url' => $c->image_url,
+        ] : null;
     }
 }

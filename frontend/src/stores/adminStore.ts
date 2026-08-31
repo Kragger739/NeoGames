@@ -17,6 +17,7 @@ export interface AdminUser {
   ban_reason: string | null;
   created_at: string | null;
   avatar: AvatarData;
+  season_pass: boolean;
 }
 
 export interface AdminUserUpdate {
@@ -50,6 +51,7 @@ interface AdminState {
   banUser: (id: number, reason: string) => Promise<AdminUser>;
   unbanUser: (id: number) => Promise<AdminUser>;
   resetXp: (id: number) => Promise<AdminUser>;
+  setSeasonPass: (id: number, granted: boolean) => Promise<AdminUser>;
 }
 
 interface ListResponse {
@@ -127,6 +129,15 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   resetXp: async (id) => {
     const response = await api.post<AdminUser>(`/api/admin/users/${id}/reset-xp`);
+    set((state) => ({
+      selected: response.data,
+      users: state.users.map((u) => (u.id === id ? response.data : u)),
+    }));
+    return response.data;
+  },
+
+  setSeasonPass: async (id, granted) => {
+    const response = await api.post<AdminUser>(`/api/admin/users/${id}/season-pass`, { granted });
     set((state) => ({
       selected: response.data,
       users: state.users.map((u) => (u.id === id ? response.data : u)),

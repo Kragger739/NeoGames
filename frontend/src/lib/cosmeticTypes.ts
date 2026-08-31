@@ -2,12 +2,16 @@ import type { AvatarData, CosmeticRarity, CosmeticSlot } from "./avatarData";
 
 export type CosmeticSource = "starter" | "track" | "pass";
 
-export interface CatalogCosmetic {
+export interface CosmeticBrief {
   id: number;
   slot: CosmeticSlot;
   key: string;
   name: string;
   rarity: CosmeticRarity;
+  image_url: string | null;
+}
+
+export interface CatalogCosmetic extends CosmeticBrief {
   source: CosmeticSource;
   tier: number | null;
   owned: boolean;
@@ -23,19 +27,16 @@ export interface SeasonInfo {
 export interface TierInfo {
   tier: number;
   threshold: number;
-  cosmetic: {
-    id: number;
-    slot: CosmeticSlot;
-    key: string;
-    name: string;
-    rarity: CosmeticRarity;
-  } | null;
-  owned: boolean;
+  free: CosmeticBrief | null;
+  premium: CosmeticBrief | null;
+  free_owned: boolean;
+  premium_owned: boolean;
+  has_pass: boolean;
 }
 
 export interface CosmeticsResponse {
   season: SeasonInfo | null;
-  progress: { xp: number; current_tier: number };
+  progress: { xp: number; current_tier: number; has_pass: boolean };
   equipped: Partial<Record<CosmeticSlot, number>>;
   catalog: CatalogCosmetic[];
   tiers: TierInfo[];

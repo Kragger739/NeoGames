@@ -51,10 +51,22 @@ class SeasonSeeder extends Seeder
             10 => ['slot' => 'effect', 'key' => 'effect_sparkle', 'name' => 'Sparkle Ring', 'rarity' => 'epic'],
         ];
 
+        $thresholds = config('seasons.tier_thresholds');
+
         foreach ($track as $tier => $row) {
-            Cosmetic::query()->firstOrCreate(
+            $cosmetic = Cosmetic::query()->firstOrCreate(
                 ['key' => $row['key']],
                 [...$row, 'source' => 'track', 'season_id' => $season->id, 'tier' => $tier],
+            );
+
+            // Battlepass ladder rows (free track only for Season 1).
+            $season->tiers()->updateOrCreate(
+                ['tier' => $tier],
+                [
+                    'xp_threshold' => (int) $thresholds[$tier - 1],
+                    'free_cosmetic_id' => $cosmetic->id,
+                    'premium_cosmetic_id' => null,
+                ],
             );
         }
 

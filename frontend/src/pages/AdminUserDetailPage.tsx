@@ -20,7 +20,7 @@ export function AdminUserDetailPage() {
   const navigate = useNavigate();
 
   const host = useAuthStore((state) => state.host);
-  const { selected, selectedStatus, fetchUser, updateUser, deleteUser, banUser, unbanUser, resetXp } =
+  const { selected, selectedStatus, fetchUser, updateUser, deleteUser, banUser, unbanUser, resetXp, setSeasonPass } =
     useAdminStore();
 
   const [form, setForm] = useState(EMPTY_FORM);
@@ -219,6 +219,21 @@ export function AdminUserDetailPage() {
             }}
           >
             {confirm === "resetXp" ? "Click again to confirm reset" : "Reset XP"}
+          </Button>
+        </div>
+
+        <div>
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                () => setSeasonPass(user.id, !user.season_pass),
+                user.season_pass ? "Season pass revoked." : "Season pass granted.",
+              )
+            }
+          >
+            {user.season_pass ? "Revoke season pass" : "Grant season pass"}
           </Button>
         </div>
 

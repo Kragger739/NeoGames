@@ -4,9 +4,13 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AdminUpdateUserRequest;
+use App\Models\Season;
+use App\Models\SeasonProgress;
 use App\Models\User;
+use App\Services\SeasonService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class AdminUserController extends Controller
 {
@@ -118,10 +122,40 @@ class AdminUserController extends Controller
     }
 
     /**
+     * Grant or revoke the current season's premium battlepass for one user.
+     * Granting back-fills every premium reward for tiers they've reached.
+     */
+    public function seasonPass(Request $request, User $user, SeasonService $seasons)
+    {
+        $granted = $request->validate(['granted' => ['required', 'boolean']])['granted'];
+
+        $season = Season::current();
+
+        if ($season === null) {
+            throw ValidationException::withMessages(['granted' => ['No season is running right now.']]);
+        }
+
+        if ($granted) {
+            $seasons->grantPass($user->id, $season);
+        } else {
+            SeasonProgress::where('season_id', $season->id)->where('user_id', $user->id)
+                ->update(['has_pass' => false]);
+        }
+
+        return response()->json($this->toAdminArray($user->fresh()));
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function toAdminArray(User $user): array
     {
+        $season = Season::current();
+        $seasonPass = $season !== null && SeasonProgress::where('season_id', $season->id)
+            ->where('user_id', $user->id)
+            ->where('has_pass', true)
+            ->exists();
+
         return [
             'id' => $user->id,
             'name' => $user->name,
@@ -136,6 +170,7 @@ class AdminUserController extends Controller
             'ban_reason' => $user->ban_reason,
             'created_at' => $user->created_at?->toIso8601String(),
             'avatar' => $user->avatarPayload(),
+            'season_pass' => $seasonPass,
         ];
     }
 }

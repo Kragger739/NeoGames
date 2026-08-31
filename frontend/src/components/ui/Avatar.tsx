@@ -53,11 +53,23 @@ export function Avatar({ data, size = "sm", animated = true, className }: Avatar
 }
 
 function CosmeticLayer({ slot, data }: { slot: CosmeticSlot; data: AvatarData }) {
-  const key = data.cosmetics[slot]?.key;
-  const Svg = key ? COSMETIC_SVGS[key] : undefined;
-  if (!Svg) return null;
+  const cosmetic = data.cosmetics[slot];
+  if (!cosmetic) return null;
 
   const style: CSSProperties = { zIndex: SLOT_Z[slot] };
+
+  // An admin-uploaded cosmetic renders from its image; otherwise fall back to
+  // the hand-authored SVG in the registry keyed by `key`.
+  if (cosmetic.image_url) {
+    return (
+      <span className="avatar-layer" style={style}>
+        <img className="avatar-layer-svg" src={cosmetic.image_url} alt="" aria-hidden="true" />
+      </span>
+    );
+  }
+
+  const Svg = COSMETIC_SVGS[cosmetic.key];
+  if (!Svg) return null;
 
   return (
     <span className="avatar-layer" style={style}>

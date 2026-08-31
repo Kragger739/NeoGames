@@ -29,6 +29,12 @@ class Season extends Model
             ->first();
     }
 
+    public function isCurrent(): bool
+    {
+        return $this->starts_at?->lte(now()) && $this->ends_at?->gt(now())
+            && (self::current()?->id === $this->id);
+    }
+
     public function cosmetics(): HasMany
     {
         return $this->hasMany(Cosmetic::class);
@@ -37,5 +43,10 @@ class Season extends Model
     public function progress(): HasMany
     {
         return $this->hasMany(SeasonProgress::class);
+    }
+
+    public function tiers(): HasMany
+    {
+        return $this->hasMany(SeasonTier::class)->orderBy('tier');
     }
 }

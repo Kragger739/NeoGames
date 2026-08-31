@@ -8,6 +8,8 @@ export type CosmeticRarity = "common" | "rare" | "epic";
 export interface EquippedCosmetic {
   key: string;
   rarity: CosmeticRarity;
+  /** Admin-uploaded image; when set the client renders it instead of the key's registry SVG. */
+  image_url: string | null;
 }
 
 export interface AvatarData {

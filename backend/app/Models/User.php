@@ -102,7 +102,7 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * @return array{avatar_url: string|null, level: int, cosmetics: array<string, array{key: string, rarity: string}>, is_admin: bool}
+     * @return array{avatar_url: string|null, level: int, cosmetics: array<string, array{key: string, rarity: string, image_url: string|null}>, is_admin: bool}
      */
     public function avatarPayload(): array
     {
@@ -119,7 +119,7 @@ class User extends Authenticatable implements MustVerifyEmail
      * via the cached catalogue - a stale/unknown id or a slot mismatch is just
      * dropped, so a removed cosmetic never breaks rendering.
      *
-     * @return array<string, array{key: string, rarity: string}>
+     * @return array<string, array{key: string, rarity: string, image_url: string|null}>
      */
     public function resolveEquippedCosmetics(): array
     {
@@ -136,7 +136,11 @@ class User extends Authenticatable implements MustVerifyEmail
             $cosmetic = $catalog[$id] ?? null;
 
             if ($cosmetic !== null && $cosmetic['slot'] === $slot) {
-                $out[$slot] = ['key' => $cosmetic['key'], 'rarity' => $cosmetic['rarity']];
+                $out[$slot] = [
+                    'key' => $cosmetic['key'],
+                    'rarity' => $cosmetic['rarity'],
+                    'image_url' => $cosmetic['image_url'] ?? null,
+                ];
             }
         }
 
