@@ -52,8 +52,11 @@
   position: relative;
 }
 
-.songle-lock-wrap.is-locked > .btn {
-  opacity: 0.8;
+/* Keep the button looking exactly like a normal ghost button - the lock
+   overlay, not a faded state, is what says "locked". */
+.songle-lock-wrap.is-locked > .btn:disabled {
+  opacity: 1;
+  box-shadow: var(--shadow-sm);
 }
 
 .songle-lock-overlay {
@@ -64,7 +67,6 @@
   justify-content: center;
   gap: 8px;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(1.5px);
   font-family: var(--display);
   font-weight: 800;
