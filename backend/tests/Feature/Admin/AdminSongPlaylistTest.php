@@ -5,7 +5,10 @@ namespace Tests\Feature\Admin;
 use App\Models\SeedPlaylist;
 use App\Models\Song;
 use App\Models\User;
+use App\Services\Music\IncrementalSongSync;
+use App\Services\Music\SpotifyClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -185,6 +188,80 @@ class AdminSongPlaylistTest extends TestCase
         Http::assertNotSent(fn ($r) => str_contains(urldecode($r->url()), 'Song A') && str_contains($r->url(), 'itunes'));
     }
 
+    public function test_pooled_tracks_are_filtered_out_before_seeding(): void
+    {
+        Storage::fake('public');
+        SeedPlaylist::create(['genre' => 'pop', 'spotify_playlist_id' => 'abcdefghijABCDEFGHIJ12']);
+        // 'Song A' matches an existing row by title+artist; 'Song C' matches by
+        // synthetic scraped id. Only 'Song B' is new.
+        Song::factory()->create(['title' => 'Song A', 'artist' => 'Act']);
+        Song::factory()->create([
+            'provider_track_id' => SpotifyClient::scrapedId('Act', 'Song C'),
+            'title' => 'Different Text', 'artist' => 'Different Act',
+        ]);
+        $this->fakeSpotifyToken();
+        $this->fakeSpotifyPlaylistPage([['Song A', 'Act'], ['Song C', 'Act'], ['Song B', 'Act']]);
+        Http::fake([
+            'api.spotify.com/v1/search*' => Http::response(['tracks' => ['items' => []]], 200),
+            'itunes.apple.com/search*' => Http::response(['results' => [[
+                'kind' => 'song', 'trackId' => 2, 'trackName' => 'Song B', 'artistName' => 'Act',
+                'previewUrl' => 'https://audio-ssl.itunes.apple.com/b.m4a',
+                'artworkUrl100' => 'https://is1.mzstatic.com/100x100bb.jpg', 'releaseDate' => '2010-01-01T00:00:00Z',
+            ]]], 200),
+            'audio-ssl.itunes.apple.com/*' => Http::response('m4a', 200),
+        ]);
+
+        $admin = $this->admin();
+        $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync', ['start' => true]);
+        $res = null;
+        for ($i = 0; $i < 10; $i++) {
+            $res = $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync');
+            if (in_array($res->json('phase'), ['done', 'error'], true)) {
+                break;
+            }
+        }
+
+        $res->assertJsonPath('phase', 'done')
+            ->assertJsonPath('seeded', 1)
+            ->assertJsonPath('already', 2)
+            ->assertJsonPath('total_items', 1);
+        Http::assertNotSent(fn ($r) => str_contains($r->url(), 'itunes')
+            && (str_contains(urldecode($r->url()), 'Song A') || str_contains(urldecode($r->url()), 'Song C')));
+        $this->assertDatabaseHas('songs', ['title' => 'Song B', 'artist' => 'Act', 'genre' => 'pop']);
+    }
+
+    public function test_a_sync_where_every_track_is_already_pooled_completes_with_nothing_seeded(): void
+    {
+        Storage::fake('public');
+        SeedPlaylist::create(['genre' => 'pop', 'spotify_playlist_id' => 'abcdefghijABCDEFGHIJ12']);
+        Song::factory()->create(['title' => 'Song A', 'artist' => 'Act']);
+        Song::factory()->create(['title' => 'Song B', 'artist' => 'Act']);
+        $this->fakeSpotifyToken();
+        $this->fakeSpotifyPlaylistPage([['Song A', 'Act'], ['Song B', 'Act']]);
+        Http::fake([
+            'api.spotify.com/v1/search*' => Http::response(['tracks' => ['items' => []]], 200),
+            'itunes.apple.com/search*' => Http::response(['results' => []], 200),
+        ]);
+
+        $admin = $this->admin();
+        $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync', ['start' => true]);
+        $res = null;
+        for ($i = 0; $i < 10; $i++) {
+            $res = $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync');
+            if (in_array($res->json('phase'), ['done', 'error'], true)) {
+                break;
+            }
+        }
+
+        $res->assertJsonPath('phase', 'done')
+            ->assertJsonPath('seeded', 0)
+            ->assertJsonPath('already', 2)
+            ->assertJsonPath('total_items', 0);
+        Http::assertNotSent(fn ($r) => str_contains($r->url(), 'itunes')
+            || str_contains($r->url(), 'api.spotify.com/v1/search'));
+        $this->assertSame(2, Song::count());
+    }
+
     public function test_a_rate_limit_pauses_the_run_and_it_resumes_afterwards(): void
     {
         Storage::fake('public');
@@ -219,9 +296,9 @@ class AdminSongPlaylistTest extends TestCase
         $this->assertNotNull($res->json('rate_limited_until'));
 
         // Simulate the cooldown elapsing.
-        $state = \Illuminate\Support\Facades\Cache::get(\App\Services\Music\IncrementalSongSync::PROGRESS_KEY);
+        $state = Cache::get(IncrementalSongSync::PROGRESS_KEY);
         $state['rate_limited_until'] = time() - 1;
-        \Illuminate\Support\Facades\Cache::put(\App\Services\Music\IncrementalSongSync::PROGRESS_KEY, $state);
+        Cache::put(IncrementalSongSync::PROGRESS_KEY, $state);
 
         for ($i = 0; $i < 5; $i++) {
             $res = $this->actingAs($admin)->postJson('/api/admin/song-playlists/sync');

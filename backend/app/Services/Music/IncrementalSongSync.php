@@ -176,9 +176,8 @@ class IncrementalSongSync
         }
 
         if ($state['playlists'] === []) {
-            $state['total_items'] = count($state['items']);
-
             if ($state['items'] === []) {
+                $state['total_items'] = 0;
                 $failed = $state['failed_playlists'];
                 $state['phase'] = 'error';
                 $state['error'] = $failed === []
@@ -186,9 +185,54 @@ class IncrementalSongSync
                     : count($failed).' playlist(s) could not be read - make sure they are public and '
                         .'not a Spotify-made editorial playlist: '.implode(', ', $failed);
             } else {
+                // Drop everything already in the pool in one pass, so the seed
+                // phase only touches genuinely new tracks (no per-track API
+                // work, no per-track EXISTS query). seedBatch() keeps its own
+                // alreadyInPool() check as a backstop.
+                $this->filterOutPooled($state);
+                $state['total_items'] = count($state['items']);
                 $state['phase'] = 'seed';
             }
         }
+    }
+
+    /**
+     * Remove candidate items that are already in the song pool, counting the
+     * removed ones into `already`. Identity matches alreadyInPool(): the
+     * synthetic scraped id, or a case-insensitive title + artist match.
+     *
+     * @param  array<string, mixed>  $state
+     */
+    private function filterOutPooled(array &$state): void
+    {
+        $pooledIds = [];
+        $pooledKeys = [];
+
+        foreach (Song::query()->select('provider_track_id', 'title', 'artist')->cursor() as $song) {
+            $pooledIds[$song->provider_track_id] = true;
+            $pooledKeys[mb_strtolower(trim($song->artist).'|'.trim($song->title))] = true;
+        }
+
+        if ($pooledIds === [] && $pooledKeys === []) {
+            return;
+        }
+
+        $kept = [];
+
+        foreach ($state['items'] as $item) {
+            $key = mb_strtolower(trim($item['artist']).'|'.trim($item['title']));
+            $scrapedId = SpotifyClient::scrapedId($item['artist'], $item['title']);
+
+            if (isset($pooledIds[$scrapedId]) || isset($pooledKeys[$key])) {
+                $state['already']++;
+
+                continue;
+            }
+
+            $kept[] = $item;
+        }
+
+        $state['items'] = $kept;
     }
 
     /**
