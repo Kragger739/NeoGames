@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Enums\GameMode;
 use App\Enums\RoomPlayerMode;
 use App\Enums\RoomStatus;
-use App\Enums\SongGenre;
 use App\Events\BattleRoyaleRoundResolved;
 use App\Events\GameFinished;
 use App\Events\RoundFailed;
@@ -16,6 +15,7 @@ use App\Jobs\AdvanceRoundStage;
 use App\Jobs\ExpandSongPool;
 use App\Jobs\FinishGame;
 use App\Jobs\StartNextRound;
+use App\Models\DailyChallengeAttempt;
 use App\Models\GameRoom;
 use App\Models\Round;
 use App\Models\Song;
@@ -74,21 +74,28 @@ class RoundService
 
     public function startNextRound(GameRoom $room): Round
     {
-        $filter = SongFilter::fromRoom($room);
-        $context = $this->buildSelectionContext($room);
-        $song = $this->pickPlayableSong($filter, $context);
+        if ($room->daily_challenge_id !== null) {
+            // Daily challenge: the song set is fixed for the day, played in
+            // order - no discovery, no host no-repeat memory (its iconic
+            // songs shouldn't crowd out the host's normal-game rotation).
+            $song = $this->pickDailySong($room);
+        } else {
+            $filter = SongFilter::fromRoom($room);
+            $context = $this->buildSelectionContext($room);
+            $song = $this->pickPlayableSong($filter, $context);
 
-        if (! $song) {
-            throw new RuntimeException("Couldn't find a {$room->current_tier->value} song right now. Try again shortly.");
+            if (! $song) {
+                throw new RuntimeException("Couldn't find a {$room->current_tier->value} song right now. Try again shortly.");
+            }
+
+            $song->update(['last_used_at' => now()]);
+
+            // Host-scoped cross-game no-repeat memory - every mode records into
+            // it (see buildSelectionContext() for where it's read back), so a
+            // host replaying the same genre/artist pool isn't handed a wall of
+            // songs they just heard.
+            $room->host->songPlays()->syncWithoutDetaching([$song->id]);
         }
-
-        $song->update(['last_used_at' => now()]);
-
-        // Host-scoped cross-game no-repeat memory - every mode records into
-        // it (see buildSelectionContext() for where it's read back), so a
-        // host replaying the same genre/artist pool isn't handed a wall of
-        // songs they just heard.
-        $room->host->songPlays()->syncWithoutDetaching([$song->id]);
 
         $round = $room->rounds()->create([
             'song_id' => $song->id,
@@ -122,9 +129,10 @@ class RoundService
         // per-room pool from the named act's Spotify top tracks; for every
         // other genre the pool is owned by `php artisan songs:sync` and this
         // is a near-instant no-op (see ExpandSongPool::handle). A custom
-        // dataset IS the pool, so there is nothing to grow.
-        if ($room->dataset_id === null) {
-            ExpandSongPool::dispatch($filter);
+        // dataset IS the pool, and the Daily challenge draws from a fixed
+        // list, so neither has anything to grow.
+        if ($room->dataset_id === null && $room->daily_challenge_id === null) {
+            ExpandSongPool::dispatch(SongFilter::fromRoom($room));
         }
 
         // Solo (player_mode, not a GameMode - see RoomPlayerMode) has no
@@ -168,6 +176,25 @@ class RoundService
         }
 
         return null;
+    }
+
+    /**
+     * The Daily challenge's song for the round in progress - taken straight
+     * from the challenge's fixed, ordered list by current_song_index.
+     */
+    private function pickDailySong(GameRoom $room): Song
+    {
+        $ids = $room->dailyChallenge->song_ids ?? [];
+        $songId = $ids[$room->current_song_index] ?? null;
+        $song = $songId ? Song::find($songId) : null;
+
+        if (! $song || ! $this->songDiscovery->ensurePlayable($song)) {
+            throw new RuntimeException('Today’s daily song is unavailable. Try again shortly.');
+        }
+
+        $song->update(['last_used_at' => now()]);
+
+        return $song;
     }
 
     /**
@@ -283,6 +310,19 @@ class RoundService
 
         if ($round) {
             $this->leveling->awardForGameFinish($round);
+        }
+
+        if ($room->daily_challenge_id !== null) {
+            $hostPlayer = $room->players()->where('user_id', $room->host_id)->first();
+
+            DailyChallengeAttempt::where([
+                'daily_challenge_id' => $room->daily_challenge_id,
+                'user_id' => $room->host_id,
+            ])->update([
+                'score' => $hostPlayer?->score ?? 0,
+                'correct_count' => $room->rounds()->where('status', 'won')->count(),
+                'finished_at' => now(),
+            ]);
         }
 
         broadcast(new GameFinished($room->fresh()));

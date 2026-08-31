@@ -38,6 +38,7 @@ class GameRoom extends Model
         'current_tier',
         'current_song_index',
         'dataset_id',
+        'daily_challenge_id',
     ];
 
     protected function casts(): array
@@ -98,6 +99,21 @@ class GameRoom extends Model
     public function dataset(): BelongsTo
     {
         return $this->belongsTo(Dataset::class);
+    }
+
+    /**
+     * The Daily challenge this room plays through, or null for a normal
+     * game. When set, RoundService draws each round's song straight from the
+     * challenge's fixed list.
+     */
+    public function dailyChallenge(): BelongsTo
+    {
+        return $this->belongsTo(DailyChallenge::class);
+    }
+
+    public function isDaily(): bool
+    {
+        return $this->daily_challenge_id !== null;
     }
 
     /**

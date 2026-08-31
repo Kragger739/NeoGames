@@ -5,6 +5,7 @@ import { RequireHost } from "./components/RequireHost";
 import { RoomInviteToast } from "./components/RoomInviteToast";
 import { SiteFooter } from "./components/SiteFooter";
 import { AdminSongPlaylistsPage } from "./pages/AdminSongPlaylistsPage";
+import { AdminUnlocksPage } from "./pages/AdminUnlocksPage";
 import { AdminUserDetailPage } from "./pages/AdminUserDetailPage";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { DdfGmPanelPage } from "./pages/DdfGmPanelPage";
@@ -138,6 +139,14 @@ function App() {
           element={
             <RequireAdmin>
               <AdminSongPlaylistsPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/admin/unlocks"
+          element={
+            <RequireAdmin>
+              <AdminUnlocksPage />
             </RequireAdmin>
           }
         />

@@ -1,12 +1,15 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\AdminDailyController;
 use App\Http\Controllers\Api\Admin\AdminSongPlaylistController;
+use App\Http\Controllers\Api\Admin\AdminUnlockController;
 use App\Http\Controllers\Api\Admin\AdminUserController;
 use App\Http\Controllers\Api\ArtistSearchController;
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\EmailVerificationController;
 use App\Http\Controllers\Api\Auth\OAuthController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
+use App\Http\Controllers\Api\DailyChallengeController;
 use App\Http\Controllers\Api\DatasetController;
 use App\Http\Controllers\Api\DdfAnswerController;
 use App\Http\Controllers\Api\DdfGameController;
@@ -19,6 +22,7 @@ use App\Http\Controllers\Api\RoomInviteController;
 use App\Http\Controllers\Api\RoomPlayerController;
 use App\Http\Controllers\Api\RoundController;
 use App\Http\Controllers\Api\SongSearchController;
+use App\Http\Controllers\Api\UnlockRequirementController;
 use App\Http\Middleware\EnsureUserNotBanned;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -147,6 +151,13 @@ Route::middleware(['auth:sanctum', 'not-banned'])->group(function () {
         Route::post('/rooms/{code}/start', [GameRoomController::class, 'start']);
         Route::post('/rooms/{code}/redo', [GameRoomController::class, 'redo']);
 
+        // Daily challenge - solo, fixed songs, one attempt per day, no lobby.
+        Route::get('/daily', [DailyChallengeController::class, 'show']);
+        Route::post('/daily/start', [DailyChallengeController::class, 'start']);
+
+        // Level required for each mode / genre / hosting a game night.
+        Route::get('/unlock-requirements', [UnlockRequirementController::class, 'index']);
+
         Route::patch('/profile', [ProfileController::class, 'update']);
         Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar']);
         Route::delete('/profile/avatar', [ProfileController::class, 'destroyAvatar']);
@@ -195,4 +206,11 @@ Route::middleware(['auth:sanctum', 'not-banned', 'verified', 'admin'])
         Route::post('/song-playlists', [AdminSongPlaylistController::class, 'store']);
         Route::delete('/song-playlists/{songPlaylist}', [AdminSongPlaylistController::class, 'destroy']);
         Route::post('/song-playlists/sync', [AdminSongPlaylistController::class, 'sync']);
+
+        Route::get('/unlock-requirements', [AdminUnlockController::class, 'index']);
+        Route::patch('/unlock-requirements/{key}', [AdminUnlockController::class, 'update'])->where('key', '[a-z_:]+');
+
+        Route::get('/daily-songs/search', [AdminDailyController::class, 'songSearch']);
+        Route::get('/daily/{date?}', [AdminDailyController::class, 'show'])->where('date', '\d{4}-\d{2}-\d{2}');
+        Route::patch('/daily/{date}', [AdminDailyController::class, 'update'])->where('date', '\d{4}-\d{2}-\d{2}');
     });

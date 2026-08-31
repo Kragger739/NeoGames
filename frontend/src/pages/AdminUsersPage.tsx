@@ -34,6 +34,8 @@ export function AdminUsersPage() {
         <Link to="/">← Home</Link>
         {"  ·  "}
         <Link to="/admin/song-playlists">Song playlists</Link>
+        {"  ·  "}
+        <Link to="/admin/unlocks">Unlocks &amp; Daily</Link>
       </p>
       <h1>Users</h1>
 

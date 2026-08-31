@@ -63,6 +63,8 @@ export function AdminSongPlaylistsPage() {
       <p>
         <Link to="/admin">← Users</Link>
         {"  ·  "}
+        <Link to="/admin/unlocks">Unlocks &amp; Daily</Link>
+        {"  ·  "}
         <Link to="/">Home</Link>
       </p>
       <h1>Song playlists</h1>

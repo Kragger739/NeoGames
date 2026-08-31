@@ -8,6 +8,7 @@ import { PLAYER_MODES } from "../lib/playerModes";
 import { MULTI_ARTIST_MAX, SONG_GENRES } from "../lib/songGenres";
 import type { GameMode, PlayerMode, SongGenre } from "../lib/roomTypes";
 import type { DatasetsIndex, DatasetSummary } from "../lib/workshopTypes";
+import { useUnlockStore } from "../stores/unlockStore";
 
 interface ArtistSuggestion {
   provider_artist_id: string;
@@ -114,6 +115,13 @@ export function RoomSettingsForm({
   datasetName,
   hostLevel,
 }: RoomSettingsFormProps) {
+  const fetchUnlocks = useUnlockStore((state) => state.fetch);
+  const requiredLevel = useUnlockStore((state) => state.requiredLevel);
+
+  useEffect(() => {
+    void fetchUnlocks();
+  }, [fetchUnlocks]);
+
   const [songs, setSongs] = useState(songsPerTier);
   const [selectedTiers, setSelectedTiers] = useState<string[]>(enabledTiers);
   const [timeout, setTimeoutSeconds] = useState(guessTimeoutSeconds);
@@ -411,7 +419,8 @@ export function RoomSettingsForm({
       <fieldset className="mode-picker">
         <legend>Mode</legend>
         {GAME_MODES.map((option) => {
-          const locked = option.minLevel !== undefined && (hostLevel ?? 0) < option.minLevel;
+          const modeLevel = requiredLevel(`mode:${option.value}`);
+          const locked = (hostLevel ?? 1) < modeLevel;
 
           return (
             <label key={option.value} className={locked ? "mode-option mode-option-locked" : "mode-option"}>
@@ -439,7 +448,7 @@ export function RoomSettingsForm({
               <span>
                 <strong>{option.label}</strong>
                 <span className="hint">
-                  {locked ? `Unlocks at level ${option.minLevel}` : option.description}
+                  {locked ? `Unlocks at level ${modeLevel}` : option.description}
                 </span>
               </span>
             </label>
@@ -449,13 +458,21 @@ export function RoomSettingsForm({
       {!isClassic && !datasetActive && (
       <fieldset className="mode-picker">
         <legend>Genre</legend>
-        {SONG_GENRES.map((option) => (
-          <label key={option.value} className="mode-option">
+        {SONG_GENRES.map((option) => {
+          const genreLevel = requiredLevel(`genre:${option.value}`);
+          const genreLocked = (hostLevel ?? 1) < genreLevel;
+
+          return (
+          <label
+            key={option.value}
+            className={genreLocked ? "mode-option mode-option-locked" : "mode-option"}
+          >
             <input
               type="radio"
               name="genre"
               value={option.value}
               checked={selectedGenre === option.value}
+              disabled={genreLocked}
               onChange={() => {
                 setSelectedGenre(option.value);
                 void save({ genre: option.value });
@@ -463,7 +480,9 @@ export function RoomSettingsForm({
             />
             <span>
               <strong>{option.label}</strong>
-              <span className="hint">{option.description}</span>
+              <span className="hint">
+                {genreLocked ? `Unlocks at level ${genreLevel}` : option.description}
+              </span>
               {option.value === "year" && selectedGenre === "year" && (
                 <span className="year-range-inputs">
                   <label>
@@ -611,7 +630,8 @@ export function RoomSettingsForm({
               )}
             </span>
           </label>
-        ))}
+          );
+        })}
       </fieldset>
       )}
       {error && <p className="form-error">{error}</p>}

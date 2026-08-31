@@ -8,7 +8,7 @@ use App\Enums\GameMode;
 use App\Enums\RoomPlayerMode;
 use App\Enums\SongGenre;
 use App\Models\Dataset;
-use App\Rules\BattleRoyaleRequiresLevel;
+use App\Rules\RequiresUnlockLevel;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -29,9 +29,9 @@ class StoreGameRoomRequest extends FormRequest
             'enabled_tiers' => ['sometimes', 'array', 'min:1'],
             'enabled_tiers.*' => [Rule::in(array_column(DifficultyTier::cases(), 'value'))],
             'guess_timeout_seconds' => ['sometimes', 'integer', 'min:3', 'max:60'],
-            'mode' => ['sometimes', Rule::in(array_column(GameMode::cases(), 'value')), new BattleRoyaleRequiresLevel($this)],
+            'mode' => ['sometimes', Rule::in(array_column(GameMode::cases(), 'value')), new RequiresUnlockLevel($this, 'mode')],
             'player_mode' => ['sometimes', Rule::in(array_column(RoomPlayerMode::cases(), 'value'))],
-            'genre' => ['sometimes', Rule::in(array_column(SongGenre::cases(), 'value'))],
+            'genre' => ['sometimes', Rule::in(array_column(SongGenre::cases(), 'value')), new RequiresUnlockLevel($this, 'genre')],
             // nullable is required alongside required_if: the frontend
             // always sends an explicit year_from/year_to (null when genre
             // isn't "year", not simply omitted), and without nullable a

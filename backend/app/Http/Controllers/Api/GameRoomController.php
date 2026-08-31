@@ -17,6 +17,7 @@ use App\Models\GameRoom;
 use App\Models\Guess;
 use App\Models\RoomPlayer;
 use App\Models\Round;
+use App\Models\UnlockRequirement;
 use App\Services\RoundService;
 use App\Support\SongFilter;
 use Illuminate\Http\Request;
@@ -27,6 +28,18 @@ class GameRoomController extends Controller
 {
     public function store(StoreGameRoomRequest $request)
     {
+        // Hosting a game night is level-gated (Daily is the always-open path
+        // for a brand-new account). The genre/mode gates are validation
+        // rules on the request; this one guards room creation itself.
+        $gameNightLevel = UnlockRequirement::levelFor('game_night');
+        $hostLevel = (int) ($request->user()->level ?? 1);
+
+        if ($hostLevel < $gameNightLevel) {
+            throw ValidationException::withMessages([
+                'room' => ["Hosting a game night unlocks at level {$gameNightLevel} (you're level {$hostLevel})."],
+            ]);
+        }
+
         $mode = $request->validated('mode', GameMode::Classic->value);
         // Classic mode has no configurable settings - it always plays with
         // these fixed, "as intended" defaults, ignoring anything else the
@@ -379,6 +392,7 @@ class GameRoomController extends Controller
             'guess_timeout_seconds' => $room->guess_timeout_seconds,
             'dataset_id' => $room->dataset_id,
             'dataset_name' => $room->dataset?->name,
+            'daily_challenge_id' => $room->daily_challenge_id,
             'current_tier' => $room->current_tier?->value,
             'current_song_index' => $room->current_song_index,
             'players' => $room->players()
