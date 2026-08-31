@@ -45,17 +45,15 @@
   justify-content: flex-start;
 }
 
-/* "Start a game night" when the host hasn't reached the required level.
-   The button itself is left completely untouched (looks exactly like the
-   unlocked one); a lock + "Unlocks at level N" simply sit on top of it. */
+/* "Start a game night" when the host hasn't reached the required level -
+   the real button stays readable underneath a light frosted blur, with a
+   lock + label floating on top. */
 .songle-lock-wrap {
   position: relative;
 }
 
-.songle-lock-wrap.is-locked > .btn:disabled {
-  opacity: 1;
-  box-shadow: var(--shadow-sm);
-  cursor: not-allowed;
+.songle-lock-wrap.is-locked > .btn {
+  opacity: 0.8;
 }
 
 .songle-lock-overlay {
@@ -65,11 +63,14 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(1.5px);
   font-family: var(--display);
   font-weight: 800;
   font-size: 15px;
   color: var(--ink);
-  text-shadow: 0 1px 4px rgba(255, 255, 255, 0.9), 0 0 2px rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.7);
   pointer-events: none;
 }
 
