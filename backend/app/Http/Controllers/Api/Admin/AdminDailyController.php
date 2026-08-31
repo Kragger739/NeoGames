@@ -21,12 +21,14 @@ class AdminDailyController extends Controller
     {
         $request->validate(['q' => ['required', 'string', 'min:2', 'max:100']]);
 
-        $like = '%'.addcslashes(trim((string) $request->query('q')), '%_\\').'%';
+        // LOWER() both sides so it's case-insensitive on Postgres too (its LIKE
+        // is case-sensitive, unlike sqlite/mysql).
+        $like = '%'.addcslashes(mb_strtolower(trim((string) $request->query('q'))), '%_\\').'%';
 
         return response()->json([
             'results' => Song::query()
                 ->where('excluded', false)
-                ->where(fn ($q) => $q->where('title', 'like', $like)->orWhere('artist', 'like', $like))
+                ->where(fn ($q) => $q->whereRaw('LOWER(title) LIKE ?', [$like])->orWhereRaw('LOWER(artist) LIKE ?', [$like]))
                 ->orderByDesc('popularity')
                 ->limit(10)
                 ->get(['id', 'title', 'artist', 'album_art_url']),

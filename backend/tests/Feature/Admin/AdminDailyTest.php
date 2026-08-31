@@ -28,6 +28,16 @@ class AdminDailyTest extends TestCase
         $this->assertFalse($res->json('has_attempts'));
     }
 
+    public function test_song_search_is_case_insensitive(): void
+    {
+        Song::factory()->create(['title' => 'Bohemian Rhapsody', 'artist' => 'Queen']);
+
+        $this->actingAs($this->admin())
+            ->getJson('/api/admin/daily-songs/search?q=bohemian')
+            ->assertOk()
+            ->assertJsonPath('results.0.title', 'Bohemian Rhapsody');
+    }
+
     public function test_an_admin_can_override_the_days_songs(): void
     {
         Song::factory()->count(12)->create(['genre' => 'iconic']);

@@ -55,6 +55,26 @@ class SongSearchTest extends TestCase
             ->assertJsonPath('results.0.title', 'Bohemian Rhapsody');
     }
 
+    /**
+     * Postgres LIKE is case-sensitive (sqlite/mysql aren't); the controller
+     * LOWER()s both sides so a lowercase query still finds a Title Case song.
+     */
+    public function test_search_is_case_insensitive(): void
+    {
+        Song::factory()->create(['title' => 'Blinding Lights', 'artist' => 'The Weeknd']);
+        $player = $this->player();
+
+        $this->withHeader('X-Player-Token', $player->connection_token)
+            ->getJson('/api/songs/search?q=blinding')
+            ->assertOk()
+            ->assertJsonPath('results.0.title', 'Blinding Lights');
+
+        $this->withHeader('X-Player-Token', $player->connection_token)
+            ->getJson('/api/songs/search?q=WEEKND')
+            ->assertOk()
+            ->assertJsonPath('results.0.artist', 'The Weeknd');
+    }
+
     public function test_search_excludes_flagged_songs(): void
     {
         Song::factory()->create(['title' => 'Hidden Track', 'artist' => 'X', 'excluded' => true]);

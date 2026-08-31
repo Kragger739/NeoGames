@@ -22,14 +22,17 @@ class SongSearchController extends Controller
         ]);
 
         $term = trim((string) $request->query('q'));
-        // Escape LIKE wildcards so a literal % or _ in the query isn't a wildcard.
-        $like = '%'.addcslashes($term, '%_\\').'%';
+        // Lowercase + LOWER() so matching is case-insensitive on every driver -
+        // Postgres LIKE is case-sensitive (unlike sqlite/mysql), so a plain
+        // '%blinding%' would never match "Blinding Lights". Escape LIKE
+        // wildcards so a literal % or _ in the query isn't treated as one.
+        $like = '%'.addcslashes(mb_strtolower($term), '%_\\').'%';
 
         $results = Song::query()
             ->where('excluded', false)
             ->where(fn (Builder $q) => $q
-                ->where('title', 'like', $like)
-                ->orWhere('artist', 'like', $like))
+                ->whereRaw('LOWER(title) LIKE ?', [$like])
+                ->orWhereRaw('LOWER(artist) LIKE ?', [$like]))
             ->orderByDesc('popularity')
             ->limit(8)
             ->get(['provider_track_id', 'title', 'artist', 'album_art_url']);

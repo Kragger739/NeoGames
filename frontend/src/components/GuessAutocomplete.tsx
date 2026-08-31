@@ -36,12 +36,12 @@ export function GuessAutocomplete({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SongSuggestion[]>([]);
   const [open, setOpen] = useState(false);
-  const [searching, setSearching] = useState(false);
+  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
 
   useEffect(() => {
     if (query.trim().length < MIN_QUERY_LENGTH) {
       setResults([]);
-      setSearching(false);
+      setStatus("idle");
       return;
     }
 
@@ -51,17 +51,24 @@ export function GuessAutocomplete({
     const controller = new AbortController();
 
     const handle = setTimeout(() => {
-      setSearching(true);
+      setStatus("loading");
       api
         .get<{ results: SongSuggestion[] }>("/api/songs/search", {
           params: { q: query },
           signal: controller.signal,
         })
-        .then((response) => setResults(response.data.results))
-        .catch((err) => {
-          if (err.code !== "ERR_CANCELED") setResults([]);
+        .then((response) => {
+          setResults(response.data.results ?? []);
+          setStatus("done");
         })
-        .finally(() => setSearching(false));
+        .catch((err) => {
+          if (err.code === "ERR_CANCELED") return;
+          // Don't fail silently - an empty dropdown is indistinguishable
+          // from "no matches" otherwise.
+          console.warn("song search failed", err);
+          setResults([]);
+          setStatus("error");
+        });
     }, DEBOUNCE_MS);
 
     return () => {
@@ -114,14 +121,17 @@ export function GuessAutocomplete({
         </button>
       </form>
 
-      {open &&
-        searching &&
-        results.length === 0 &&
-        query.trim().length >= MIN_QUERY_LENGTH && (
-          <ul className="guess-suggestions">
-            <li className="hint">Searching…</li>
-          </ul>
-        )}
+      {open && results.length === 0 && query.trim().length >= MIN_QUERY_LENGTH && status !== "idle" && (
+        <ul className="guess-suggestions">
+          <li className="hint">
+            {status === "loading"
+              ? "Searching…"
+              : status === "error"
+                ? "Search unavailable — try again"
+                : "No matching song in the pool"}
+          </li>
+        </ul>
+      )}
 
       {open && results.length > 0 && (
         <ul className="guess-suggestions">
