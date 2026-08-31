@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Lock } from "lucide-react";
 
 import { api } from "../lib/api";
 import { DIFFICULTY_TIERS } from "../lib/difficultyTiers";
@@ -424,6 +425,12 @@ export function RoomSettingsForm({
 
           return (
             <label key={option.value} className={locked ? "mode-option mode-option-locked" : "mode-option"}>
+              {locked && (
+                <span className="mode-option-lock">
+                  <Lock size={13} strokeWidth={2.5} />
+                  Locked
+                </span>
+              )}
               <input
                 type="radio"
                 name="mode"
@@ -467,6 +474,12 @@ export function RoomSettingsForm({
             key={option.value}
             className={genreLocked ? "mode-option mode-option-locked" : "mode-option"}
           >
+            {genreLocked && (
+              <span className="mode-option-lock">
+                <Lock size={13} strokeWidth={2.5} />
+                Locked
+              </span>
+            )}
             <input
               type="radio"
               name="genre"

@@ -105,10 +105,10 @@ export function AdminUnlocksPage() {
                     <input
                       type="number"
                       min={1}
-                      max={50}
+                      max={999}
                       value={row.required_level}
                       onChange={(e) => {
-                        const n = Math.max(1, Math.min(50, Number(e.target.value) || 1));
+                        const n = Math.max(1, Math.min(999, Number(e.target.value) || 1));
                         void setLevel(row.key, n);
                       }}
                     />

@@ -66,7 +66,22 @@ class AdminUnlockTest extends TestCase
             ->assertUnprocessable();
 
         $this->actingAs($admin)
-            ->patchJson('/api/admin/unlock-requirements/game_night', ['required_level' => 99])
+            ->patchJson('/api/admin/unlock-requirements/game_night', ['required_level' => 1000])
             ->assertUnprocessable();
+    }
+
+    public function test_the_cap_is_999(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)
+            ->patchJson('/api/admin/unlock-requirements/mode:battle_royale', ['required_level' => 999])
+            ->assertOk()
+            ->assertJsonPath('required_level', 999);
+
+        $this->actingAs(User::factory()->create(['xp' => 1_000_000]))
+            ->getJson('/api/unlock-requirements')
+            ->assertOk()
+            ->assertJsonPath('mode:battle_royale', 999);
     }
 }

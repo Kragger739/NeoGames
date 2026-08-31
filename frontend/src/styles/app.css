@@ -759,6 +759,7 @@ button:disabled {
 }
 
 .mode-option {
+  position: relative;
   flex: 1 1 200px;
   flex-direction: row;
   align-items: flex-start;
@@ -777,17 +778,40 @@ button:disabled {
   box-shadow: var(--shadow-card);
 }
 
-/* A level-gated mode/genre option not yet unlocked - still fully visible
-   (so it's clear it exists and how to unlock it), just dimmed and
-   unclickable. */
+/* A level-gated mode/genre option not yet unlocked - still visible (so it's
+   clear it exists and how to unlock it), with a lock badge and dimmed
+   content, and unclickable. */
 .mode-option-locked {
-  opacity: 0.5;
   cursor: not-allowed;
+}
+
+.mode-option-locked strong,
+.mode-option-locked .hint,
+.mode-option-locked input {
+  opacity: 0.45;
 }
 
 .mode-option-locked:hover {
   transform: none;
   box-shadow: var(--shadow-sm);
+}
+
+.mode-option-lock {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-sunk);
+  box-shadow: var(--shadow-sm);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
 }
 
 .mode-option:has(input:checked) {

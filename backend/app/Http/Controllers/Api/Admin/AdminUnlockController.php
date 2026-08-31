@@ -32,7 +32,7 @@ class AdminUnlockController extends Controller
         abort_unless(array_key_exists($key, UnlockRequirement::labels()), 404);
 
         $data = $request->validate([
-            'required_level' => ['required', 'integer', 'min:1', 'max:50'],
+            'required_level' => ['required', 'integer', 'min:1', 'max:999'],
         ]);
 
         $row = UnlockRequirement::updateOrCreate(
