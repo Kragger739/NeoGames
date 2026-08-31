@@ -298,8 +298,7 @@ a {
   margin: 0 0 24px;
 }
 
-.admin-nav a,
-.admin-nav-brand {
+.admin-nav a {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -326,14 +325,14 @@ a {
   background: var(--coral-wash);
 }
 
-.admin-nav-brand {
-  color: var(--ink-soft);
-  background: var(--surface-sunk);
-  box-shadow: none;
+.admin-nav-home {
+  background: var(--fail);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(33, 28, 51, 0.14);
 }
 
-.admin-nav-home {
-  margin-left: auto;
+.admin-nav-home:hover {
+  color: #fff;
 }
 
 .new-room-page > p:first-child,

@@ -1,4 +1,4 @@
-import { CalendarDays, Home, ListMusic, Lock, ShieldCheck, Users } from "lucide-react";
+import { CalendarDays, Home, ListMusic, Lock, Users } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const SECTIONS = [
@@ -12,20 +12,16 @@ const SECTIONS = [
 export function AdminNav() {
   return (
     <nav className="admin-nav">
-      <span className="admin-nav-brand">
-        <ShieldCheck size={16} strokeWidth={2.25} />
-        Admin
-      </span>
+      <NavLink to="/" className="admin-nav-home">
+        <Home size={16} strokeWidth={2.25} />
+        Home
+      </NavLink>
       {SECTIONS.map(({ to, label, icon: Icon }) => (
         <NavLink key={to} to={to} className={({ isActive }) => (isActive ? "is-active" : undefined)}>
           <Icon size={16} strokeWidth={2.25} />
           {label}
         </NavLink>
       ))}
-      <NavLink to="/" className="admin-nav-home">
-        <Home size={16} strokeWidth={2.25} />
-        Home
-      </NavLink>
     </nav>
   );
 }
