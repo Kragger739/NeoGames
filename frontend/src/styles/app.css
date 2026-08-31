@@ -50,6 +50,13 @@
    lock + label floating on top. */
 .songle-lock-wrap {
   position: relative;
+  display: flex;
+}
+
+/* Match the full-width stretch the Daily button gets as a direct flex item
+   of .songle-page - here the button is nested inside this wrapper. */
+.songle-lock-wrap > .btn {
+  flex: 1;
 }
 
 .songle-lock-wrap.is-locked > .btn {
