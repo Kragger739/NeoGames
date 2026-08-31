@@ -113,7 +113,7 @@ export function SonglePage() {
 
       <div className={gameNightLocked ? "songle-lock-wrap is-locked" : "songle-lock-wrap"}>
         <Button
-          variant="ghost"
+          variant="primary"
           size="lg"
           onClick={() => void handleNewRoom()}
           disabled={creating || gameNightLocked}
