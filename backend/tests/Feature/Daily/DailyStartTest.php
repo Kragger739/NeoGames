@@ -127,4 +127,15 @@ class DailyStartTest extends TestCase
             ->assertJsonPath('played', true)
             ->assertJsonPath('finished', false);
     }
+
+    public function test_show_reports_next_utc_midnight_as_reset_time(): void
+    {
+        $this->travelTo('2026-09-01 14:30:00');
+        $this->seedIconic();
+        $host = User::factory()->create();
+
+        $this->actingAs($host)->getJson('/api/daily')
+            ->assertOk()
+            ->assertJsonPath('resets_at', now()->addDay()->startOfDay()->toIso8601String());
+    }
 }

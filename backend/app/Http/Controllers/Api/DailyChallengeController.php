@@ -41,6 +41,9 @@ class DailyChallengeController extends Controller
             'played' => $attempt !== null,
             'finished' => $attempt?->finished_at !== null,
             'best_score' => $attempt?->score,
+            // Next UTC midnight - the app runs in UTC and the daily is keyed
+            // by calendar date, so this is exactly when a new run opens up.
+            'resets_at' => now()->addDay()->startOfDay()->toIso8601String(),
         ]);
     }
 

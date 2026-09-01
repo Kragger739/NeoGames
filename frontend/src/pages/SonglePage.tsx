@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, CalendarDays, Gamepad2, Lock } from "lucide-react";
 
@@ -17,6 +17,20 @@ interface DailyStatus {
   played: boolean;
   finished: boolean;
   best_score: number | null;
+  resets_at: string;
+}
+
+/** Whole seconds between now and `iso`, floored at zero. */
+function secondsUntil(iso: string): number {
+  return Math.max(0, Math.floor((new Date(iso).getTime() - Date.now()) / 1000));
+}
+
+/** `HH:MM:SS`, zero-padded, hours uncapped. */
+function formatCountdown(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds].map((n) => String(n).padStart(2, "0")).join(":");
 }
 
 interface DailyStartResponse {
@@ -34,14 +48,43 @@ export function SonglePage() {
   const [startingDaily, setStartingDaily] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [daily, setDaily] = useState<DailyStatus | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState(0);
 
-  useEffect(() => {
-    void fetchUnlocks();
+  const loadDaily = useCallback(() => {
     api
       .get<DailyStatus>("/api/daily")
       .then((res) => setDaily(res.data))
       .catch(() => setDaily(null));
-  }, [fetchUnlocks]);
+  }, []);
+
+  useEffect(() => {
+    void fetchUnlocks();
+    loadDaily();
+  }, [fetchUnlocks, loadDaily]);
+
+  // While today's run is done, tick a countdown to the next daily. When it
+  // hits zero the day has rolled over, so re-fetch to re-open the button.
+  useEffect(() => {
+    if (!daily?.played) {
+      return;
+    }
+
+    let lastReload = 0;
+    const tick = () => {
+      const remaining = secondsUntil(daily.resets_at);
+      setSecondsLeft(remaining);
+      // Past the reset: re-fetch so the button re-opens once the server day
+      // rolls over. Throttled in case our clock is ahead of the server's.
+      if (remaining === 0 && Date.now() - lastReload > 10_000) {
+        lastReload = Date.now();
+        loadDaily();
+      }
+    };
+
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [daily?.played, daily?.resets_at, loadDaily]);
 
   const gameNightLevel = requiredLevel("game_night");
   const gameNightLocked = host != null && host.level < gameNightLevel;
@@ -101,7 +144,10 @@ export function SonglePage() {
         {startingDaily ? (
           "Starting…"
         ) : daily?.played ? (
-          "Daily done — come back tomorrow"
+          <>
+            <CalendarDays size={20} strokeWidth={2.5} />
+            Next daily in {formatCountdown(secondsLeft)}
+          </>
         ) : (
           <>
             <CalendarDays size={20} strokeWidth={2.5} />
