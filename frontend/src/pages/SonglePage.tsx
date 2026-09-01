@@ -181,7 +181,7 @@ export function SonglePage() {
         )}
       </div>
       {createError && <p className="form-error">{createError}</p>}
-      <p className="hint">Songs are pulled automatically — no setup needed.</p>
+      <p className="hint">Host, control and play like you want to</p>
     </div>
   );
 }
