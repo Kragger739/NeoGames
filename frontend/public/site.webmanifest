@@ -1,0 +1,26 @@
+{
+  "name": "NeoGames",
+  "short_name": "NeoGames",
+  "description": "Quick, chaotic party games for game night. Guess the song, tease your friends, and see who takes the win.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FFF9F2",
+  "theme_color": "#FF5C7A",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "type": "image/png",
+      "sizes": "180x180",
+      "purpose": "any maskable"
+    }
+  ]
+}
