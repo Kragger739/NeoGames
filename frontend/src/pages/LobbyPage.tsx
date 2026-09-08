@@ -313,7 +313,7 @@ export function LobbyPage() {
         </>
       )}
 
-      {isSeated && host && (
+      {isSeated && host && room?.player_mode !== "solo" && (
         <>
           <h2>Invite a friend</h2>
           {friendsStatus !== "ready" ? (
