@@ -165,7 +165,7 @@ export function IconicArtistLobbySettings({
 
       {error && <p className="form-error">{error}</p>}
       <p className="hint save-status" aria-live="polite">
-        {saving ? "Saving…" : saved ? "Saved" : " "}
+        {saving ? "Saving…" : saved ? "Saved" : ""}
       </p>
     </form>
   );
