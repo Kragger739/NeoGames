@@ -86,6 +86,19 @@
   cursor: default;
 }
 
+/* Opt out of the global button hover/active lift - the card's only motion is
+   its own centered-vs-side scale, driven by selection, not pointer state. */
+.iconic-artist-card:hover:not(:disabled),
+.iconic-artist-card:active:not(:disabled) {
+  transform: scale(0.8);
+  box-shadow: none;
+}
+
+.iconic-artist-card.is-centered:hover:not(:disabled),
+.iconic-artist-card.is-centered:active:not(:disabled) {
+  transform: scale(1.12);
+}
+
 .iconic-artist-photo {
   width: 100%;
   aspect-ratio: 1;
