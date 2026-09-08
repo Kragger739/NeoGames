@@ -90,8 +90,8 @@ export function AdminIconicArtistsPage() {
       <h1>Iconic Artists</h1>
       <p className="hint">
         Curated acts for the Songle landing-page carousel. <strong>Name</strong> must match how
-        Spotify spells the artist. Adding one auto-fetches ~100 of their songs in the
-        background; games play the 20 most popular. Progress shows per row.
+        iTunes spells the artist. Adding one auto-fetches ~100 of their songs from iTunes;
+        games play the top 20. Progress shows per row.
       </p>
 
       {error && <p className="form-error">{error}</p>}

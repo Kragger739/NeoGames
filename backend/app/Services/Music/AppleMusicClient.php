@@ -85,6 +85,54 @@ class AppleMusicClient
         ];
     }
 
+    /**
+     * Every song iTunes lists for an artist name, in Apple's relevance order
+     * (a decent popularity proxy - iTunes has no popularity field). The
+     * result already carries the preview URL, so no per-track lookup is
+     * needed. Used to build an Iconic Artist's curated catalogue without
+     * touching Spotify (whose catalogue endpoints are edge-blocked for our
+     * app token).
+     *
+     * @return array<int, array{itunes_track_id: string, title: string, artist: string, preview_url: string, album_art_url: ?string, release_year: ?int}>
+     */
+    public function artistSongs(string $name, int $limit = 150): array
+    {
+        $response = Http::acceptJson()->get(self::BASE_URL.'/search', [
+            'term' => trim($name),
+            'entity' => 'song',
+            'attribute' => 'artistTerm',
+            'limit' => min(200, max(1, $limit)),
+            'country' => config('music.itunes_country', 'US'),
+        ]);
+
+        if ($response->status() === 403 || $response->status() === 429) {
+            throw new RateLimitException('iTunes Search API rate limit hit (HTTP '.$response->status().').');
+        }
+
+        if ($response->failed()) {
+            throw new RuntimeException("iTunes artist search failed ({$response->status()}) for \"{$name}\".");
+        }
+
+        $out = [];
+
+        foreach ($response->json('results', []) as $result) {
+            if (($result['kind'] ?? null) !== 'song' || empty($result['previewUrl']) || ! isset($result['trackId'])) {
+                continue;
+            }
+
+            $out[] = [
+                'itunes_track_id' => (string) $result['trackId'],
+                'title' => (string) ($result['trackName'] ?? ''),
+                'artist' => (string) ($result['artistName'] ?? ''),
+                'preview_url' => (string) $result['previewUrl'],
+                'album_art_url' => $this->upscaleArtwork($result['artworkUrl100'] ?? null),
+                'release_year' => $this->parseReleaseYear($result['releaseDate'] ?? null),
+            ];
+        }
+
+        return $out;
+    }
+
     private function matchScore(string $wantArtist, string $wantTitle, string $gotArtist, string $gotTitle): int
     {
         $score = 0;
