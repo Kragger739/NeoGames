@@ -165,6 +165,25 @@ span.iconic-artist-photo.art-placeholder {
 
 .iconic-lobby-settings {
   max-width: 28rem;
+  margin-inline: auto;
+  /* Undo the generic `form` left alignment so the trimmed iconic lobby
+     reads as centered, like the rest of the Songle flow. */
+  align-items: center;
+  text-align: center;
+}
+
+/* The mode picker keeps its full width + its own radio-row layout. */
+.iconic-lobby-settings .mode-picker {
+  align-self: stretch;
+}
+
+.iconic-lobby-settings .mode-picker legend {
+  width: 100%;
+  text-align: center;
+}
+
+.iconic-lobby-settings .mode-option {
+  text-align: left;
 }
 
 /* Shop */
