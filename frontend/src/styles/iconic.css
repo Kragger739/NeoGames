@@ -166,10 +166,17 @@ span.iconic-artist-photo.art-placeholder {
 .iconic-lobby-settings {
   max-width: 28rem;
   margin-inline: auto;
+  /* Tighten the drop to the next section - the default form bottom margin
+     plus `.lobby-page h2`'s 28px top margin left a cavernous gap. */
+  margin-block: 16px 4px;
   /* Undo the generic `form` left alignment so the trimmed iconic lobby
      reads as centered, like the rest of the Songle flow. */
   align-items: center;
   text-align: center;
+}
+
+.iconic-lobby-settings + h2 {
+  margin-top: 16px;
 }
 
 /* The mode picker keeps its full width + its own radio-row layout. */
