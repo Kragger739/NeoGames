@@ -988,6 +988,9 @@ button:disabled {
   .game-play-layout {
     flex-direction: column-reverse;
     gap: 20px;
+    /* Fill the page and centre the control stack vertically for thumb reach. */
+    flex: 1;
+    justify-content: center;
   }
 
   /* Stacked column: the base `align-items: flex-start` would otherwise let
@@ -995,6 +998,11 @@ button:disabled {
   .game-play-main,
   .scoreboard-panel {
     width: 100%;
+  }
+
+  /* Phones use the hardware volume rocker - the on-screen slider is clutter. */
+  .volume-control input[type="range"] {
+    display: none;
   }
 
   /* Controller mode: compact horizontal strip instead of a full card
@@ -1018,7 +1026,8 @@ button:disabled {
   }
 
   .game-play-page {
-    padding-bottom: 32px;
+    padding-top: 24px;
+    padding-bottom: 24px;
   }
 }
 
