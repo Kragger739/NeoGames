@@ -35,6 +35,7 @@ class UnlockRequirement extends Model
     {
         $out = [
             'game_night' => ['label' => 'Host a game night', 'category' => 'game_night'],
+            'iconic_series' => ['label' => 'Iconic Artist series', 'category' => 'game_night'],
         ];
 
         foreach (GameMode::cases() as $mode) {

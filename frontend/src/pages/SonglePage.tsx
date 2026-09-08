@@ -4,12 +4,14 @@ import { ArrowLeft, CalendarDays, Gamepad2, Lock } from "lucide-react";
 
 import { api } from "../lib/api";
 import { firstValidationError } from "../lib/errors";
+import type { IconicArtist } from "../lib/iconicSeries";
 import type { CreateRoomResponse } from "../lib/roomTypes";
 import { setPlayerId, setPlayerToken } from "../lib/playerToken";
 import { useAuthStore } from "../stores/authStore";
 import { useUnlockStore } from "../stores/unlockStore";
 import { Button } from "../components/ui/Button";
 import { IconButton } from "../components/ui/IconButton";
+import { IconicArtistCarousel } from "../components/IconicArtistCarousel";
 import { PartyNote } from "../components/illustrations/PartyNote";
 
 interface DailyStatus {
@@ -49,6 +51,8 @@ export function SonglePage() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [daily, setDaily] = useState<DailyStatus | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [iconicArtists, setIconicArtists] = useState<IconicArtist[]>([]);
+  const [pickingArtist, setPickingArtist] = useState(false);
 
   const loadDaily = useCallback(() => {
     api
@@ -60,6 +64,10 @@ export function SonglePage() {
   useEffect(() => {
     void fetchUnlocks();
     loadDaily();
+    api
+      .get<IconicArtist[]>("/api/iconic-artists")
+      .then((res) => setIconicArtists(res.data))
+      .catch(() => setIconicArtists([]));
   }, [fetchUnlocks, loadDaily]);
 
   // While today's run is done, tick a countdown to the next daily. When it
@@ -88,6 +96,24 @@ export function SonglePage() {
 
   const gameNightLevel = requiredLevel("game_night");
   const gameNightLocked = host != null && host.level < gameNightLevel;
+  const iconicLevel = requiredLevel("iconic_series");
+  const iconicLocked = host != null && host.level < iconicLevel;
+
+  async function handlePickArtist(artistId: number) {
+    setCreateError(null);
+    setPickingArtist(true);
+    try {
+      const response = await api.post<DailyStartResponse>(
+        `/api/iconic-artists/${artistId}/start`,
+      );
+      setPlayerToken(response.data.player.connection_token);
+      setPlayerId(response.data.player.id);
+      navigate(`/rooms/${response.data.code}/lobby`);
+    } catch (err) {
+      setCreateError(firstValidationError(err));
+      setPickingArtist(false);
+    }
+  }
 
   async function handleDaily() {
     setCreateError(null);
@@ -134,6 +160,28 @@ export function SonglePage() {
       <p className="dashboard-wordmark">Songle</p>
       <PartyNote className="dashboard-hero" />
       {host && <h1>Hey, {host.name}!</h1>}
+
+      {iconicArtists.length > 0 && (
+        <section className="iconic-series">
+          <p className="iconic-series-title">Iconic Artists</p>
+          {iconicLocked ? (
+            <div className="songle-lock-wrap is-locked">
+              <IconicArtistCarousel artists={iconicArtists} onPick={() => {}} disabled />
+              <div className="songle-lock-overlay" aria-hidden="true">
+                <Lock size={22} strokeWidth={2.5} />
+                <span>Unlocks at level {iconicLevel}</span>
+              </div>
+            </div>
+          ) : (
+            <IconicArtistCarousel
+              artists={iconicArtists}
+              onPick={(id) => void handlePickArtist(id)}
+              busy={pickingArtist}
+            />
+          )}
+          <p className="hint">Five songs by one artist. Pick a mode in the lobby.</p>
+        </section>
+      )}
 
       <Button
         variant="primary"

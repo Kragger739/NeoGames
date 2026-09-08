@@ -77,6 +77,8 @@ export interface RoomState {
   dataset_id: number | null;
   dataset_name: string | null;
   daily_challenge_id: number | null;
+  iconic_artist_id: number | null;
+  iconic_artist: { id: number; name: string; image_url: string | null } | null;
   current_tier: string | null;
   current_song_index: number;
   players: RoomPlayerSummary[];
@@ -97,4 +99,23 @@ export interface PresenceMember {
   name: string;
   level: number | null;
   avatar: AvatarData | null;
+}
+
+/**
+ * The full settings payload `PATCH /api/rooms/{code}` expects. The backend
+ * always wants every field (it recomputes forced values from the whole set),
+ * so both RoomSettingsForm and IconicArtistLobbySettings send all of it.
+ */
+export interface SettingsPayload {
+  songs_per_tier: number;
+  enabled_tiers: string[];
+  guess_timeout_seconds: number;
+  mode: GameMode;
+  player_mode: PlayerMode;
+  genre: SongGenre;
+  year_from: number | null;
+  year_to: number | null;
+  artist_name: string | null;
+  artist_names: string[] | null;
+  dataset_id: number | null;
 }

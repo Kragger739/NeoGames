@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Admin\AdminCosmeticController;
 use App\Http\Controllers\Api\Admin\AdminDailyController;
+use App\Http\Controllers\Api\Admin\AdminIconicArtistController;
 use App\Http\Controllers\Api\Admin\AdminSeasonController;
 use App\Http\Controllers\Api\Admin\AdminSongController;
 use App\Http\Controllers\Api\Admin\AdminSongPlaylistController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\Api\DdfGameController;
 use App\Http\Controllers\Api\DdfVoteController;
 use App\Http\Controllers\Api\FriendController;
 use App\Http\Controllers\Api\GameRoomController;
+use App\Http\Controllers\Api\IconicArtistController;
 use App\Http\Controllers\Api\LeaderboardController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RoomInviteController;
@@ -159,6 +161,11 @@ Route::middleware(['auth:sanctum', 'not-banned'])->group(function () {
         Route::get('/daily', [DailyChallengeController::class, 'show']);
         Route::post('/daily/start', [DailyChallengeController::class, 'start']);
 
+        // Iconic Artist series - curated act carousel; picking one creates a
+        // genre=artist room left in the lobby for the trimmed settings form.
+        Route::get('/iconic-artists', [IconicArtistController::class, 'index']);
+        Route::post('/iconic-artists/{iconicArtist}/start', [IconicArtistController::class, 'start']);
+
         // Level required for each mode / genre / hosting a game night.
         Route::get('/unlock-requirements', [UnlockRequirementController::class, 'index']);
 
@@ -222,6 +229,12 @@ Route::middleware(['auth:sanctum', 'not-banned', 'verified', 'admin'])
         Route::post('/song-playlists', [AdminSongPlaylistController::class, 'store']);
         Route::delete('/song-playlists/{songPlaylist}', [AdminSongPlaylistController::class, 'destroy']);
         Route::post('/song-playlists/sync', [AdminSongPlaylistController::class, 'sync']);
+
+        // Iconic Artist series curation. POST for update so a photo can ride along.
+        Route::get('/iconic-artists', [AdminIconicArtistController::class, 'index']);
+        Route::post('/iconic-artists', [AdminIconicArtistController::class, 'store']);
+        Route::post('/iconic-artists/{iconicArtist}', [AdminIconicArtistController::class, 'update']);
+        Route::delete('/iconic-artists/{iconicArtist}', [AdminIconicArtistController::class, 'destroy']);
 
         // Individual song pool: browse, edit metadata, remove/restore (the
         // reversible `excluded` flag). `bulk-exclude` before `{song}` so the

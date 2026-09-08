@@ -7,7 +7,7 @@ import { firstValidationError } from "../lib/errors";
 import { GAME_MODES } from "../lib/gameModes";
 import { PLAYER_MODES } from "../lib/playerModes";
 import { MULTI_ARTIST_MAX, SONG_GENRES } from "../lib/songGenres";
-import type { GameMode, PlayerMode, SongGenre } from "../lib/roomTypes";
+import type { GameMode, PlayerMode, SettingsPayload, SongGenre } from "../lib/roomTypes";
 import type { DatasetsIndex, DatasetSummary } from "../lib/workshopTypes";
 import { useUnlockStore } from "../stores/unlockStore";
 
@@ -38,20 +38,6 @@ interface RoomSettingsFormProps {
 const CURRENT_YEAR = new Date().getFullYear();
 const DEFAULT_YEAR_FROM = 1970;
 const DEFAULT_YEAR_TO = 1989;
-
-interface SettingsPayload {
-  songs_per_tier: number;
-  enabled_tiers: string[];
-  guess_timeout_seconds: number;
-  mode: GameMode;
-  player_mode: PlayerMode;
-  genre: SongGenre;
-  year_from: number | null;
-  year_to: number | null;
-  artist_name: string | null;
-  artist_names: string[] | null;
-  dataset_id: number | null;
-}
 
 const DATASET_MIN_ROUNDS = 1;
 const DATASET_MAX_ROUNDS = 30;

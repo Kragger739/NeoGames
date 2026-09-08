@@ -414,6 +414,12 @@ class GameRoomController extends Controller
             'dataset_id' => $room->dataset_id,
             'dataset_name' => $room->dataset?->name,
             'daily_challenge_id' => $room->daily_challenge_id,
+            'iconic_artist_id' => $room->iconic_artist_id,
+            'iconic_artist' => $room->iconicArtist ? [
+                'id' => $room->iconicArtist->id,
+                'name' => $room->iconicArtist->name,
+                'image_url' => $room->iconicArtist->image_url,
+            ] : null,
             'current_tier' => $room->current_tier?->value,
             'current_song_index' => $room->current_song_index,
             'players' => $room->players()

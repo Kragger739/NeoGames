@@ -7,6 +7,7 @@ import './styles/ddf.css'
 import './styles/avatar.css'
 import './styles/cosmetics.css'
 import './styles/workshop.css'
+import './styles/iconic.css'
 import App from './App.tsx'
 import { initTheme } from './stores/themeStore'
 

@@ -39,6 +39,7 @@ class GameRoom extends Model
         'current_song_index',
         'dataset_id',
         'daily_challenge_id',
+        'iconic_artist_id',
     ];
 
     protected function casts(): array
@@ -114,6 +115,16 @@ class GameRoom extends Model
     public function isDaily(): bool
     {
         return $this->daily_challenge_id !== null;
+    }
+
+    /**
+     * The curated act this room plays through for the Iconic Artist series,
+     * or null for a normal game. Purely a marker for the lobby UI - song
+     * selection still runs off `artist_name` / `genre`.
+     */
+    public function iconicArtist(): BelongsTo
+    {
+        return $this->belongsTo(IconicArtist::class);
     }
 
     /**

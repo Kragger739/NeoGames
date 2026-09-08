@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Check, Copy, LogOut, Rocket } from "lucide-react";
 
+import { IconicArtistLobbySettings } from "../components/IconicArtistLobbySettings";
 import { RoomSettingsForm } from "../components/RoomSettingsForm";
 import { api } from "../lib/api";
 import { DIFFICULTY_TIERS } from "../lib/difficultyTiers";
@@ -224,6 +225,14 @@ export function LobbyPage() {
 
   return (
     <div className="lobby-page">
+      {room?.iconic_artist && (
+        <div className="lobby-iconic-artist">
+          {room.iconic_artist.image_url && (
+            <img src={room.iconic_artist.image_url} alt="" width={40} height={40} />
+          )}
+          <span>Iconic Artist · {room.iconic_artist.name}</span>
+        </div>
+      )}
       <div className="lobby-header">
         <h1 className="room-ticket">{code?.toUpperCase()}</h1>
         <div className="lobby-header-actions">
@@ -236,22 +245,34 @@ export function LobbyPage() {
       </div>
       {channelError && <p className="form-error">{channelError}</p>}
       {room && code && isHost && room.status === "lobby" ? (
-        <RoomSettingsForm
-          code={code}
-          songsPerTier={room.songs_per_tier}
-          enabledTiers={room.enabled_tiers}
-          guessTimeoutSeconds={room.guess_timeout_seconds}
-          mode={room.mode}
-          playerMode={room.player_mode}
-          genre={room.genre}
-          yearFrom={room.year_from}
-          yearTo={room.year_to}
-          artistName={room.artist_name}
-          artistNames={room.artist_names}
-          datasetId={room.dataset_id}
-          datasetName={room.dataset_name}
-          hostLevel={host?.level ?? null}
-        />
+        room.iconic_artist_id != null ? (
+          <IconicArtistLobbySettings
+            code={code}
+            artistName={room.iconic_artist?.name ?? room.artist_name ?? ""}
+            songsPerTier={room.songs_per_tier}
+            guessTimeoutSeconds={room.guess_timeout_seconds}
+            mode={room.mode}
+            playerMode={room.player_mode}
+            hostLevel={host?.level ?? null}
+          />
+        ) : (
+          <RoomSettingsForm
+            code={code}
+            songsPerTier={room.songs_per_tier}
+            enabledTiers={room.enabled_tiers}
+            guessTimeoutSeconds={room.guess_timeout_seconds}
+            mode={room.mode}
+            playerMode={room.player_mode}
+            genre={room.genre}
+            yearFrom={room.year_from}
+            yearTo={room.year_to}
+            artistName={room.artist_name}
+            artistNames={room.artist_names}
+            datasetId={room.dataset_id}
+            datasetName={room.dataset_name}
+            hostLevel={host?.level ?? null}
+          />
+        )
       ) : (
         room &&
         (room.mode === "classic" ? (
