@@ -1370,6 +1370,32 @@ button:disabled {
   color: var(--grape-dark);
 }
 
+/* Majority-vote "end this reveal early" button (multiplayer only). */
+.round-reveal-skip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 16px 0 0;
+  padding: 9px 16px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunk);
+  color: var(--ink-soft);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.round-reveal-skip:hover:not(:disabled) {
+  background: var(--grape-wash);
+  color: var(--grape-dark);
+}
+
+.round-reveal-skip:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 @keyframes reveal-pop {
   from {
     opacity: 0;

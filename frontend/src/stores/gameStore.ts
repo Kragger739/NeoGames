@@ -8,6 +8,7 @@ import type {
   GameFinishedPayload,
   GuessMissedPayload,
   RevealedAnswer,
+  RevealSkipProgressPayload,
   RoomResetPayload,
   RoomSettingsUpdatedPayload,
   RoundFailedPayload,
@@ -41,6 +42,9 @@ interface GameState {
   totalRounds: number | null;
   outcome: Outcome | null;
   missedNotices: string[];
+  // Live tally for the "skip the reveal" vote - null except while a reveal
+  // is on screen and at least one vote has landed.
+  revealSkip: { roundId: number; votesCast: number; eligible: number } | null;
   scoreboard: ScoreboardEntry[] | null;
   players: ScoreboardEntry[];
   members: PresenceMember[];
@@ -81,6 +85,7 @@ const initialState = {
   totalRounds: null,
   outcome: null,
   missedNotices: [],
+  revealSkip: null,
   scoreboard: null,
   players: [],
   members: [],
@@ -194,6 +199,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         totalRounds: payload.total_rounds,
         outcome: null,
         missedNotices: [],
+        revealSkip: null,
       });
     });
 
@@ -217,6 +223,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           points: payload.points,
         },
         players: payload.scoreboard,
+        revealSkip: null,
       });
     });
 
@@ -224,6 +231,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({
         phase: "revealed",
         outcome: { type: "failed", answer: payload.answer },
+        revealSkip: null,
       });
     });
 
@@ -239,6 +247,17 @@ export const useGameStore = create<GameState>((set, get) => ({
           eliminated: payload.eliminated,
         },
         players: payload.scoreboard,
+        revealSkip: null,
+      });
+    });
+
+    channel.listen(".round.reveal_skip_progress", (payload: RevealSkipProgressPayload) => {
+      set({
+        revealSkip: {
+          roundId: payload.round_id,
+          votesCast: payload.votes_cast,
+          eligible: payload.eligible,
+        },
       });
     });
 
@@ -269,6 +288,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         totalRounds: null,
         outcome: null,
         missedNotices: [],
+        revealSkip: null,
         scoreboard: null,
         players: payload.players,
       });

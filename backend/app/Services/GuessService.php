@@ -9,8 +9,8 @@ use App\Events\RoundWon;
 use App\Models\Guess;
 use App\Models\RoomPlayer;
 use App\Models\Round;
+use App\Support\GuessNormalizer;
 use App\Support\Scoring;
-use Illuminate\Support\Str;
 
 class GuessService
 {
@@ -117,6 +117,6 @@ class GuessService
 
     private function normalize(string $value): string
     {
-        return Str::of($value)->lower()->trim()->squish()->toString();
+        return GuessNormalizer::normalize($value);
     }
 }

@@ -17,10 +17,12 @@ use App\Models\GameRoom;
 use App\Models\Guess;
 use App\Models\RoomPlayer;
 use App\Models\Round;
+use App\Models\RoundRevealSkipVote;
 use App\Models\UnlockRequirement;
 use App\Services\RoundService;
 use App\Support\SongFilter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
@@ -211,10 +213,13 @@ class GameRoomController extends Controller
     /**
      * Resets a finished room back to the lobby - same starting state as a
      * brand new room (Easy tier, song index 0, scores zeroed) - so the
-     * host can start a fresh game without recreating the room. Round/guess
-     * history is deliberately left alone: it just means startNextRound()
-     * naturally avoids repeating a song from the previous playthrough
-     * before eventually cycling back to it.
+     * host can start a fresh game without recreating the room. The previous
+     * playthrough's rounds and guesses are deleted (same teardown a room
+     * gets when its last player leaves), so the results screen's "Songs
+     * this game" list shows only the game that just finished rather than
+     * every replay stacked together. Cross-game song variety still holds:
+     * it's driven by the host's own no-repeat memory (User::songPlays()),
+     * which a redo leaves untouched.
      */
     public function redo(Request $request, string $code)
     {
@@ -237,15 +242,24 @@ class GameRoomController extends Controller
             ]);
         }
 
-        $room->update([
-            'status' => RoomStatus::Lobby->value,
-            'current_tier' => $room->firstEnabledTier()->value,
-            'current_song_index' => 0,
-        ]);
+        DB::transaction(function () use ($room) {
+            // Wipe the finished playthrough so the next game's results screen
+            // starts from an empty song history.
+            $roundIds = $room->rounds()->pluck('id');
+            Guess::whereIn('round_id', $roundIds)->delete();
+            RoundRevealSkipVote::whereIn('round_id', $roundIds)->delete();
+            $room->rounds()->delete();
 
-        // Battle Royale eliminations don't outlive the game they happened
-        // in - a redo is a fresh start, same as scores zeroing.
-        $room->players()->update(['score' => 0, 'is_eliminated' => false]);
+            $room->update([
+                'status' => RoomStatus::Lobby->value,
+                'current_tier' => $room->firstEnabledTier()->value,
+                'current_song_index' => 0,
+            ]);
+
+            // Battle Royale eliminations don't outlive the game they happened
+            // in - a redo is a fresh start, same as scores zeroing.
+            $room->players()->update(['score' => 0, 'is_eliminated' => false]);
+        });
 
         broadcast(new RoomReset($room->fresh()));
 

@@ -5,19 +5,22 @@ namespace App\Services;
 use App\Enums\GameMode;
 use App\Enums\RoomPlayerMode;
 use App\Enums\RoomStatus;
+use App\Enums\RoundStatus;
 use App\Events\BattleRoyaleRoundResolved;
 use App\Events\GameFinished;
+use App\Events\RevealSkipProgress;
 use App\Events\RoundFailed;
 use App\Events\RoundStageAdvanced;
 use App\Events\RoundStarted;
 use App\Events\TierAdvanced;
+use App\Jobs\AdvanceAfterReveal;
 use App\Jobs\AdvanceRoundStage;
 use App\Jobs\ExpandSongPool;
-use App\Jobs\FinishGame;
-use App\Jobs\StartNextRound;
 use App\Models\DailyChallengeAttempt;
 use App\Models\GameRoom;
+use App\Models\RoomPlayer;
 use App\Models\Round;
+use App\Models\RoundRevealSkipVote;
 use App\Models\Song;
 use App\Support\SnippetStage;
 use App\Support\SongFilter;
@@ -253,53 +256,154 @@ class RoundService
     }
 
     /**
-     * Called after a round resolves (won or failed): advances the room to
-     * the next song, tier, or ends the game. The next round is dispatched
-     * with a short delay so players have time to see the reveal.
+     * Called after a round resolves (won or failed). Schedules the move to
+     * the next song / tier / game-finish for after the reveal window. The
+     * decision itself is deferred to advanceNow() so this delayed path and
+     * the >50% skip-reveal vote share one guarded code path.
      */
     public function advanceAfterRoundResolved(Round $round): void
     {
+        AdvanceAfterReveal::dispatch($round->id)->delay(now()->addSeconds(self::REVEAL_DELAY_SECONDS));
+    }
+
+    /**
+     * The single guarded "the reveal for a just-resolved round is over -
+     * move the game forward" path. Reached from the AdvanceAfterReveal job,
+     * which is dispatched twice for the same $resolvedRoundId: with an
+     * 18s delay when the round resolved, and with no delay once more than
+     * half the room votes to skip. The atomic advanced_at claim below lets
+     * exactly one of those calls do the work; every other call - including
+     * a stale delayed job that fires after the skipped-to round has itself
+     * already resolved - is a safe no-op.
+     */
+    public function advanceNow(int $resolvedRoundId): void
+    {
+        $claimed = Round::query()
+            ->where('id', $resolvedRoundId)
+            ->whereNull('advanced_at')
+            ->whereIn('status', ['won', 'failed'])
+            ->update(['advanced_at' => now()]);
+
+        if (! $claimed) {
+            return;
+        }
+
+        $round = Round::with('room')->find($resolvedRoundId);
+
+        if (! $round || ! $round->room) {
+            return;
+        }
+
         $room = $round->room;
 
-        $nextIndex = $room->current_song_index + 1;
-
-        if ($nextIndex < $room->songs_per_tier) {
-            $room->update(['current_song_index' => $nextIndex]);
-            StartNextRound::dispatch($room->id)->delay(now()->addSeconds(self::REVEAL_DELAY_SECONDS));
-
+        if ($room->status !== RoomStatus::Active) {
             return;
         }
 
-        $nextTier = $room->nextEnabledTier();
+        try {
+            // Battle Royale wipe / last player standing: finish, don't start
+            // another round.
+            if ($room->mode === GameMode::BattleRoyale && $room->activePlayers()->count() <= 1) {
+                $this->finishGame($room, $round->id);
 
-        if ($nextTier === null) {
-            // Same reveal delay as the next-round path above, via a
-            // dedicated job rather than finishing synchronously here - see
-            // finishGame()'s docblock for why.
-            FinishGame::dispatch($room->id, $round->id)->delay(now()->addSeconds(self::REVEAL_DELAY_SECONDS));
+                return;
+            }
 
+            $nextIndex = $room->current_song_index + 1;
+
+            if ($nextIndex < $room->songs_per_tier) {
+                $room->update(['current_song_index' => $nextIndex]);
+                $this->startNextRound($room);
+
+                return;
+            }
+
+            $nextTier = $room->nextEnabledTier();
+
+            if ($nextTier === null) {
+                $this->finishGame($room, $round->id);
+
+                return;
+            }
+
+            $room->update([
+                'current_tier' => $nextTier->value,
+                'current_song_index' => 0,
+            ]);
+
+            broadcast(new TierAdvanced($room->fresh()));
+
+            $this->startNextRound($room);
+        } catch (\Throwable $e) {
+            // startNextRound() can throw (song discovery / network). Release
+            // the claim so the queue's retry can genuinely re-attempt,
+            // instead of the latch freezing the game on a transient error.
+            Round::whereKey($resolvedRoundId)->update(['advanced_at' => null]);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * A seated, non-eliminated player votes to end the current
+     * between-rounds reveal early. Once strictly more than 50% of the
+     * currently-eligible players have voted for this round, the advance
+     * runs immediately through the same advanceNow() the delayed job uses.
+     * Safe to call on a still-playing or already-advanced round, or from an
+     * eliminated player - all no-op.
+     */
+    public function voteSkipReveal(Round $round, RoomPlayer $player): void
+    {
+        $round->refresh();
+
+        if ($round->status === RoundStatus::Playing || $round->advanced_at !== null) {
             return;
         }
 
-        $room->update([
-            'current_tier' => $nextTier->value,
-            'current_song_index' => 0,
+        if ($player->is_eliminated) {
+            return;
+        }
+
+        // Idempotent via the unique(round_id, room_player_id) index - a
+        // repeat tap inserts zero rows. insertOrIgnore() skips timestamps,
+        // so set them explicitly.
+        RoundRevealSkipVote::query()->insertOrIgnore([
+            'round_id' => $round->id,
+            'room_player_id' => $player->id,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
-        broadcast(new TierAdvanced($room->fresh()));
+        $room = $round->room;
 
-        StartNextRound::dispatch($room->id)->delay(now()->addSeconds(self::REVEAL_DELAY_SECONDS));
+        // Numerator and denominator come from the same live activePlayers()
+        // set, so a voter who left or was eliminated after voting drops out
+        // of both.
+        $eligibleIds = $room->activePlayers()->pluck('id');
+        $eligible = $eligibleIds->count();
+
+        $votesCast = RoundRevealSkipVote::query()
+            ->where('round_id', $round->id)
+            ->whereIn('room_player_id', $eligibleIds)
+            ->count();
+
+        broadcast(new RevealSkipProgress($room, $round->id, $votesCast, $eligible));
+
+        // Strictly more than half (integer math, no float compare).
+        if ($eligible > 0 && $votesCast * 2 > $eligible) {
+            // No delay. The already-queued 18s AdvanceAfterReveal for this
+            // same round becomes a no-op when it later fires.
+            AdvanceAfterReveal::dispatch($round->id);
+        }
     }
 
     /**
      * Actually ends the game: marks the room finished, awards placement XP,
-     * and broadcasts GameFinished - split out from
-     * advanceAfterRoundResolved()/resolveBattleRoyaleRound() and invoked
-     * only via FinishGame's delayed dispatch, so the room's status (and the
+     * and broadcasts GameFinished - invoked from advanceNow() (via the
+     * delayed AdvanceAfterReveal job or a skip-reveal vote) rather than the
+     * instant the final round resolves, so the room's status (and the
      * frontend's navigation to /results, which is keyed off it) doesn't
-     * flip the instant the final round resolves. Without the delay, the
-     * last round's reveal card got skipped past almost immediately while
-     * every earlier round got the full REVEAL_DELAY_SECONDS to sit on
+     * flip while the last round's reveal card is still meant to be on
      * screen - the same reveal window every other round already gets.
      */
     public function finishGame(GameRoom $room, int $roundId): void
@@ -511,15 +615,10 @@ class RoundService
         // Covers both "one player left" (they win) and "zero left" (a full
         // wipe) - either way the existing score-sorted scoreboard is all
         // GameFinished needs to show the result, no separate "declare
-        // winner" step required. Same delayed finishGame() as Classic/Solo
-        // (see its docblock) - the round-resolved broadcast just above is
-        // what shows the reveal card; finishing must wait for it.
-        if ($room->activePlayers()->count() <= 1) {
-            FinishGame::dispatch($room->id, $round->id)->delay(now()->addSeconds(self::REVEAL_DELAY_SECONDS));
-
-            return;
-        }
-
+        // winner" step required. advanceNow() (reached via the delayed job
+        // or a skip-reveal vote) re-checks activePlayers() and finishes the
+        // game instead of starting a round when <= 1 remain, so both paths
+        // stay skippable like every other reveal.
         $this->advanceAfterRoundResolved($round);
     }
 }

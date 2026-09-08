@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class Round extends Model
 {
@@ -24,6 +25,7 @@ class Round extends Model
         'status',
         'winning_player_id',
         'stage_version',
+        'advanced_at',
     ];
 
     protected function casts(): array
@@ -34,6 +36,7 @@ class Round extends Model
             'snippet_stage' => 'float',
             'stage_started_at' => 'datetime',
             'stage_version' => 'integer',
+            'advanced_at' => 'datetime',
         ];
     }
 
@@ -57,11 +60,16 @@ class Round extends Model
         return $this->hasMany(Guess::class);
     }
 
+    public function revealSkipVotes(): HasMany
+    {
+        return $this->hasMany(RoundRevealSkipVote::class);
+    }
+
     /**
      * Distinct player ids with at least one correct guess on this round -
      * used by Battle Royale to decide who survives when the round closes.
      */
-    public function correctGuesserIds(): \Illuminate\Support\Collection
+    public function correctGuesserIds(): Collection
     {
         return $this->guesses()->where('correct', true)->distinct()->pluck('player_id');
     }

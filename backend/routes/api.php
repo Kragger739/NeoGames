@@ -117,6 +117,7 @@ Route::middleware('auth:player,sanctum')->delete('/rooms/{code}/leave', [RoomPla
 
 Route::middleware('auth:player')->group(function () {
     Route::post('/rounds/{round}/guess', [RoundController::class, 'guess']);
+    Route::post('/rounds/{round}/skip-reveal', [RoundController::class, 'skipReveal']);
     Route::get('/songs/search', [SongSearchController::class, 'search']);
 });
 

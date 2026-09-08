@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import { api } from "../lib/api";
 
@@ -37,6 +37,39 @@ export function GuessAutocomplete({
   const [results, setResults] = useState<SongSuggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // This component remounts at the start of every round (GamePlayPage only
+  // renders it while phase === "playing"), so focusing on mount puts the
+  // cursor in the guess box each new round without the player clicking it.
+  // Explicit .focus() rather than relying on the `autoFocus` attribute,
+  // which browsers apply inconsistently after an autoplaying <audio>.
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  // Type-from-anywhere: while a round is live, any printable keypress that
+  // isn't already going into a field pulls focus into the guess box and
+  // starts the query - so you can just start typing the moment the clip
+  // plays. preventDefault + manual append so the triggering character isn't
+  // also inserted a second time once focus lands.
+  useEffect(() => {
+    function handleKeydown(event: KeyboardEvent) {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.key.length !== 1) return;
+      const active = document.activeElement;
+      if (active === inputRef.current) return;
+      if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
+
+      event.preventDefault();
+      inputRef.current?.focus();
+      setQuery((current) => current + event.key);
+      setOpen(true);
+    }
+
+    document.addEventListener("keydown", handleKeydown);
+    return () => document.removeEventListener("keydown", handleKeydown);
+  }, []);
 
   useEffect(() => {
     if (query.trim().length < MIN_QUERY_LENGTH) {
@@ -105,6 +138,7 @@ export function GuessAutocomplete({
     <div className="guess-autocomplete">
       <form onSubmit={handleSubmit}>
         <input
+          ref={inputRef}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);

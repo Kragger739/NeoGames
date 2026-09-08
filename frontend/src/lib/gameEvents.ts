@@ -38,6 +38,12 @@ export interface GuessMissedPayload {
   nickname: string;
 }
 
+export interface RevealSkipProgressPayload {
+  round_id: number;
+  votes_cast: number;
+  eligible: number;
+}
+
 export interface TierAdvancedPayload {
   tier: string;
   round_number: number;

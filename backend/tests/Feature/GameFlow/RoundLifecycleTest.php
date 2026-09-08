@@ -183,14 +183,12 @@ class RoundLifecycleTest extends TestCase
 
     public function test_round_won_broadcasts_the_songs_album_art(): void
     {
-        // songs_per_tier=1 means the win also advances the tier, which
-        // would otherwise dispatch StartNextRound for real (sync queue) and
-        // try to find/broadcast an Intermediate-tier round this test never
-        // seeded, and (now that broadcasts are ShouldBroadcastNow, sent
-        // immediately rather than via a fakeable queued job) actually
-        // attempt a real TierAdvanced broadcast - both irrelevant to what's
-        // being asserted here, so TierAdvanced needs its own explicit fake
-        // alongside RoundWon; Queue::fake() alone no longer covers it.
+        // songs_per_tier=1 means the win also advances the tier. The full
+        // Queue::fake() below stops AdvanceAfterReveal from running, so the
+        // tier advance (and its TierAdvanced broadcast / next-round lookup
+        // into an Intermediate tier this test never seeded) never happens -
+        // but TierAdvanced still gets its own explicit fake here as a guard,
+        // since it's a ShouldBroadcastNow event, not a queued job.
         Event::fake([RoundWon::class, TierAdvanced::class]);
         Queue::fake();
 
@@ -471,6 +469,8 @@ class RoundLifecycleTest extends TestCase
         $room->refresh();
         $this->assertSame('finished', $room->status->value);
         $this->assertGreaterThan(0, $player->fresh()->score);
+        $playedRoundIds = $room->rounds()->pluck('id');
+        $this->assertNotEmpty($playedRoundIds);
 
         $response = $this->actingAs($host)->postJson("/api/rooms/{$room->code}/redo");
 
@@ -484,6 +484,12 @@ class RoundLifecycleTest extends TestCase
         $this->assertSame('easy', $room->current_tier->value);
         $this->assertSame(0, $room->current_song_index);
         $this->assertSame(0, $player->fresh()->score);
+
+        // The finished playthrough's rounds + guesses are cleared, so the
+        // next game's results screen starts from an empty song history
+        // instead of stacking every replay together.
+        $this->assertSame(0, $room->rounds()->count());
+        $this->assertDatabaseMissing('guesses', ['round_id' => $playedRoundIds->first()]);
 
         Event::assertDispatched(RoomReset::class);
     }
@@ -508,5 +514,44 @@ class RoundLifecycleTest extends TestCase
         $response = $this->actingAs($host)->postJson("/api/rooms/{$room->code}/redo");
 
         $response->assertUnprocessable();
+    }
+
+    public function test_song_history_covers_only_the_most_recent_playthrough_after_a_redo(): void
+    {
+        Event::fake();
+
+        $this->seedSongsForAllTiers(count: 6);
+        $host = User::factory()->create();
+        $room = GameRoom::factory()->for($host, 'host')->create([
+            'enabled_tiers' => [DifficultyTier::Easy->value],
+            'songs_per_tier' => 1,
+        ]);
+        $guessService = app(GuessService::class);
+
+        $playAndFinishOneRound = function () use ($room, $guessService) {
+            app(RoundService::class)->start($room->fresh());
+            $player = $room->players()->firstOrCreate(
+                ['nickname' => 'Alice'],
+                ['connection_token' => RoomPlayer::generateConnectionToken()],
+            );
+            $round = $room->fresh()->rounds()->where('status', 'playing')->firstOrFail();
+            $guessService->submit($round, $player, $round->song->title);
+        };
+
+        $playAndFinishOneRound();
+        $this->assertSame('finished', $room->fresh()->status->value);
+
+        $this->getJson("/api/rooms/{$room->code}/song-history")
+            ->assertOk()
+            ->assertJsonCount(1, 'rounds');
+
+        $this->actingAs($host)->postJson("/api/rooms/{$room->code}/redo")->assertOk();
+        $playAndFinishOneRound();
+
+        // Still just the one song from the game that just finished - not the
+        // two-game running total the old behaviour accumulated.
+        $this->getJson("/api/rooms/{$room->code}/song-history")
+            ->assertOk()
+            ->assertJsonCount(1, 'rounds');
     }
 }

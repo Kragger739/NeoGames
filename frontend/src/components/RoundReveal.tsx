@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import confetti from "canvas-confetti";
-import { Users } from "lucide-react";
+import { SkipForward, Users } from "lucide-react";
 
 import { MAX_SNIPPET_SECONDS } from "../lib/snippetStages";
 import { playSound } from "../lib/sounds";
@@ -12,6 +12,11 @@ interface RoundRevealProps {
   audioUrl: string | null;
   roundId: number | null;
   volume: number;
+  // Skip-the-reveal vote (multiplayer only; hidden in solo / daily).
+  canSkip: boolean;
+  skipVotes: number;
+  skipEligible: number;
+  onSkip: () => void;
 }
 
 const CONFETTI_COLORS = ["#FF5C7A", "#17C3B2", "#FFC93C", "#8B5CF6", "#FF6FB5"];
@@ -39,8 +44,23 @@ function formatPlayerLabel(nickname: string, level: number | null | undefined): 
  * only the outcome line differs (survivors/eliminated lists instead of a
  * single winner).
  */
-export function RoundReveal({ outcome, audioUrl, roundId, volume }: RoundRevealProps) {
+export function RoundReveal({
+  outcome,
+  audioUrl,
+  roundId,
+  volume,
+  canSkip,
+  skipVotes,
+  skipEligible,
+  onSkip,
+}: RoundRevealProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [voted, setVoted] = useState(false);
+
+  // A fresh reveal (new round) re-arms the skip button.
+  useEffect(() => {
+    setVoted(false);
+  }, [roundId]);
 
   // "Positive" drives the green-glow/confetti vs. red-flash/shake
   // treatment: a Classic/Solo win, or a Battle Royale round where at
@@ -68,18 +88,10 @@ export function RoundReveal({ outcome, audioUrl, roundId, volume }: RoundRevealP
       audio.pause();
     }, MAX_SNIPPET_SECONDS * 1000);
 
-    let confettiTimer: ReturnType<typeof setInterval> | undefined;
-
     if (isPositive) {
-      const burst = () => {
-        confetti({ particleCount: 90, spread: 70, origin: { x: 0.2, y: 0.7 }, colors: CONFETTI_COLORS });
-        confetti({ particleCount: 90, spread: 70, origin: { x: 0.8, y: 0.7 }, colors: CONFETTI_COLORS });
-      };
-      burst();
-      // Keeps bursting for as long as this reveal card is on screen (the
-      // backend's REVEAL_DELAY_SECONDS window, ~18s) instead of a single
-      // burst that fizzles out long before the next round starts.
-      confettiTimer = setInterval(burst, 2500);
+      // A single burst when the reveal appears - no repeating loop.
+      confetti({ particleCount: 90, spread: 70, origin: { x: 0.2, y: 0.7 }, colors: CONFETTI_COLORS });
+      confetti({ particleCount: 90, spread: 70, origin: { x: 0.8, y: 0.7 }, colors: CONFETTI_COLORS });
       playSound("win");
     } else {
       playSound("fail");
@@ -87,7 +99,6 @@ export function RoundReveal({ outcome, audioUrl, roundId, volume }: RoundRevealP
 
     return () => {
       clearTimeout(stopTimer);
-      clearInterval(confettiTimer);
       audio.pause();
     };
     // Re-runs only when a new round's reveal starts, not on every prop
@@ -166,6 +177,21 @@ export function RoundReveal({ outcome, audioUrl, roundId, volume }: RoundRevealP
               </p>
             )}
           </>
+        )}
+        {canSkip && (
+          <button
+            type="button"
+            className="round-reveal-skip"
+            onClick={() => {
+              setVoted(true);
+              onSkip();
+            }}
+            disabled={voted}
+          >
+            <SkipForward size={16} strokeWidth={2.5} />
+            {voted ? "Skipping" : "Skip reveal"}
+            {skipVotes > 0 && ` (${skipVotes}/${skipEligible})`}
+          </button>
         )}
         {roundId !== null && <p className="round-reveal-debug-id">Round #{roundId}</p>}
       </div>

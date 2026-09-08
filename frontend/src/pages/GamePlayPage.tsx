@@ -34,9 +34,11 @@ export function GamePlayPage() {
   const totalRounds = useGameStore((state) => state.totalRounds);
   const outcome = useGameStore((state) => state.outcome);
   const missedNotices = useGameStore((state) => state.missedNotices);
+  const revealSkip = useGameStore((state) => state.revealSkip);
   const players = useGameStore((state) => state.players);
   const guessTimeoutSeconds = useGameStore((state) => state.guessTimeoutSeconds);
   const playerMode = useGameStore((state) => state.playerMode);
+  const dailyChallengeId = useGameStore((state) => state.dailyChallengeId);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fillRef = useRef<HTMLDivElement | null>(null);
@@ -172,6 +174,13 @@ export function GamePlayPage() {
     setMuted(next);
   }
 
+  function skipReveal() {
+    if (!round) return;
+    // Fire-and-forget: the server no-ops a stale/duplicate vote, and the
+    // reveal closes for everyone via the .round.started broadcast.
+    void api.post(`/api/rounds/${round.round_id}/skip-reveal`).catch(() => {});
+  }
+
   async function submitGuess(guess: string) {
     if (!round || !guess.trim()) return;
     setError(null);
@@ -294,6 +303,12 @@ export function GamePlayPage() {
               audioUrl={round?.audio_url ?? null}
               roundId={round?.round_id ?? null}
               volume={volume}
+              canSkip={isPlayer && playerMode !== "solo" && dailyChallengeId == null}
+              skipVotes={revealSkip?.votesCast ?? 0}
+              skipEligible={
+                revealSkip?.eligible ?? players.filter((p) => !p.is_eliminated).length
+              }
+              onSkip={skipReveal}
             />
           )}
 

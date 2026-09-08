@@ -2,10 +2,9 @@
 
 namespace Tests\Feature\Daily;
 
+use App\Jobs\AdvanceAfterReveal;
 use App\Jobs\AdvanceRoundStage;
 use App\Jobs\ExpandSongPool;
-use App\Jobs\FinishGame;
-use App\Jobs\StartNextRound;
 use App\Models\GameRoom;
 use App\Models\Song;
 use App\Models\UnlockRequirement;
@@ -24,7 +23,7 @@ class DailyStartTest extends TestCase
     {
         parent::setUp();
 
-        Queue::fake([AdvanceRoundStage::class, ExpandSongPool::class, StartNextRound::class, FinishGame::class]);
+        Queue::fake([AdvanceRoundStage::class, ExpandSongPool::class, AdvanceAfterReveal::class]);
         $this->fakeDeezerTrackRefresh();
     }
 
