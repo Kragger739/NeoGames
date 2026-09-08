@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Hammer, ShieldCheck, Trophy, UserRound, Users2 } from "lucide-react";
+import { Hammer, ShieldCheck, ShoppingBag, Trophy, UserRound, Users2 } from "lucide-react";
 
 import { PLAYABLE_GAMES, LOCKED_GAMES } from "../lib/games";
 import { useAuthStore } from "../stores/authStore";
@@ -19,14 +19,17 @@ export function HomePage() {
   const connectFriendNotifications = useFriendsStore((state) => state.connectNotifications);
   const pendingRequestCount = useFriendsStore((state) => state.incomingRequests.length);
 
+  const isGuest = !!host?.is_guest;
+  const hasAccount = !!host && !isGuest;
+
   useEffect(() => {
+    // Friends endpoints 401/403 for anonymous visitors and guests.
+    if (!hasAccount) return;
     if (friendsStatus === "idle") {
       void fetchFriends();
     }
-    // Makes the badge below live without ever having visited /friends -
-    // same notification the Friends page itself listens for.
     connectFriendNotifications();
-  }, [friendsStatus, fetchFriends, connectFriendNotifications]);
+  }, [hasAccount, friendsStatus, fetchFriends, connectFriendNotifications]);
 
   async function handleLogout() {
     await logout();
@@ -35,11 +38,12 @@ export function HomePage() {
 
   return (
     <div className="home-page">
-      <h1>Hey, {host?.name}!</h1>
-      {host && <Avatar data={host.avatar} size="sm" />}
-      {host && (
+      <h1>Hey, {host && !isGuest ? host.name : "there"}!</h1>
+      {host && !isGuest && <Avatar data={host.avatar} size="sm" />}
+      {hasAccount && (
         <p className="hint">
-          <Badge tone="grape">Lvl {host.level}</Badge> {host.xp} XP
+          <Badge tone="grape">Lvl {host!.level}</Badge> {host!.xp} XP ·{" "}
+          <Badge tone="turquoise">◈ {host!.neo_coins}</Badge>
         </p>
       )}
 
@@ -70,34 +74,55 @@ export function HomePage() {
         })}
       </div>
 
-      <nav>
-        <Link to="/profile">
-          <UserRound size={16} strokeWidth={2.25} />
-          Profile
-        </Link>
-        <Link to="/leaderboard">
-          <Trophy size={16} strokeWidth={2.25} />
-          Leaderboard
-        </Link>
-        <Link to="/workshop">
-          <Hammer size={16} strokeWidth={2.25} />
-          Workshop
-        </Link>
-        <Link to="/friends">
-          <Users2 size={16} strokeWidth={2.25} />
-          Friends
-          {pendingRequestCount > 0 && <Badge tone="coral">{pendingRequestCount}</Badge>}
-        </Link>
-        {host?.is_admin && (
-          <Link to="/admin">
-            <ShieldCheck size={16} strokeWidth={2.25} />
-            Admin
-          </Link>
-        )}
-      </nav>
-      <Button variant="ghost" onClick={handleLogout}>
-        Log out
-      </Button>
+      {hasAccount ? (
+        <>
+          <nav>
+            <Link to="/profile">
+              <UserRound size={16} strokeWidth={2.25} />
+              Profile
+            </Link>
+            <Link to="/shop">
+              <ShoppingBag size={16} strokeWidth={2.25} />
+              Shop
+            </Link>
+            <Link to="/leaderboard">
+              <Trophy size={16} strokeWidth={2.25} />
+              Leaderboard
+            </Link>
+            <Link to="/workshop">
+              <Hammer size={16} strokeWidth={2.25} />
+              Workshop
+            </Link>
+            <Link to="/friends">
+              <Users2 size={16} strokeWidth={2.25} />
+              Friends
+              {pendingRequestCount > 0 && <Badge tone="coral">{pendingRequestCount}</Badge>}
+            </Link>
+            {host?.is_admin && (
+              <Link to="/admin">
+                <ShieldCheck size={16} strokeWidth={2.25} />
+                Admin
+              </Link>
+            )}
+          </nav>
+          <Button variant="ghost" onClick={handleLogout}>
+            Log out
+          </Button>
+        </>
+      ) : (
+        <>
+          <p className="hint">
+            The Daily and Der Dümmste fliegt are open to everyone. Create a free account to
+            keep your progress, host game nights, unlock artists and more.
+          </p>
+          <Button variant="primary" onClick={() => navigate("/register")}>
+            Create a free account
+          </Button>
+          <p className="hint">
+            Already have one? <Link to="/login">Log in</Link>
+          </p>
+        </>
+      )}
     </div>
   );
 }

@@ -30,6 +30,11 @@ class GameRoomController extends Controller
 {
     public function store(StoreGameRoomRequest $request)
     {
+        // A guest has no account to attach a game night to. (The route's
+        // `not-guest` middleware already blocks this; the explicit check keeps
+        // the guarantee independent of route config.)
+        abort_if($request->user()->is_guest, 403, 'Create a free account to host a game night.');
+
         // Hosting a game night is level-gated (Daily is the always-open path
         // for a brand-new account). The genre/mode gates are validation
         // rules on the request; this one guards room creation itself.

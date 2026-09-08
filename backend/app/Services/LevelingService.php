@@ -19,6 +19,7 @@ class LevelingService
 {
     public function __construct(
         private SeasonService $seasons,
+        private NeoCoinService $neoCoins,
     ) {}
 
     /**
@@ -33,6 +34,7 @@ class LevelingService
     public function awardForGameFinish(Round $finalRound): void
     {
         $placements = $finalRound->room->players()
+            ->with('user:id,is_guest')
             ->orderByDesc('score')
             ->orderBy('id')
             ->get(['id', 'user_id']);
@@ -43,7 +45,10 @@ class LevelingService
 
         DB::transaction(function () use ($finalRound, $placements) {
             foreach ($placements as $place => $player) {
-                if ($player->user_id === null) {
+                // Anonymous players and guests still occupy a placement slot
+                // (so a linked player ranks behind them correctly) but never
+                // earn XP / season XP / NeoCoins - guests have no account.
+                if ($player->user_id === null || $player->user?->is_guest) {
                     continue;
                 }
 
@@ -87,10 +92,45 @@ class LevelingService
             return;
         }
 
+        // Capture xp BEFORE the increment so the pre/post level boundary is
+        // exact.
+        $oldXp = (int) User::where('id', $userId)->value('xp');
+
         User::where('id', $userId)->increment('xp', $amount);
 
         // Season XP rides the same placement amounts and the same one-shot
         // guard above, so it can never be double-counted for a finished game.
         $this->seasons->awardSeasonXp($userId, $amount);
+
+        $this->creditLevelUpCoins($userId, $oldXp, $oldXp + $amount);
+    }
+
+    /**
+     * Credit NeoCoins for every level boundary the user's xp just crossed.
+     * Guarded by neo_coin_events.UNIQUE(user_id, dedup_key) via
+     * NeoCoinService::creditOnce(), on top of award()'s own once-per-round
+     * XpEvent guard - a replay can never double-pay.
+     */
+    private function creditLevelUpCoins(int $userId, int $oldXp, int $newXp): void
+    {
+        $fromLevel = $this->levelForXp($oldXp);
+        $toLevel = $this->levelForXp($newXp);
+
+        if ($toLevel <= $fromLevel) {
+            return;
+        }
+
+        $user = User::find($userId);
+        $perLevel = (int) config('neocoins.per_level');
+
+        for ($level = $fromLevel + 1; $level <= $toLevel; $level++) {
+            $this->neoCoins->creditOnce(
+                $user,
+                $perLevel,
+                'level_up',
+                "level_up:{$userId}:{$level}",
+                ['level' => $level],
+            );
+        }
     }
 }

@@ -40,9 +40,28 @@ class IconicArtistStartTest extends TestCase
             ->assertJsonPath('1.name', 'Bee');
     }
 
-    public function test_the_carousel_requires_authentication(): void
+    public function test_the_carousel_is_open_to_guests(): void
     {
-        $this->getJson('/api/iconic-artists')->assertUnauthorized();
+        IconicArtist::factory()->create(['name' => 'Free Act', 'price' => 0]);
+
+        // guest-ok: an unauthenticated hit mints a hidden guest user and
+        // returns the free-artist carousel. Picking one still needs an
+        // account (covered in GuestAccessTest).
+        $this->getJson('/api/iconic-artists')
+            ->assertOk()
+            ->assertJsonCount(1);
+
+        $this->assertDatabaseHas('users', ['is_guest' => true]);
+    }
+
+    public function test_a_priced_artist_the_user_does_not_own_cannot_be_started(): void
+    {
+        $artist = IconicArtist::factory()->create(['price' => 500]);
+
+        $this->actingAs(User::factory()->create())
+            ->postJson("/api/iconic-artists/{$artist->id}/start")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('iconic');
     }
 
     public function test_starting_creates_an_artist_room_left_in_the_lobby(): void
@@ -94,15 +113,16 @@ class IconicArtistStartTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_it_respects_the_iconic_series_unlock_level(): void
+    public function test_a_free_artist_ignores_the_legacy_iconic_series_level_gate(): void
     {
+        // The old iconic_series UnlockRequirement is retired - gating is now
+        // NeoCoins-only (price), so a level-1 account can play any free act.
         UnlockRequirement::updateOrCreate(['key' => 'iconic_series'], ['required_level' => 50]);
-        $artist = IconicArtist::factory()->create();
+        $artist = IconicArtist::factory()->create(['price' => 0]);
 
         $this->actingAs(User::factory()->create(['xp' => 0]))     // level 1
             ->postJson("/api/iconic-artists/{$artist->id}/start")
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('iconic');
+            ->assertCreated();
     }
 
     public function test_the_room_payload_carries_the_iconic_artist(): void

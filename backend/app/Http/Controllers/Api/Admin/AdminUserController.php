@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\AdminUpdateUserRequest;
 use App\Models\Season;
 use App\Models\SeasonProgress;
 use App\Models\User;
+use App\Services\NeoCoinService;
 use App\Services\SeasonService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -115,10 +116,28 @@ class AdminUserController extends Controller
 
     public function resetXp(User $user)
     {
-        $user->forceFill(['xp' => 0])->save();
+        $user->forceFill(['xp' => 0, 'neo_coins' => 0])->save();
         $user->seasonProgress()->delete();
+        // Purge the ledger too - otherwise the level_up:{id}:{lvl} dedup keys
+        // survive and re-levelling would never re-credit those coins.
+        $user->neoCoinEvents()->delete();
 
         return response()->json($this->toAdminArray($user));
+    }
+
+    /**
+     * Manually grant or deduct NeoCoins. `delta` is signed; the balance is
+     * clamped at 0. Writes an `admin_grant` ledger row (NeoCoinService).
+     */
+    public function adjustNeoCoins(Request $request, User $user, NeoCoinService $coins)
+    {
+        $delta = (int) $request->validate([
+            'delta' => ['required', 'integer', 'between:-100000,100000', 'not_in:0'],
+        ])['delta'];
+
+        $coins->adminAdjust($user, $delta, $request->user()->id);
+
+        return response()->json($this->toAdminArray($user->fresh()));
     }
 
     /**
@@ -165,6 +184,7 @@ class AdminUserController extends Controller
             'provider' => $user->provider,
             'xp' => (int) ($user->xp ?? 0),
             'level' => $user->level,
+            'neo_coins' => (int) ($user->neo_coins ?? 0),
             'is_admin' => (bool) $user->is_admin,
             'banned_at' => $user->banned_at?->toIso8601String(),
             'ban_reason' => $user->ban_reason,

@@ -11,7 +11,6 @@ use App\Http\Controllers\Controller;
 use App\Models\GameRoom;
 use App\Models\IconicArtist;
 use App\Models\RoomPlayer;
-use App\Models\UnlockRequirement;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -23,12 +22,21 @@ use Illuminate\Validation\ValidationException;
  */
 class IconicArtistController extends Controller
 {
-    /** GET /api/iconic-artists - the landing-page carousel. */
-    public function index()
+    /**
+     * GET /api/iconic-artists - the landing-page carousel. Only free artists
+     * (price = 0) and ones this user has unlocked in the Shop appear here;
+     * priced-but-unowned acts are discoverable on the Shop page. Reachable by
+     * a guest (guest-ok group) - a guest owns nothing, so they see only the
+     * free ones, and picking any still needs an account (start() below).
+     */
+    public function index(Request $request)
     {
+        $ownedIds = $request->user()?->iconicArtists()->pluck('iconic_artists.id')->all() ?? [];
+
         return response()->json(
             IconicArtist::query()
                 ->where('enabled', true)
+                ->where(fn ($q) => $q->where('price', 0)->orWhereIn('id', $ownedIds))
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get()
@@ -47,12 +55,16 @@ class IconicArtistController extends Controller
         // should read as "gone", not silently create a room.
         abort_unless($iconicArtist->enabled, 404);
 
-        $required = UnlockRequirement::levelFor('iconic_series');
-        $hostLevel = (int) ($request->user()->level ?? 1);
+        // The iconic series is an account feature (the route's `not-guest`
+        // gate already enforces this; explicit here too).
+        abort_if($request->user()->is_guest, 403, 'Create a free account to play the Iconic Artist series.');
 
-        if ($hostLevel < $required) {
+        // Priced acts must be unlocked in the Shop first; free acts (price 0)
+        // are open to any account.
+        if ($iconicArtist->price > 0
+            && ! $request->user()->iconicArtists()->whereKey($iconicArtist->id)->exists()) {
             throw ValidationException::withMessages([
-                'iconic' => ["The Iconic Artist series unlocks at level {$required} (you're level {$hostLevel})."],
+                'iconic' => ['Unlock this artist in the Shop first.'],
             ]);
         }
 

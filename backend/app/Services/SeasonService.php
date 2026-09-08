@@ -5,6 +5,9 @@ namespace App\Services;
 use App\Models\Cosmetic;
 use App\Models\Season;
 use App\Models\SeasonProgress;
+use App\Models\SeasonTier;
+use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -21,6 +24,10 @@ use Illuminate\Support\Facades\DB;
  */
 class SeasonService
 {
+    public function __construct(
+        private NeoCoinService $neoCoins,
+    ) {}
+
     /**
      * Add season XP for one user and grant any tier rewards they just crossed.
      * No-op when no season is active. Called once per linked player from
@@ -64,12 +71,24 @@ class SeasonService
 
         $progress->update(['has_pass' => true]);
 
-        $premiumIds = $season->tiers()
+        $reachedTiers = $season->tiers()
             ->where('tier', '<=', $progress->current_tier)
-            ->whereNotNull('premium_cosmetic_id')
-            ->pluck('premium_cosmetic_id');
+            ->get();
 
-        $this->grantCosmetics($userId, $premiumIds->all(), 'pass');
+        $this->grantCosmetics(
+            $userId,
+            $reachedTiers->pluck('premium_cosmetic_id')->filter()->all(),
+            'pass',
+        );
+
+        // Back-fill premium coins + premium iconic-artist unlocks for tiers
+        // already reached. creditOnce keys these by "bp:{season}:{tier}:premium",
+        // so toggling the pass off and on never double-pays.
+        $user = User::find($userId);
+
+        foreach ($reachedTiers as $tier) {
+            $this->grantPremiumTierExtras($user, $season, $tier);
+        }
     }
 
     /**
@@ -108,12 +127,85 @@ class SeasonService
             $this->grantCosmetics($progress->user_id, $premium, 'pass');
         }
 
+        $this->grantTierExtras($progress, $season, $crossed);
+
         $progress->update(['current_tier' => $reachedTier]);
+    }
+
+    /**
+     * NeoCoins + iconic-artist unlocks for the tiers just crossed - the free
+     * track always, the premium track only when the user owns the pass. All
+     * idempotent (creditOnce dedup keys / insertOrIgnore), so re-entry from a
+     * replayed game finish is harmless.
+     *
+     * @param  Collection<int, SeasonTier>  $crossed
+     */
+    private function grantTierExtras(SeasonProgress $progress, Season $season, Collection $crossed): void
+    {
+        if ($crossed->isEmpty()) {
+            return;
+        }
+
+        $user = User::find($progress->user_id);
+
+        foreach ($crossed as $tier) {
+            $this->grantFreeTierExtras($user, $season, $tier);
+
+            if ($progress->has_pass) {
+                $this->grantPremiumTierExtras($user, $season, $tier);
+            }
+        }
+    }
+
+    private function grantFreeTierExtras(User $user, Season $season, SeasonTier $tier): void
+    {
+        if ((int) $tier->free_coins > 0) {
+            $this->neoCoins->creditOnce(
+                $user,
+                (int) $tier->free_coins,
+                'battlepass',
+                "bp:{$season->id}:{$tier->tier}:free",
+                ['season_id' => $season->id, 'tier' => $tier->tier, 'track' => 'free'],
+            );
+        }
+
+        if ($tier->free_iconic_artist_id !== null) {
+            $this->grantIconicArtist($user->id, (int) $tier->free_iconic_artist_id);
+        }
+    }
+
+    private function grantPremiumTierExtras(User $user, Season $season, SeasonTier $tier): void
+    {
+        if ((int) $tier->premium_coins > 0) {
+            $this->neoCoins->creditOnce(
+                $user,
+                (int) $tier->premium_coins,
+                'battlepass',
+                "bp:{$season->id}:{$tier->tier}:premium",
+                ['season_id' => $season->id, 'tier' => $tier->tier, 'track' => 'premium'],
+            );
+        }
+
+        if ($tier->premium_iconic_artist_id !== null) {
+            $this->grantIconicArtist($user->id, (int) $tier->premium_iconic_artist_id);
+        }
+    }
+
+    private function grantIconicArtist(int $userId, int $iconicArtistId): void
+    {
+        DB::table('iconic_artist_user')->insertOrIgnore([
+            'user_id' => $userId,
+            'iconic_artist_id' => $iconicArtistId,
+            'source' => 'battlepass',
+            'acquired_at' => now(),
+        ]);
     }
 
     /**
      * Pre-season_tiers behaviour: thresholds from config, one reward per tier
      * pulled from the cosmetics table by (season_id, source='track', tier).
+     * Cosmetic-only - NeoCoin / iconic-artist tier rewards need a real
+     * season_tiers row and so never apply on the legacy path.
      */
     private function syncTierUnlocksLegacy(SeasonProgress $progress, Season $season): void
     {

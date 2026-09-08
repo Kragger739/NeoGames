@@ -21,11 +21,22 @@ export function AdminUserDetailPage() {
   const navigate = useNavigate();
 
   const host = useAuthStore((state) => state.host);
-  const { selected, selectedStatus, fetchUser, updateUser, deleteUser, banUser, unbanUser, resetXp, setSeasonPass } =
-    useAdminStore();
+  const {
+    selected,
+    selectedStatus,
+    fetchUser,
+    updateUser,
+    deleteUser,
+    banUser,
+    unbanUser,
+    resetXp,
+    setSeasonPass,
+    adjustNeoCoins,
+  } = useAdminStore();
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [banReason, setBanReason] = useState("");
+  const [coinAmount, setCoinAmount] = useState(100);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -107,7 +118,8 @@ export function AdminUserDetailPage() {
       <AdminNav />
       <h1>{user.username ?? user.name}</h1>
       <p className="hint">
-        Joined {user.created_at?.slice(0, 10) ?? "—"} · Level {user.level} · {user.xp} XP
+        Joined {user.created_at?.slice(0, 10) ?? "—"} · Level {user.level} · {user.xp} XP · ◈{" "}
+        {user.neo_coins} NeoCoins
         {user.provider ? ` · ${user.provider} account` : ""}
       </p>
 
@@ -229,6 +241,29 @@ export function AdminUserDetailPage() {
             }
           >
             {user.season_pass ? "Revoke season pass" : "Grant season pass"}
+          </Button>
+        </div>
+
+        <div className="admin-ban-box">
+          <input
+            type="number"
+            min={1}
+            value={coinAmount}
+            onChange={(e) => setCoinAmount(Math.max(1, Number(e.target.value)))}
+          />
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() => void run(() => adjustNeoCoins(user.id, coinAmount), "NeoCoins granted.")}
+          >
+            Grant ◈
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() => void run(() => adjustNeoCoins(user.id, -coinAmount), "NeoCoins deducted.")}
+          >
+            Deduct ◈
           </Button>
         </div>
 

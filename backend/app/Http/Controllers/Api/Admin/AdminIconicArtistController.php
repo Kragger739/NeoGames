@@ -35,6 +35,7 @@ class AdminIconicArtistController extends Controller
             // ("0"/"false"), which the model's boolean cast would misread.
             'enabled' => $request->boolean('enabled', true),
             'sort_order' => $request->integer('sort_order', 0),
+            'price' => $request->integer('price', 0),
         ]);
 
         if ($request->hasFile('image')) {
@@ -56,6 +57,7 @@ class AdminIconicArtistController extends Controller
             'name' => $data['name'],
             'enabled' => $request->boolean('enabled', $iconicArtist->enabled),
             'sort_order' => $request->integer('sort_order', $iconicArtist->sort_order),
+            'price' => $request->integer('price', $iconicArtist->price),
         ]);
 
         if ($request->hasFile('image')) {
@@ -107,6 +109,7 @@ class AdminIconicArtistController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'enabled' => ['sometimes', 'boolean'],
             'sort_order' => ['sometimes', 'integer', 'min:0', 'max:9999'],
+            'price' => ['sometimes', 'integer', 'min:0', 'max:1000000'],
             'image' => ['nullable', 'image', 'mimes:png,webp,jpg,jpeg', 'max:4096'],
         ]);
     }
@@ -126,6 +129,7 @@ class AdminIconicArtistController extends Controller
             'image_url' => $artist->image_url,
             'enabled' => (bool) $artist->enabled,
             'sort_order' => $artist->sort_order,
+            'price' => (int) $artist->price,
             'pool_size' => $artist->poolCount(),
             'fetch_status' => $artist->fetch_status,
             'fetch_total' => $artist->fetched_total,

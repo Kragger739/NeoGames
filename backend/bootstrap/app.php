@@ -1,5 +1,9 @@
 <?php
 
+use App\Http\Middleware\EnsureGuestOrUser;
+use App\Http\Middleware\EnsureNotGuest;
+use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Http\Middleware\EnsureUserNotBanned;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -45,8 +49,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Route-level guards. Task 8 extends this same array.
         $middleware->alias([
-            'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
-            'not-banned' => \App\Http\Middleware\EnsureUserNotBanned::class,
+            'admin' => EnsureUserIsAdmin::class,
+            'not-banned' => EnsureUserNotBanned::class,
+            'guest-ok' => EnsureGuestOrUser::class,
+            'not-guest' => EnsureNotGuest::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

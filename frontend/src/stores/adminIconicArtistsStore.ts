@@ -11,6 +11,7 @@ export interface AdminIconicArtist {
   image_url: string | null;
   enabled: boolean;
   sort_order: number;
+  price: number;
   pool_size: number;
   fetch_status: IconicFetchStatus;
   fetch_total: number;

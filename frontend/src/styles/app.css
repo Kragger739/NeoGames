@@ -1811,6 +1811,26 @@ button:disabled {
   vertical-align: top;
 }
 
+.guest-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 14px;
+  padding: 10px 16px;
+  background: var(--grape-wash);
+  border-bottom: 1px solid var(--surface-sunk);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.guest-banner a {
+  color: var(--grape);
+  font-weight: 700;
+}
+
 .site-footer {
   border-top: 1px solid var(--surface-sunk);
   margin-top: 48px;

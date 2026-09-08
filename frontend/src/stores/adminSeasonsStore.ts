@@ -8,6 +8,15 @@ export interface SeasonTierRow {
   xp_threshold: number;
   free_cosmetic_id: number | null;
   premium_cosmetic_id: number | null;
+  free_coins: number;
+  premium_coins: number;
+  free_iconic_artist_id: number | null;
+  premium_iconic_artist_id: number | null;
+}
+
+export interface IconicArtistOption {
+  id: number;
+  name: string;
 }
 
 export interface SeasonRow {
@@ -45,6 +54,7 @@ interface CreateSeasonPayload {
 interface AdminSeasonsState {
   seasons: SeasonRow[];
   cosmetics: CosmeticLibItem[];
+  iconicArtists: IconicArtistOption[];
   slots: string[];
   rarities: string[];
   sources: string[];
@@ -63,7 +73,9 @@ interface AdminSeasonsState {
 export const useAdminSeasonsStore = create<AdminSeasonsState>((set, get) => {
   async function reload() {
     const [seasons, cosmetics] = await Promise.all([
-      api.get<{ seasons: SeasonRow[]; slots: string[] }>("/api/admin/seasons"),
+      api.get<{ seasons: SeasonRow[]; slots: string[]; iconic_artists: IconicArtistOption[] }>(
+        "/api/admin/seasons",
+      ),
       api.get<{ cosmetics: CosmeticLibItem[]; slots: string[]; rarities: string[]; sources: string[] }>(
         "/api/admin/cosmetics",
       ),
@@ -71,6 +83,7 @@ export const useAdminSeasonsStore = create<AdminSeasonsState>((set, get) => {
     set({
       seasons: seasons.data.seasons,
       cosmetics: cosmetics.data.cosmetics,
+      iconicArtists: seasons.data.iconic_artists ?? [],
       slots: cosmetics.data.slots,
       rarities: cosmetics.data.rarities,
       sources: cosmetics.data.sources,
@@ -92,6 +105,7 @@ export const useAdminSeasonsStore = create<AdminSeasonsState>((set, get) => {
   return {
     seasons: [],
     cosmetics: [],
+    iconicArtists: [],
     slots: [],
     rarities: [],
     sources: [],
@@ -117,6 +131,10 @@ export const useAdminSeasonsStore = create<AdminSeasonsState>((set, get) => {
             xp_threshold: t.xp_threshold,
             free_cosmetic_id: t.free_cosmetic_id,
             premium_cosmetic_id: t.premium_cosmetic_id,
+            free_coins: t.free_coins,
+            premium_coins: t.premium_coins,
+            free_iconic_artist_id: t.free_iconic_artist_id,
+            premium_iconic_artist_id: t.premium_iconic_artist_id,
           })),
         }),
       ),

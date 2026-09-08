@@ -1,7 +1,9 @@
 import { Route, Routes } from "react-router-dom";
 
+import { GuestBanner } from "./components/GuestBanner";
 import { RequireAdmin } from "./components/RequireAdmin";
 import { RequireHost } from "./components/RequireHost";
+import { RequireIdentity } from "./components/RequireIdentity";
 import { RoomInviteToast } from "./components/RoomInviteToast";
 import { SiteFooter } from "./components/SiteFooter";
 import { AdminIconicArtistsPage } from "./pages/AdminIconicArtistsPage";
@@ -26,6 +28,7 @@ import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { LobbyPage } from "./pages/LobbyPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ResultsPage } from "./pages/ResultsPage";
+import { ShopPage } from "./pages/ShopPage";
 import { SonglePage } from "./pages/SonglePage";
 import { WorkshopPage } from "./pages/WorkshopPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
@@ -45,13 +48,14 @@ function App() {
   return (
     <>
       <RoomInviteToast />
+      <GuestBanner />
       <Routes>
         <Route
           path="/"
           element={
-            <RequireHost>
+            <RequireIdentity>
               <HomePage />
-            </RequireHost>
+            </RequireIdentity>
           }
         />
         <Route path="/login" element={<LoginPage />} />
@@ -69,8 +73,16 @@ function App() {
         <Route
           path="/songle"
           element={
-            <RequireHost>
+            <RequireIdentity>
               <SonglePage />
+            </RequireIdentity>
+          }
+        />
+        <Route
+          path="/shop"
+          element={
+            <RequireHost>
+              <ShopPage />
             </RequireHost>
           }
         />
@@ -194,18 +206,18 @@ function App() {
         <Route
           path="/ddf"
           element={
-            <RequireHost>
+            <RequireIdentity>
               <DdfLandingPage />
-            </RequireHost>
+            </RequireIdentity>
           }
         />
         <Route path="/ddf-rooms/:code/lobby" element={<DdfLobbyPage />} />
         <Route
           path="/ddf-rooms/:code/gm"
           element={
-            <RequireHost>
+            <RequireIdentity>
               <DdfGmPanelPage />
-            </RequireHost>
+            </RequireIdentity>
           }
         />
         <Route path="/ddf-rooms/:code/play" element={<DdfPlayOverlayPage />} />

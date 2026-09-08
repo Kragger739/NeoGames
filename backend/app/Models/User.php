@@ -43,6 +43,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'xp' => 'integer',
+            'neo_coins' => 'integer',
+            'is_guest' => 'boolean',
             'equipped_cosmetics' => 'array',
             'is_admin' => 'boolean',
             'banned_at' => 'datetime',
@@ -194,6 +196,19 @@ class User extends Authenticatable implements MustVerifyEmail
     public function seasonProgress(): HasMany
     {
         return $this->hasMany(SeasonProgress::class);
+    }
+
+    /** Append-only NeoCoins ledger; users.neo_coins is the running total. */
+    public function neoCoinEvents(): HasMany
+    {
+        return $this->hasMany(NeoCoinEvent::class);
+    }
+
+    /** Priced iconic artists this user has unlocked (Shop or battle pass). */
+    public function iconicArtists(): BelongsToMany
+    {
+        return $this->belongsToMany(IconicArtist::class, 'iconic_artist_user')
+            ->withPivot('source', 'acquired_at');
     }
 
     /**

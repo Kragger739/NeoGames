@@ -283,3 +283,18 @@
   margin: 0;
   font-size: 11px;
 }
+
+/* Coin / iconic-artist tier rewards, shown under the cosmetic thumbs. */
+.cos-tier-extra {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.cos-tier-extra.cos-tier-premium {
+  outline: none;
+  color: var(--sun, #ffc93c);
+}

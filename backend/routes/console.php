@@ -13,3 +13,6 @@ Artisan::command('inspire', function () {
 // playlist changes, not keeping links alive. Runs long (throttled iTunes
 // lookups) - overlap guard + background.
 Schedule::command('songs:sync')->weeklyOn(1, '04:00')->withoutOverlapping()->runInBackground();
+
+// Sweep away guest users that never came back (see PruneGuestUsersCommand).
+Schedule::command('guests:prune')->dailyAt('03:30')->withoutOverlapping();

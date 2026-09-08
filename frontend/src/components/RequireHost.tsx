@@ -20,6 +20,10 @@ export function RequireHost({ children }: PropsWithChildren) {
     return <Navigate to="/login" replace />;
   }
 
+  if (host.is_guest) {
+    return <Navigate to="/register" replace />;
+  }
+
   if (!host.email_verified) {
     return <Navigate to="/verify-email" replace />;
   }

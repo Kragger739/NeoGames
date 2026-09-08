@@ -12,6 +12,7 @@ export interface AdminUser {
   provider: string | null;
   xp: number;
   level: number;
+  neo_coins: number;
   is_admin: boolean;
   banned_at: string | null;
   ban_reason: string | null;
@@ -52,6 +53,7 @@ interface AdminState {
   unbanUser: (id: number) => Promise<AdminUser>;
   resetXp: (id: number) => Promise<AdminUser>;
   setSeasonPass: (id: number, granted: boolean) => Promise<AdminUser>;
+  adjustNeoCoins: (id: number, delta: number) => Promise<AdminUser>;
 }
 
 interface ListResponse {
@@ -138,6 +140,15 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   setSeasonPass: async (id, granted) => {
     const response = await api.post<AdminUser>(`/api/admin/users/${id}/season-pass`, { granted });
+    set((state) => ({
+      selected: response.data,
+      users: state.users.map((u) => (u.id === id ? response.data : u)),
+    }));
+    return response.data;
+  },
+
+  adjustNeoCoins: async (id, delta) => {
+    const response = await api.post<AdminUser>(`/api/admin/users/${id}/neo-coins`, { delta });
     set((state) => ({
       selected: response.data,
       users: state.users.map((u) => (u.id === id ? response.data : u)),

@@ -7,6 +7,7 @@ use Database\Factories\IconicArtistFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -26,6 +27,7 @@ class IconicArtist extends Model
         'image_path',
         'enabled',
         'sort_order',
+        'price',
         'fetch_status',
         'fetched_total',
         'fetched_playable',
@@ -40,6 +42,7 @@ class IconicArtist extends Model
         return [
             'enabled' => 'boolean',
             'sort_order' => 'integer',
+            'price' => 'integer',
             'fetched_total' => 'integer',
             'fetched_playable' => 'integer',
             'fetched_at' => 'datetime',
@@ -50,6 +53,13 @@ class IconicArtist extends Model
     public function songs(): HasMany
     {
         return $this->hasMany(IconicArtistSong::class);
+    }
+
+    /** Users who have unlocked this artist (only meaningful when price > 0). */
+    public function owners(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'iconic_artist_user')
+            ->withPivot('source', 'acquired_at');
     }
 
     /**

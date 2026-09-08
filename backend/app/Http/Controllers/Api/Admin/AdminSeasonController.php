@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Enums\CosmeticSlot;
 use App\Http\Controllers\Controller;
 use App\Models\Cosmetic;
+use App\Models\IconicArtist;
 use App\Models\Season;
 use App\Models\SeasonTier;
 use Illuminate\Http\Request;
@@ -31,18 +32,16 @@ class AdminSeasonController extends Controller
             'is_current' => $current?->id === $s->id,
             'tier_count' => $s->tiers()->count(),
             'player_count' => $s->progress()->count(),
-            'tiers' => $s->tiers()->get()->map(fn (SeasonTier $t) => [
-                'tier' => $t->tier,
-                'xp_threshold' => $t->xp_threshold,
-                'free_cosmetic_id' => $t->free_cosmetic_id,
-                'premium_cosmetic_id' => $t->premium_cosmetic_id,
-            ]),
+            'tiers' => $s->tiers()->get()->map(fn (SeasonTier $t) => $this->tierRow($t)),
         ]);
 
         return response()->json([
             'seasons' => $seasons,
             'cosmetics' => Cosmetic::query()->orderBy('slot')->orderBy('name')->get()
                 ->map(fn (Cosmetic $c) => $this->cosmeticRow($c)),
+            'iconic_artists' => IconicArtist::query()->orderBy('sort_order')->orderBy('id')
+                ->get(['id', 'name'])
+                ->map(fn (IconicArtist $a) => ['id' => $a->id, 'name' => $a->name]),
             'slots' => CosmeticSlot::values(),
         ]);
     }
@@ -83,6 +82,10 @@ class AdminSeasonController extends Controller
                     'xp_threshold' => $t->xp_threshold,
                     'free_cosmetic_id' => $t->free_cosmetic_id,
                     'premium_cosmetic_id' => $t->premium_cosmetic_id,
+                    'free_coins' => $t->free_coins,
+                    'premium_coins' => $t->premium_coins,
+                    'free_iconic_artist_id' => $t->free_iconic_artist_id,
+                    'premium_iconic_artist_id' => $t->premium_iconic_artist_id,
                 ]);
             }
         }
@@ -127,6 +130,10 @@ class AdminSeasonController extends Controller
             'tiers.*.xp_threshold' => ['required', 'integer', 'min:1', 'max:1000000'],
             'tiers.*.free_cosmetic_id' => ['nullable', 'integer', 'exists:cosmetics,id'],
             'tiers.*.premium_cosmetic_id' => ['nullable', 'integer', 'exists:cosmetics,id'],
+            'tiers.*.free_coins' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+            'tiers.*.premium_coins' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+            'tiers.*.free_iconic_artist_id' => ['nullable', 'integer', 'exists:iconic_artists,id'],
+            'tiers.*.premium_iconic_artist_id' => ['nullable', 'integer', 'exists:iconic_artists,id'],
         ]);
 
         $rows = $data['tiers'];
@@ -149,6 +156,10 @@ class AdminSeasonController extends Controller
                 'xp_threshold' => $row['xp_threshold'],
                 'free_cosmetic_id' => $row['free_cosmetic_id'] ?? null,
                 'premium_cosmetic_id' => $row['premium_cosmetic_id'] ?? null,
+                'free_coins' => $row['free_coins'] ?? 0,
+                'premium_coins' => $row['premium_coins'] ?? 0,
+                'free_iconic_artist_id' => $row['free_iconic_artist_id'] ?? null,
+                'premium_iconic_artist_id' => $row['premium_iconic_artist_id'] ?? null,
             ]);
         }
 
@@ -185,12 +196,24 @@ class AdminSeasonController extends Controller
             'is_current' => $current?->id === $season->id,
             'tier_count' => $season->tiers()->count(),
             'player_count' => $season->progress()->count(),
-            'tiers' => $season->tiers()->get()->map(fn (SeasonTier $t) => [
-                'tier' => $t->tier,
-                'xp_threshold' => $t->xp_threshold,
-                'free_cosmetic_id' => $t->free_cosmetic_id,
-                'premium_cosmetic_id' => $t->premium_cosmetic_id,
-            ]),
+            'tiers' => $season->tiers()->get()->map(fn (SeasonTier $t) => $this->tierRow($t)),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function tierRow(SeasonTier $t): array
+    {
+        return [
+            'tier' => $t->tier,
+            'xp_threshold' => $t->xp_threshold,
+            'free_cosmetic_id' => $t->free_cosmetic_id,
+            'premium_cosmetic_id' => $t->premium_cosmetic_id,
+            'free_coins' => (int) $t->free_coins,
+            'premium_coins' => (int) $t->premium_coins,
+            'free_iconic_artist_id' => $t->free_iconic_artist_id,
+            'premium_iconic_artist_id' => $t->premium_iconic_artist_id,
         ];
     }
 

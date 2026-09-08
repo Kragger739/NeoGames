@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RoomInviteController;
 use App\Http\Controllers\Api\RoomPlayerController;
 use App\Http\Controllers\Api\RoundController;
+use App\Http\Controllers\Api\ShopController;
 use App\Http\Controllers\Api\SongSearchController;
 use App\Http\Controllers\Api\UnlockRequirementController;
 use App\Http\Middleware\EnsureUserNotBanned;
@@ -94,8 +95,24 @@ Route::middleware('auth:player')->group(function () {
     Route::post('/ddf-rooms/{code}/vote', [DdfVoteController::class, 'store']);
 });
 
-Route::middleware(['auth:sanctum', 'not-banned', 'verified'])->group(function () {
+// Always-open surfaces: the Daily, the DDF room-create, and the read-only
+// catalogue the Songle entry page renders. An unauthenticated visitor is
+// given a hidden guest `User` row on first hit (EnsureGuestOrUser) so rooms
+// and attempts have a real host; the guest earns no XP/level/NeoCoins and
+// cannot host a game night (EnsureNotGuest guards those).
+Route::middleware(['guest-ok', 'not-banned'])->group(function () {
+    Route::get('/daily', [DailyChallengeController::class, 'show']);
+    Route::post('/daily/start', [DailyChallengeController::class, 'start']);
     Route::post('/ddf-rooms', [DdfGameController::class, 'store']);
+    Route::get('/iconic-artists', [IconicArtistController::class, 'index']);
+    Route::get('/unlock-requirements', [UnlockRequirementController::class, 'index']);
+});
+
+Route::middleware(['auth:sanctum', 'not-banned'])->group(function () {
+    // GM controls: the guest host holds a real web session from creating the
+    // room, and every handler re-checks room->host_id === user->id. Dropping
+    // `verified` only additionally admits authenticated-but-unverified real
+    // users, consistent with letting them create the room above.
     Route::get('/ddf-rooms/{code}/gm-state', [DdfGameController::class, 'gmState']);
     Route::post('/ddf-rooms/{code}/start', [DdfGameController::class, 'start']);
     Route::post('/ddf-rooms/{code}/pause', [DdfGameController::class, 'pause']);
@@ -149,25 +166,24 @@ Route::middleware(['auth:sanctum', 'not-banned'])->group(function () {
     Route::post('/email/verification-code', [EmailVerificationController::class, 'resend'])->middleware('throttle:10,1');
 
     // Everything a real, verified host account can do. An unverified user
-    // hitting any of these gets a 403 (JSON) from the `verified` middleware.
-    Route::middleware('verified')->group(function () {
+    // hitting any of these gets a 403 (JSON) from the `verified` middleware;
+    // a guest gets a 403 from `not-guest`. The two gates are independent -
+    // every real verified user clears both.
+    Route::middleware(['verified', 'not-guest'])->group(function () {
         Route::post('/rooms', [GameRoomController::class, 'store']);
         Route::patch('/rooms/{code}', [GameRoomController::class, 'update']);
         Route::get('/artists/search', [ArtistSearchController::class, 'search']);
         Route::post('/rooms/{code}/start', [GameRoomController::class, 'start']);
         Route::post('/rooms/{code}/redo', [GameRoomController::class, 'redo']);
 
-        // Daily challenge - solo, fixed songs, one attempt per day, no lobby.
-        Route::get('/daily', [DailyChallengeController::class, 'show']);
-        Route::post('/daily/start', [DailyChallengeController::class, 'start']);
-
         // Iconic Artist series - curated act carousel; picking one creates a
         // genre=artist room left in the lobby for the trimmed settings form.
-        Route::get('/iconic-artists', [IconicArtistController::class, 'index']);
+        // (GET /iconic-artists is on the open group above.)
         Route::post('/iconic-artists/{iconicArtist}/start', [IconicArtistController::class, 'start']);
 
-        // Level required for each mode / genre / hosting a game night.
-        Route::get('/unlock-requirements', [UnlockRequirementController::class, 'index']);
+        // Shop: unlock priced iconic artists with NeoCoins.
+        Route::get('/shop', [ShopController::class, 'index']);
+        Route::post('/shop/iconic-artists/{iconicArtist}/buy', [ShopController::class, 'buyIconicArtist']);
 
         Route::patch('/profile', [ProfileController::class, 'update']);
         Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar']);
@@ -213,6 +229,7 @@ Route::middleware(['auth:sanctum', 'not-banned', 'verified', 'admin'])
         Route::post('/users/{user}/unban', [AdminUserController::class, 'unban']);
         Route::post('/users/{user}/reset-xp', [AdminUserController::class, 'resetXp']);
         Route::post('/users/{user}/season-pass', [AdminUserController::class, 'seasonPass']);
+        Route::post('/users/{user}/neo-coins', [AdminUserController::class, 'adjustNeoCoins']);
 
         Route::get('/seasons', [AdminSeasonController::class, 'index']);
         Route::post('/seasons', [AdminSeasonController::class, 'store']);

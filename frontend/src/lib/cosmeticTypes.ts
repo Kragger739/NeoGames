@@ -24,11 +24,21 @@ export interface SeasonInfo {
   ends_at: string;
 }
 
+export interface IconicArtistBrief {
+  id: number;
+  name: string;
+  image_url: string | null;
+}
+
 export interface TierInfo {
   tier: number;
   threshold: number;
   free: CosmeticBrief | null;
   premium: CosmeticBrief | null;
+  free_coins: number;
+  premium_coins: number;
+  free_iconic: IconicArtistBrief | null;
+  premium_iconic: IconicArtistBrief | null;
   free_owned: boolean;
   premium_owned: boolean;
   has_pass: boolean;

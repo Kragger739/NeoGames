@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateAvatarRequest;
 use App\Http\Requests\UpdateCosmeticsRequest;
 use App\Http\Requests\UpdateProfileRequest;
 use App\Models\Cosmetic;
+use App\Models\IconicArtist;
 use App\Models\Season;
 use App\Models\SeasonProgress;
 use Illuminate\Http\Request;
@@ -180,7 +181,7 @@ class ProfileController extends Controller
      */
     private function tierLadder(Season $season, array $ownedIds, bool $hasPass): array
     {
-        $tiers = $season->tiers()->with(['free', 'premium'])->get();
+        $tiers = $season->tiers()->with(['free', 'premium', 'freeIconic', 'premiumIconic'])->get();
 
         if ($tiers->isNotEmpty()) {
             return $tiers->map(fn ($t) => [
@@ -188,6 +189,10 @@ class ProfileController extends Controller
                 'threshold' => $t->xp_threshold,
                 'free' => $this->cosmeticBrief($t->free),
                 'premium' => $this->cosmeticBrief($t->premium),
+                'free_coins' => (int) $t->free_coins,
+                'premium_coins' => (int) $t->premium_coins,
+                'free_iconic' => $this->iconicBrief($t->freeIconic),
+                'premium_iconic' => $this->iconicBrief($t->premiumIconic),
                 'free_owned' => $t->free_cosmetic_id ? in_array($t->free_cosmetic_id, $ownedIds, true) : false,
                 'premium_owned' => $t->premium_cosmetic_id ? in_array($t->premium_cosmetic_id, $ownedIds, true) : false,
                 'has_pass' => $hasPass,
@@ -212,6 +217,10 @@ class ProfileController extends Controller
                 'threshold' => (int) $threshold,
                 'free' => $this->cosmeticBrief($cosmetic),
                 'premium' => null,
+                'free_coins' => 0,
+                'premium_coins' => 0,
+                'free_iconic' => null,
+                'premium_iconic' => null,
                 'free_owned' => $cosmetic ? in_array($cosmetic->id, $ownedIds, true) : false,
                 'premium_owned' => false,
                 'has_pass' => $hasPass,
@@ -233,6 +242,18 @@ class ProfileController extends Controller
             'name' => $c->name,
             'rarity' => $c->rarity,
             'image_url' => $c->image_url,
+        ] : null;
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private function iconicBrief(?IconicArtist $a): ?array
+    {
+        return $a ? [
+            'id' => $a->id,
+            'name' => $a->name,
+            'image_url' => $a->image_url,
         ] : null;
     }
 }

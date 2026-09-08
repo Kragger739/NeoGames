@@ -215,6 +215,23 @@ export function CosmeticsPage() {
                         <CosmeticThumb cosmetic={tier.premium} />
                       </span>
                     )}
+                    {(tier.free_coins > 0 || tier.free_iconic) && (
+                      <span className="cos-tier-extra">
+                        {tier.free_coins > 0 && <>◈ {tier.free_coins}</>}
+                        {tier.free_coins > 0 && tier.free_iconic && " · "}
+                        {tier.free_iconic && tier.free_iconic.name}
+                      </span>
+                    )}
+                    {(tier.premium_coins > 0 || tier.premium_iconic) && (
+                      <span
+                        className="cos-tier-extra cos-tier-premium"
+                        title={hasPass ? "Premium reward" : "Premium reward (needs the season pass)"}
+                      >
+                        {tier.premium_coins > 0 && <>◈ {tier.premium_coins}</>}
+                        {tier.premium_coins > 0 && tier.premium_iconic && " · "}
+                        {tier.premium_iconic && tier.premium_iconic.name}
+                      </span>
+                    )}
                     <span className="hint">
                       {tier.free_owned ? "Unlocked" : `${tier.threshold} XP`}
                     </span>

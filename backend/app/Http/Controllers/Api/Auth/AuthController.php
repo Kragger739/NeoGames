@@ -17,12 +17,30 @@ class AuthController extends Controller
 {
     public function register(RegisterRequest $request)
     {
-        $user = User::create([
-            'name' => $request->validated('name'),
-            'username' => User::generateUniqueUsernameFrom($request->validated('name')),
-            'email' => $request->validated('email'),
-            'password' => Hash::make($request->validated('password')),
-        ]);
+        $current = $request->user();
+
+        if ($current && $current->is_guest) {
+            // Claim the guest row in place: same id, so every game_rooms.host_id
+            // / daily_challenge_attempts / xp_events FK already pointing here
+            // stays valid. Must re-verify the (now real) email.
+            $current->forceFill([
+                'name' => $request->validated('name'),
+                'username' => User::generateUniqueUsernameFrom($request->validated('name')),
+                'email' => $request->validated('email'),
+                'password' => Hash::make($request->validated('password')),
+                'is_guest' => false,
+                'email_verified_at' => null,
+            ])->save();
+
+            $user = $current;
+        } else {
+            $user = User::create([
+                'name' => $request->validated('name'),
+                'username' => User::generateUniqueUsernameFrom($request->validated('name')),
+                'email' => $request->validated('email'),
+                'password' => Hash::make($request->validated('password')),
+            ]);
+        }
 
         Auth::login($user);
 

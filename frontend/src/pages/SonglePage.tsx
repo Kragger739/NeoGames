@@ -42,6 +42,7 @@ interface DailyStartResponse {
 
 export function SonglePage() {
   const host = useAuthStore((state) => state.host);
+  const refreshHost = useAuthStore((state) => state.refreshHost);
   const fetchUnlocks = useUnlockStore((state) => state.fetch);
   const requiredLevel = useUnlockStore((state) => state.requiredLevel);
   const navigate = useNavigate();
@@ -96,10 +97,14 @@ export function SonglePage() {
 
   const gameNightLevel = requiredLevel("game_night");
   const gameNightLocked = host != null && host.level < gameNightLevel;
-  const iconicLevel = requiredLevel("iconic_series");
-  const iconicLocked = host != null && host.level < iconicLevel;
+  const needsAccount = host == null || host.is_guest;
 
   async function handlePickArtist(artistId: number) {
+    // The iconic series is account-only; a guest picking one goes to sign-up.
+    if (needsAccount) {
+      navigate("/register");
+      return;
+    }
     setCreateError(null);
     setPickingArtist(true);
     try {
@@ -122,6 +127,9 @@ export function SonglePage() {
       const response = await api.post<DailyStartResponse>("/api/daily/start");
       setPlayerToken(response.data.player.connection_token);
       setPlayerId(response.data.player.id);
+      // An anonymous visitor was just given a guest identity server-side -
+      // pull it so the app knows (guest banner, home state).
+      if (!host) void refreshHost();
       // The room is already active - the lobby immediately forwards to /play.
       navigate(`/rooms/${response.data.code}/lobby`);
     } catch (err) {
@@ -134,6 +142,10 @@ export function SonglePage() {
   // straight into a live room, and settings (including mode) become
   // editable from inside the lobby itself (see RoomSettingsForm).
   async function handleNewRoom() {
+    if (needsAccount) {
+      navigate("/register");
+      return;
+    }
     setCreateError(null);
     setCreating(true);
     try {
@@ -164,22 +176,16 @@ export function SonglePage() {
       {iconicArtists.length > 0 && (
         <section className="iconic-series">
           <p className="iconic-series-title">Iconic Artists</p>
-          {iconicLocked ? (
-            <div className="songle-lock-wrap is-locked">
-              <IconicArtistCarousel artists={iconicArtists} onPick={() => {}} disabled />
-              <div className="songle-lock-overlay" aria-hidden="true">
-                <Lock size={22} strokeWidth={2.5} />
-                <span>Unlocks at level {iconicLevel}</span>
-              </div>
-            </div>
-          ) : (
-            <IconicArtistCarousel
-              artists={iconicArtists}
-              onPick={(id) => void handlePickArtist(id)}
-              busy={pickingArtist}
-            />
-          )}
-          <p className="hint">Five songs by one artist. Pick a mode in the lobby.</p>
+          <IconicArtistCarousel
+            artists={iconicArtists}
+            onPick={(id) => void handlePickArtist(id)}
+            busy={pickingArtist}
+          />
+          <p className="hint">
+            {needsAccount
+              ? "Five songs by one artist — create an account to play. More acts in the Shop."
+              : "Five songs by one artist. Pick a mode in the lobby. More acts in the Shop."}
+          </p>
         </section>
       )}
 

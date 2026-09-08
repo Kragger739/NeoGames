@@ -24,6 +24,7 @@ export function AdminSeasonsPage() {
   const {
     seasons,
     cosmetics,
+    iconicArtists,
     slots,
     rarities,
     sources,
@@ -307,6 +308,58 @@ export function AdminSeasonsPage() {
                     ))}
                   </select>
                 </label>
+                <label className="admin-check">
+                  Free ◈
+                  <input
+                    type="number"
+                    min={0}
+                    value={row.free_coins}
+                    onChange={(e) => setTier(i, { free_coins: Math.max(0, Number(e.target.value)) })}
+                  />
+                </label>
+                <label className="admin-check">
+                  Premium ◈
+                  <input
+                    type="number"
+                    min={0}
+                    value={row.premium_coins}
+                    onChange={(e) => setTier(i, { premium_coins: Math.max(0, Number(e.target.value)) })}
+                  />
+                </label>
+                <label className="admin-check">
+                  Free artist
+                  <select
+                    value={row.free_iconic_artist_id ?? ""}
+                    onChange={(e) =>
+                      setTier(i, { free_iconic_artist_id: e.target.value === "" ? null : Number(e.target.value) })
+                    }
+                  >
+                    <option value="">— none —</option>
+                    {iconicArtists.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="admin-check">
+                  Premium artist
+                  <select
+                    value={row.premium_iconic_artist_id ?? ""}
+                    onChange={(e) =>
+                      setTier(i, {
+                        premium_iconic_artist_id: e.target.value === "" ? null : Number(e.target.value),
+                      })
+                    }
+                  >
+                    <option value="">— none —</option>
+                    {iconicArtists.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </li>
             ))}
           </ul>
@@ -321,6 +374,10 @@ export function AdminSeasonsPage() {
                     xp_threshold: (rows.at(-1)?.xp_threshold ?? 0) + 100,
                     free_cosmetic_id: null,
                     premium_cosmetic_id: null,
+                    free_coins: 0,
+                    premium_coins: 0,
+                    free_iconic_artist_id: null,
+                    premium_iconic_artist_id: null,
                   },
                 ])
               }

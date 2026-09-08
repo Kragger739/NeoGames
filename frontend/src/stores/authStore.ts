@@ -7,14 +7,19 @@ export interface Host {
   id: number;
   name: string;
   username: string | null;
-  email: string;
+  /** null for a guest (no account yet). */
+  email: string | null;
   email_verified: boolean;
+  /** A hidden auto-created row: can play the Daily / DDF but nothing account-linked. */
+  is_guest: boolean;
   /** Set when the account was created via Google/Discord OAuth. */
   provider: string | null;
   /** Grants the /admin area and the public admin badge. */
   is_admin: boolean;
   xp: number;
   level: number;
+  /** Currency earned by levelling up; spendable in the Shop. */
+  neo_coins: number;
   avatar_url: string | null;
   avatar: AvatarData;
 }

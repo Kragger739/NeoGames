@@ -43,4 +43,20 @@ class UserFactory extends Factory
             'email_verified_at' => null,
         ]);
     }
+
+    /**
+     * A hidden guest row (EnsureGuestOrUser): no email/password, verified so
+     * `verified` middleware isn't what stops it, is_guest so `not-guest` is.
+     */
+    public function guest(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'name' => 'Guest '.Str::upper(Str::random(5)),
+            'username' => null,
+            'email' => null,
+            'password' => null,
+            'email_verified_at' => now(),
+            'is_guest' => true,
+        ]);
+    }
 }
