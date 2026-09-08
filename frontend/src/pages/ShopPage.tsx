@@ -6,7 +6,7 @@ import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 
 export function ShopPage() {
-  const { status, neoCoins, artists, error, buyingId, fetch, buy } = useShopStore();
+  const { status, neoCoins, freeWeekEndsAt, artists, error, buyingId, fetch, buy } = useShopStore();
 
   useEffect(() => {
     void fetch();
@@ -24,6 +24,12 @@ export function ShopPage() {
       <p className="hint">
         Unlock iconic artists to play their five-song rounds. Earn NeoCoins by levelling up.
       </p>
+      {freeWeekEndsAt && (
+        <p className="hint">
+          One priced artist is free to play every week — the pick rotates{" "}
+          {new Date(freeWeekEndsAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}.
+        </p>
+      )}
 
       {error && <p className="form-error">{error}</p>}
 
@@ -43,6 +49,9 @@ export function ShopPage() {
                   <span className="shop-card-photo art-placeholder" aria-hidden="true" />
                 )}
                 <h3 className="shop-card-name">{artist.name}</h3>
+                {artist.free_this_week && !artist.owned && (
+                  <Badge tone="turquoise">Free this week</Badge>
+                )}
                 {artist.owned ? (
                   <Badge tone="grape">{free ? "Free" : "Owned"}</Badge>
                 ) : (

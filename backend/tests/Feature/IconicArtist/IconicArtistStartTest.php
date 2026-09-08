@@ -56,10 +56,18 @@ class IconicArtistStartTest extends TestCase
 
     public function test_a_priced_artist_the_user_does_not_own_cannot_be_started(): void
     {
-        $artist = IconicArtist::factory()->create(['price' => 500]);
+        // Two priced artists so exactly one is this week's rotating freebie;
+        // target whichever one is NOT free this week.
+        $this->travelTo('2026-01-05'); // a Monday
+        IconicArtist::factory()->create(['price' => 500, 'sort_order' => 1]);
+        IconicArtist::factory()->create(['price' => 500, 'sort_order' => 2]);
+
+        $locked = IconicArtist::where('price', '>', 0)
+            ->whereKeyNot(IconicArtist::freeThisWeek()->id)
+            ->firstOrFail();
 
         $this->actingAs(User::factory()->create())
-            ->postJson("/api/iconic-artists/{$artist->id}/start")
+            ->postJson("/api/iconic-artists/{$locked->id}/start")
             ->assertUnprocessable()
             ->assertJsonValidationErrors('iconic');
     }

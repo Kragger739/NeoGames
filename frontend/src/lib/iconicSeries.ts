@@ -4,6 +4,8 @@ export interface IconicArtist {
   id: number;
   name: string;
   image_url: string | null;
+  /** This week's rotating freebie — playable without owning it, this week only. */
+  free_this_week: boolean;
 }
 
 /**

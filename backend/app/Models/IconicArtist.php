@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -122,5 +123,38 @@ class IconicArtist extends Model
         ])->save();
 
         FetchIconicArtistCatalogue::dispatch($this->id, $token)->afterResponse();
+    }
+
+    /**
+     * The one priced artist that is free to play this calendar week. Pure
+     * function of the current UTC week and the priced-artist list - no stored
+     * state, no admin action. Rotates every Monday 00:00 UTC through the
+     * enabled priced artists in sort order. Null when no priced artist exists.
+     *
+     * Access is temporal: being the pick lets anyone start this artist without
+     * owning it (see IconicArtistController), but grants no permanent unlock.
+     */
+    public static function freeThisWeek(): ?self
+    {
+        $pool = static::query()
+            ->where('enabled', true)
+            ->where('price', '>', 0)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        if ($pool->isEmpty()) {
+            return null;
+        }
+
+        $week = intdiv(now('UTC')->startOfWeek(Carbon::MONDAY)->timestamp, 7 * 86400);
+
+        return $pool[$week % $pool->count()];
+    }
+
+    /** Monday 00:00 UTC that ends the current free-artist week. */
+    public static function freeWeekEndsAt(): Carbon
+    {
+        return now('UTC')->startOfWeek(Carbon::MONDAY)->addWeek();
     }
 }

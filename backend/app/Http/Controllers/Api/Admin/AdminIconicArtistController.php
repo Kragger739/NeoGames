@@ -130,6 +130,7 @@ class AdminIconicArtistController extends Controller
             'enabled' => (bool) $artist->enabled,
             'sort_order' => $artist->sort_order,
             'price' => (int) $artist->price,
+            'free_this_week' => $artist->id === IconicArtist::freeThisWeek()?->id,
             'pool_size' => $artist->poolCount(),
             'fetch_status' => $artist->fetch_status,
             'fetch_total' => $artist->fetched_total,

@@ -196,6 +196,7 @@ export function AdminIconicArtistsPage() {
                   {artist.price > 0 ? `◈ ${artist.price}` : "free"}
                 </span>
                 {!artist.enabled && <Badge tone="coral">Hidden</Badge>}
+                {artist.free_this_week && <Badge tone="turquoise">Free this week</Badge>}
                 {artist.fetch_status === "failed" && artist.fetch_error && (
                   <span className="form-error">{artist.fetch_error}</span>
                 )}

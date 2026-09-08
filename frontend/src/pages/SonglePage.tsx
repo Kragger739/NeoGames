@@ -98,6 +98,7 @@ export function SonglePage() {
   const gameNightLevel = requiredLevel("game_night");
   const gameNightLocked = host != null && host.level < gameNightLevel;
   const needsAccount = host == null || host.is_guest;
+  const freeThisWeek = iconicArtists.find((a) => a.free_this_week) ?? null;
 
   async function handlePickArtist(artistId: number) {
     // The iconic series is account-only; a guest picking one goes to sign-up.
@@ -181,6 +182,11 @@ export function SonglePage() {
             onPick={(id) => void handlePickArtist(id)}
             busy={pickingArtist}
           />
+          {freeThisWeek && (
+            <p className="hint">
+              <strong>★ Free this week:</strong> {freeThisWeek.name}
+            </p>
+          )}
           <p className="hint">
             {needsAccount
               ? "Five songs by one artist — create an account to play. More acts in the Shop."

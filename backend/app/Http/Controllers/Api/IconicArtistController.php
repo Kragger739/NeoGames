@@ -32,11 +32,14 @@ class IconicArtistController extends Controller
     public function index(Request $request)
     {
         $ownedIds = $request->user()?->iconicArtists()->pluck('iconic_artists.id')->all() ?? [];
+        $freeId = IconicArtist::freeThisWeek()?->id;
 
         return response()->json(
             IconicArtist::query()
                 ->where('enabled', true)
-                ->where(fn ($q) => $q->where('price', 0)->orWhereIn('id', $ownedIds))
+                ->where(fn ($q) => $q->where('price', 0)
+                    ->orWhereIn('id', $ownedIds)
+                    ->when($freeId, fn ($q) => $q->orWhere('id', $freeId)))
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get()
@@ -44,6 +47,7 @@ class IconicArtistController extends Controller
                     'id' => $artist->id,
                     'name' => $artist->name,
                     'image_url' => $artist->image_url,
+                    'free_this_week' => $artist->id === $freeId,
                 ]),
         );
     }
@@ -59,9 +63,10 @@ class IconicArtistController extends Controller
         // gate already enforces this; explicit here too).
         abort_if($request->user()->is_guest, 403, 'Create a free account to play the Iconic Artist series.');
 
-        // Priced acts must be unlocked in the Shop first; free acts (price 0)
-        // are open to any account.
+        // Priced acts must be unlocked in the Shop first - unless they're this
+        // week's rotating freebie. Free acts (price 0) are open to any account.
         if ($iconicArtist->price > 0
+            && $iconicArtist->id !== IconicArtist::freeThisWeek()?->id
             && ! $request->user()->iconicArtists()->whereKey($iconicArtist->id)->exists()) {
             throw ValidationException::withMessages([
                 'iconic' => ['Unlock this artist in the Shop first.'],

@@ -107,6 +107,21 @@ span.iconic-artist-photo.art-placeholder {
   line-height: 1.2;
 }
 
+.iconic-artist-free-badge {
+  display: inline-block;
+  margin-top: -12px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--turquoise);
+  color: #fff;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  box-shadow: var(--shadow-card);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .iconic-carousel-track {
     scroll-behavior: auto;

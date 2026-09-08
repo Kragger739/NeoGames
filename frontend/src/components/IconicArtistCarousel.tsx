@@ -114,6 +114,9 @@ export function IconicArtistCarousel({ artists, onPick, disabled = false, busy =
               ) : (
                 <span className="iconic-artist-photo art-placeholder" aria-hidden="true" />
               )}
+              {artist.free_this_week && (
+                <span className="iconic-artist-free-badge">Free this week</span>
+              )}
               <span className="iconic-artist-name">{artist.name}</span>
             </button>
           ))}

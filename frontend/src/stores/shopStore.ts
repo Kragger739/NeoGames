@@ -9,11 +9,15 @@ export interface ShopArtist {
   name: string;
   image_url: string | null;
   price: number;
+  /** Permanent unlock (bought, or price 0). */
   owned: boolean;
+  /** This week's rotating freebie — playable without owning it. */
+  free_this_week: boolean;
 }
 
 interface ShopResponse {
   neo_coins: number;
+  free_week_ends_at: string;
   artists: ShopArtist[];
 }
 
@@ -25,6 +29,7 @@ interface BuyResponse {
 interface ShopState {
   status: "idle" | "loading" | "ready";
   neoCoins: number;
+  freeWeekEndsAt: string | null;
   artists: ShopArtist[];
   error: string | null;
   buyingId: number | null;
@@ -35,6 +40,7 @@ interface ShopState {
 export const useShopStore = create<ShopState>((set, get) => ({
   status: "idle",
   neoCoins: 0,
+  freeWeekEndsAt: null,
   artists: [],
   error: null,
   buyingId: null,
@@ -43,7 +49,12 @@ export const useShopStore = create<ShopState>((set, get) => ({
     set({ status: get().status === "idle" ? "loading" : get().status, error: null });
     try {
       const { data } = await api.get<ShopResponse>("/api/shop");
-      set({ neoCoins: data.neo_coins, artists: data.artists, status: "ready" });
+      set({
+        neoCoins: data.neo_coins,
+        freeWeekEndsAt: data.free_week_ends_at,
+        artists: data.artists,
+        status: "ready",
+      });
     } catch (err) {
       set({ error: firstValidationError(err), status: "ready" });
     }

@@ -22,6 +22,7 @@ class ShopController extends Controller
     {
         $user = $request->user();
         $ownedIds = $user->iconicArtists()->pluck('iconic_artists.id')->all();
+        $freeId = IconicArtist::freeThisWeek()?->id;
 
         $artists = IconicArtist::query()
             ->where('enabled', true)
@@ -33,11 +34,15 @@ class ShopController extends Controller
                 'name' => $artist->name,
                 'image_url' => $artist->image_url,
                 'price' => (int) $artist->price,
+                // `owned` = permanent unlock. `free_this_week` is a separate,
+                // temporary right to play without owning.
                 'owned' => $artist->price === 0 || in_array($artist->id, $ownedIds, true),
+                'free_this_week' => $artist->id === $freeId,
             ]);
 
         return response()->json([
             'neo_coins' => (int) $user->neo_coins,
+            'free_week_ends_at' => IconicArtist::freeWeekEndsAt()->toIso8601String(),
             'artists' => $artists,
         ]);
     }

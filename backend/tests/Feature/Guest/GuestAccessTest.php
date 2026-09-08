@@ -42,15 +42,21 @@ class GuestAccessTest extends TestCase
         $this->assertDatabaseHas('game_rooms', ['host_id' => $guest->id]);
     }
 
-    public function test_an_anonymous_visitor_sees_only_free_artists_on_the_carousel(): void
+    public function test_an_anonymous_visitor_sees_only_free_and_weekly_free_artists(): void
     {
+        // Pin the clock so exactly one of the two priced artists is this
+        // week's rotating freebie (2026-01-05 → pool index 0 → sort_order 1).
+        $this->travelTo('2026-01-05');
         IconicArtist::factory()->create(['name' => 'Free', 'price' => 0]);
-        IconicArtist::factory()->create(['name' => 'Paid', 'price' => 500]);
+        IconicArtist::factory()->create(['name' => 'WeeklyFree', 'price' => 500, 'sort_order' => 1]);
+        IconicArtist::factory()->create(['name' => 'Locked', 'price' => 500, 'sort_order' => 2]);
 
-        $this->getJson('/api/iconic-artists')
-            ->assertOk()
-            ->assertJsonCount(1)
-            ->assertJsonPath('0.name', 'Free');
+        $names = collect($this->getJson('/api/iconic-artists')->assertOk()->json())
+            ->pluck('name');
+
+        $this->assertTrue($names->contains('Free'));
+        $this->assertTrue($names->contains('WeeklyFree'));
+        $this->assertFalse($names->contains('Locked'));
     }
 
     public function test_a_guest_cannot_reach_account_only_endpoints(): void

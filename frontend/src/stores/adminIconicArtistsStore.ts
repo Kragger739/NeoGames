@@ -12,6 +12,7 @@ export interface AdminIconicArtist {
   enabled: boolean;
   sort_order: number;
   price: number;
+  free_this_week: boolean;
   pool_size: number;
   fetch_status: IconicFetchStatus;
   fetch_total: number;
