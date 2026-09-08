@@ -31,7 +31,12 @@ class FetchIconicArtistCatalogue implements ShouldQueue
 
     public int $timeout = 120;
 
-    private const CANDIDATE_CAP = 120;
+    // How many songs to keep per artist. Games only ever play `rank <= 20`,
+    // but the rest is a reservoir the selection code spills into, so aim for a
+    // deep catalogue (100+). iTunes caps a single response at 200.
+    private const CANDIDATE_CAP = 200;
+
+    private const FETCH_LIMIT = 200;
 
     private const MAX_RL_STRIKES = 5;
 
@@ -95,8 +100,10 @@ class FetchIconicArtistCatalogue implements ShouldQueue
      *
      * If the artist has a pinned `apple_artist_id` (admin pasted their Apple
      * Music link), results are locked to that exact artist id - the name
-     * search only decides ordering, not identity. Otherwise it falls back to
-     * the exact-name string filter.
+     * search only decides ordering, not identity - AND the recency-ordered
+     * id-lookup catalogue is merged in after it (de-duped by track id) so the
+     * pool runs deep (100+), not just the ~50 an artistTerm search returns.
+     * Without a pin, only the exact-name search is available.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -108,12 +115,21 @@ class FetchIconicArtistCatalogue implements ShouldQueue
         $seen = [];
         $ranked = [];
 
-        $songs = $apple->artistSongs($name, self::CANDIDATE_CAP + 60, $pinnedId);
+        // Relevance-ordered head (popularity proxy - drives `rank <= 20`).
+        $songs = $apple->artistSongs($name, self::FETCH_LIMIT, $pinnedId);
 
-        // A badly misspelled name can return nothing from the artistTerm
-        // search even with a valid pinned id - fall back to the id lookup.
-        if ($songs === [] && $pinnedId !== null) {
-            $songs = $apple->artistSongsById($pinnedId, self::CANDIDATE_CAP + 60);
+        if ($pinnedId !== null) {
+            // Deep tail: everything else iTunes has for this exact artist.
+            $byTrackId = [];
+            foreach ($songs as $song) {
+                $byTrackId[$song['itunes_track_id']] = true;
+            }
+            foreach ($apple->artistSongsById($pinnedId, self::FETCH_LIMIT) as $extra) {
+                if (! isset($byTrackId[$extra['itunes_track_id']])) {
+                    $byTrackId[$extra['itunes_track_id']] = true;
+                    $songs[] = $extra;
+                }
+            }
         }
 
         foreach ($songs as $song) {

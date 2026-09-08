@@ -4,6 +4,7 @@ namespace Tests\Feature\GameFlow;
 
 use App\Enums\DifficultyTier;
 use App\Events\GameFinished;
+use App\Events\GuessMissed;
 use App\Events\RoomReset;
 use App\Events\RoundStarted;
 use App\Events\RoundWon;
@@ -179,6 +180,28 @@ class RoundLifecycleTest extends TestCase
         });
         // Started once for the room's first round, again for the next.
         Event::assertDispatched(RoundStarted::class, 2);
+    }
+
+    public function test_guessing_only_the_artist_name_is_not_correct(): void
+    {
+        Event::fake([RoundWon::class, RoundStarted::class, GuessMissed::class]);
+
+        $this->seedSongsForAllTiers(count: 2);
+        $host = User::factory()->create();
+        $room = GameRoom::factory()->for($host, 'host')->create(['songs_per_tier' => 2]);
+        app(RoundService::class)->start($room);
+
+        $round = $room->rounds()->first();
+        $player = $room->players()->create([
+            'nickname' => 'Alice',
+            'connection_token' => RoomPlayer::generateConnectionToken(),
+        ]);
+
+        $response = $this->withHeader('X-Player-Token', $player->connection_token)
+            ->postJson("/api/rounds/{$round->id}/guess", ['guess' => $round->song->artist]);
+
+        $response->assertOk()->assertJson(['correct' => false, 'won' => false]);
+        $this->assertSame('playing', $round->refresh()->status->value);
     }
 
     public function test_round_won_broadcasts_the_songs_album_art(): void

@@ -109,10 +109,10 @@ class GuessService
 
     private function isCorrect(string $guessText, Round $round): bool
     {
-        $normalized = $this->normalize($guessText);
-
-        return $normalized === $this->normalize($round->song->title)
-            || $normalized === $this->normalize($round->song->artist);
+        // Songle is a song-title guessing game - only the title counts. The
+        // artist alone is never a correct answer (and would trivialise the
+        // Iconic Artist series, where every round is the same known act).
+        return $this->normalize($guessText) === $this->normalize($round->song->title);
     }
 
     private function normalize(string $value): string

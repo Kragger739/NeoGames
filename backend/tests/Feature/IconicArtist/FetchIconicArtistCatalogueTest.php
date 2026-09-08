@@ -105,7 +105,29 @@ class FetchIconicArtistCatalogueTest extends TestCase
         $this->assertSame(['Real Hit', 'Another Real One'], $titles);
     }
 
-    public function test_it_falls_back_to_the_id_lookup_when_the_name_search_is_empty(): void
+    public function test_a_pinned_artist_merges_the_search_head_and_the_id_lookup_tail(): void
+    {
+        Http::fake([
+            'itunes.apple.com/search*' => Http::response(['resultCount' => 2, 'results' => [
+                $this->song('1', 'Big Single', 'The Band', artistId: 111),
+                $this->song('2', 'Shared Track', 'The Band', artistId: 111),
+            ]], 200),
+            'itunes.apple.com/lookup*' => Http::response(['resultCount' => 3, 'results' => [
+                ['wrapperType' => 'artist', 'artistId' => 111, 'artistName' => 'The Band'],
+                $this->song('2', 'Shared Track', 'The Band', artistId: 111), // dupe by track id
+                $this->song('3', 'Deep Cut', 'The Band', artistId: 111),
+            ]], 200),
+        ]);
+
+        $artist = IconicArtist::factory()->create(['name' => 'The Band', 'apple_artist_id' => 111]);
+        $this->runFetch($artist);
+
+        $titles = IconicArtistSong::where('iconic_artist_id', $artist->id)->orderBy('rank')->pluck('title')->all();
+        // Search head first, then the lookup tail, no duplicate for track id 2.
+        $this->assertSame(['Big Single', 'Shared Track', 'Deep Cut'], $titles);
+    }
+
+    public function test_a_misspelled_pinned_name_still_gets_the_catalogue_from_the_lookup(): void
     {
         Http::fake([
             'itunes.apple.com/search*' => Http::response(['resultCount' => 0, 'results' => []], 200),
