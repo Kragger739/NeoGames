@@ -987,7 +987,8 @@ button:disabled {
 @media (max-width: 720px) {
   .game-play-layout {
     flex-direction: column-reverse;
-    gap: 20px;
+    /* Tight - the scoreboard strip sits right above the controls. */
+    gap: 4px;
     /* Fill the page and centre the control stack vertically for thumb reach. */
     flex: 1;
     justify-content: center;
@@ -1000,9 +1001,16 @@ button:disabled {
     width: 100%;
   }
 
-  /* Phones use the hardware volume rocker - the on-screen slider is clutter. */
-  .volume-control input[type="range"] {
+  /* No room name / leave button and no volume control on a phone - the
+     hardware rocker and the results screen cover both. */
+  .game-play-header,
+  .volume-control {
     display: none;
+  }
+
+  .scoreboard-panel h2 {
+    text-align: center;
+    margin-bottom: 2px;
   }
 
   /* Controller mode: compact horizontal strip instead of a full card
@@ -1010,8 +1018,10 @@ button:disabled {
   .scoreboard-panel .scoreboard {
     flex-direction: row;
     flex-wrap: nowrap;
+    justify-content: center;
     overflow-x: auto;
     gap: 8px;
+    margin: 4px 0;
     padding-bottom: 4px;
   }
 
