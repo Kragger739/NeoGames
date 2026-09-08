@@ -990,6 +990,9 @@ button:disabled {
     gap: 20px;
   }
 
+  /* Stacked column: the base `align-items: flex-start` would otherwise let
+     each panel shrink to content width and hug the left. */
+  .game-play-main,
   .scoreboard-panel {
     width: 100%;
   }
