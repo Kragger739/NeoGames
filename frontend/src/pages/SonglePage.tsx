@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, CalendarDays, Gamepad2, Lock } from "lucide-react";
 
 import { api } from "../lib/api";
@@ -217,31 +217,39 @@ export function SonglePage() {
       </Button>
       <p className="hint">Five fixed songs, the same for everyone, solo. One run a day.</p>
 
-      <div className={gameNightLocked ? "songle-lock-wrap is-locked" : "songle-lock-wrap"}>
-        <Button
-          variant="primary"
-          size="lg"
-          onClick={() => void handleNewRoom()}
-          disabled={creating || gameNightLocked}
-        >
-          {creating ? (
-            "Setting up…"
-          ) : (
-            <>
-              <Gamepad2 size={20} strokeWidth={2.5} />
-              Start a game night
-            </>
-          )}
-        </Button>
-        {gameNightLocked && (
-          <div className="songle-lock-overlay" aria-hidden="true">
-            <Lock size={22} strokeWidth={2.5} />
-            <span>Unlocks at level {gameNightLevel}</span>
+      {needsAccount ? (
+        <p className="hint">
+          Want to host a game night? <Link to="/register">Create a free account</Link>.
+        </p>
+      ) : (
+        <>
+          <div className={gameNightLocked ? "songle-lock-wrap is-locked" : "songle-lock-wrap"}>
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => void handleNewRoom()}
+              disabled={creating || gameNightLocked}
+            >
+              {creating ? (
+                "Setting up…"
+              ) : (
+                <>
+                  <Gamepad2 size={20} strokeWidth={2.5} />
+                  Start a game night
+                </>
+              )}
+            </Button>
+            {gameNightLocked && (
+              <div className="songle-lock-overlay" aria-hidden="true">
+                <Lock size={22} strokeWidth={2.5} />
+                <span>Unlocks at level {gameNightLevel}</span>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+          <p className="hint">Host, control and play like you want to</p>
+        </>
+      )}
       {createError && <p className="form-error">{createError}</p>}
-      <p className="hint">Host, control and play like you want to</p>
     </div>
   );
 }
