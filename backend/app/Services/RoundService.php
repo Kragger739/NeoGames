@@ -18,6 +18,7 @@ use App\Jobs\AdvanceRoundStage;
 use App\Jobs\ExpandSongPool;
 use App\Models\DailyChallengeAttempt;
 use App\Models\GameRoom;
+use App\Models\IconicArtistSong;
 use App\Models\RoomPlayer;
 use App\Models\Round;
 use App\Models\RoundRevealSkipVote;
@@ -25,6 +26,7 @@ use App\Models\Song;
 use App\Support\SnippetStage;
 use App\Support\SongFilter;
 use App\Support\SongSelectionContext;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -46,6 +48,12 @@ class RoundService
     /** How many candidates to try before giving up on finding a playable song. */
     private const MAX_PLAYABILITY_ATTEMPTS = 3;
 
+    /** An iconic game only ever plays songs ranked in this artist's top N. */
+    private const ICONIC_TOP_RANK = 20;
+
+    /** Random spread among the most iconic few unplayed songs each round. */
+    private const ICONIC_RANDOM_SLICE = 6;
+
     public function __construct(
         private SongDiscoveryService $songDiscovery,
         private LevelingService $leveling,
@@ -53,7 +61,26 @@ class RoundService
 
     public function start(GameRoom $room): Round
     {
-        if ($room->dataset_id === null && $room->genre->isArtistSourced()) {
+        if ($room->iconic_artist_id !== null) {
+            // Iconic Artist series owns its own curated pool
+            // (iconic_artist_songs) - never warm the shared songs pool.
+            // Just confirm the top 20 has something playable, and throw
+            // BEFORE the status flip so a still-fetching artist leaves the
+            // room in "lobby" with the message on the Start button.
+            $ready = IconicArtistSong::query()
+                ->where('iconic_artist_id', $room->iconic_artist_id)
+                ->whereNotNull('song_id')
+                ->where('unplayable', false)
+                ->whereNotNull('rank')
+                ->where('rank', '<=', self::ICONIC_TOP_RANK)
+                ->exists();
+
+            if (! $ready) {
+                $name = $room->iconicArtist?->name ?? 'this artist';
+
+                throw new RuntimeException("Still fetching {$name}'s songs - try again in a minute.");
+            }
+        } elseif ($room->dataset_id === null && $room->genre->isArtistSourced()) {
             // Synchronous safety net in case Start is clicked before
             // PrimeArtistSongPool's background job (dispatched from
             // GameRoomController::update()) has finished warming the pool.
@@ -82,6 +109,12 @@ class RoundService
             // order - no discovery, no host no-repeat memory (its iconic
             // songs shouldn't crowd out the host's normal-game rotation).
             $song = $this->pickDailySong($room);
+        } elseif ($room->iconic_artist_id !== null) {
+            // Iconic Artist series: draw straight from the artist's curated
+            // top-20 catalogue. Bumps last_used_at itself (like pickDailySong)
+            // and deliberately skips the host songPlays() no-repeat memory -
+            // replaying the same artist shouldn't lock out the hits.
+            $song = $this->pickIconicArtistSong($room);
         } else {
             $filter = SongFilter::fromRoom($room);
             $context = $this->buildSelectionContext($room);
@@ -134,7 +167,7 @@ class RoundService
         // is a near-instant no-op (see ExpandSongPool::handle). A custom
         // dataset IS the pool, and the Daily challenge draws from a fixed
         // list, so neither has anything to grow.
-        if ($room->dataset_id === null && $room->daily_challenge_id === null) {
+        if ($room->dataset_id === null && $room->daily_challenge_id === null && $room->iconic_artist_id === null) {
             ExpandSongPool::dispatch(SongFilter::fromRoom($room));
         }
 
@@ -198,6 +231,72 @@ class RoundService
         $song->update(['last_used_at' => now()]);
 
         return $song;
+    }
+
+    /**
+     * The next song for an Iconic Artist series room: the artist's curated
+     * catalogue, ranked by popularity, playing only rank <= 20 (the hits).
+     * The ~80-track reservoir (rank > 20) is a fallback for games longer
+     * than 20 rounds or when a top-20 track has no playable preview.
+     */
+    private function pickIconicArtistSong(GameRoom $room): Song
+    {
+        $usedTrackIds = Song::whereIn('id', $room->rounds()->pluck('song_id'))
+            ->pluck('provider_track_id')
+            ->all();
+
+        $rows = IconicArtistSong::query()
+            ->where('iconic_artist_id', $room->iconic_artist_id)
+            ->whereNotNull('song_id')
+            ->where('unplayable', false)
+            ->whereNotNull('rank')
+            ->with('song')
+            ->orderBy('rank')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            $name = $room->iconicArtist?->name ?? 'this artist';
+
+            throw new RuntimeException("Still fetching {$name}'s songs - try again in a minute.");
+        }
+
+        $top = $rows->where('rank', '<=', self::ICONIC_TOP_RANK);
+        $reservoir = $rows->where('rank', '>', self::ICONIC_TOP_RANK);
+
+        $chosen = $this->iconicFresh($top, $usedTrackIds)
+            ?? $this->iconicFresh($reservoir, $usedTrackIds)
+            ?? $top->sortBy(fn (IconicArtistSong $r) => optional($r->song)->last_used_at)->first()
+            ?? $reservoir->sortBy(fn (IconicArtistSong $r) => optional($r->song)->last_used_at)->first();
+
+        $song = $chosen->song;
+        $song->update(['last_used_at' => now()]);
+
+        return $song;
+    }
+
+    /**
+     * Pick from `$rows` a song not yet played this game - preferring one
+     * never played in ANY game (random among the lowest-rank few), else the
+     * least-recently-used. Null when every row in `$rows` was used this game.
+     *
+     * @param  Collection<int, IconicArtistSong>  $rows
+     * @param  array<int, string>  $usedTrackIds
+     */
+    private function iconicFresh(Collection $rows, array $usedTrackIds): ?IconicArtistSong
+    {
+        $notUsedThisGame = $rows->whereNotIn('provider_track_id', $usedTrackIds);
+
+        if ($notUsedThisGame->isEmpty()) {
+            return null;
+        }
+
+        $neverUsed = $notUsedThisGame->filter(fn (IconicArtistSong $r) => optional($r->song)->last_used_at === null);
+
+        if ($neverUsed->isNotEmpty()) {
+            return $neverUsed->sortBy('rank')->take(self::ICONIC_RANDOM_SLICE)->random();
+        }
+
+        return $notUsedThisGame->sortBy(fn (IconicArtistSong $r) => optional($r->song)->last_used_at)->first();
     }
 
     /**

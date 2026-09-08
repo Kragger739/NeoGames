@@ -8,12 +8,10 @@ use App\Enums\RoomPlayerMode;
 use App\Enums\RoomStatus;
 use App\Enums\SongGenre;
 use App\Http\Controllers\Controller;
-use App\Jobs\PrimeArtistSongPool;
 use App\Models\GameRoom;
 use App\Models\IconicArtist;
 use App\Models\RoomPlayer;
 use App\Models\UnlockRequirement;
-use App\Support\SongFilter;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -75,9 +73,15 @@ class IconicArtistController extends Controller
             'iconic_artist_id' => $iconicArtist->id,
         ]);
 
-        // Warm the artist's pool while the player picks a mode. RoundService::start()
-        // still has its synchronous ensureArtistPoolReady() safety net.
-        PrimeArtistSongPool::dispatch(SongFilter::fromRoom($room));
+        // The iconic pool is owned (iconic_artist_songs), fetched when the
+        // artist was added. Re-kick that fetch only if it never succeeded or
+        // has gone stale/empty (e.g. songs:sync --fresh nulled the links).
+        $stale = $iconicArtist->fetch_status === 'done'
+            && ($iconicArtist->fetched_at?->lt(now()->subDays(30)) || $iconicArtist->playableTopCount() === 0);
+
+        if (in_array($iconicArtist->fetch_status, ['pending', 'failed'], true) || $stale) {
+            $iconicArtist->startCatalogueFetch();
+        }
 
         $hostPlayer = $room->players()->create([
             'user_id' => $request->user()->id,

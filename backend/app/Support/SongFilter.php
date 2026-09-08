@@ -28,6 +28,10 @@ final class SongFilter
         // A custom Workshop dataset id. When set, genre/year/artist are all
         // ignored: SongDiscoveryService picks straight from dataset_tracks.
         public readonly ?int $datasetId = null,
+        // An Iconic Artist series room. When set, RoundService draws each
+        // round straight from that artist's curated iconic_artist_songs
+        // (top 20 by popularity) - no discovery, no pool warming.
+        public readonly ?int $iconicArtistId = null,
     ) {}
 
     public static function fromRoom(GameRoom $room): self
@@ -41,6 +45,7 @@ final class SongFilter
             artistNames: $room->artist_names,
             enabledTiers: $room->enabledTiers(),
             datasetId: $room->dataset_id,
+            iconicArtistId: $room->iconic_artist_id,
         );
     }
 

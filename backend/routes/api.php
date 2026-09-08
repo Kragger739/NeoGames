@@ -233,6 +233,7 @@ Route::middleware(['auth:sanctum', 'not-banned', 'verified', 'admin'])
         // Iconic Artist series curation. POST for update so a photo can ride along.
         Route::get('/iconic-artists', [AdminIconicArtistController::class, 'index']);
         Route::post('/iconic-artists', [AdminIconicArtistController::class, 'store']);
+        Route::post('/iconic-artists/{iconicArtist}/refetch', [AdminIconicArtistController::class, 'refetch']);
         Route::post('/iconic-artists/{iconicArtist}', [AdminIconicArtistController::class, 'update']);
         Route::delete('/iconic-artists/{iconicArtist}', [AdminIconicArtistController::class, 'destroy']);
 

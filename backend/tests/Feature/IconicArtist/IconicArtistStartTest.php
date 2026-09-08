@@ -3,7 +3,7 @@
 namespace Tests\Feature\IconicArtist;
 
 use App\Events\RoomSettingsUpdated;
-use App\Jobs\PrimeArtistSongPool;
+use App\Jobs\FetchIconicArtistCatalogue;
 use App\Models\GameRoom;
 use App\Models\IconicArtist;
 use App\Models\UnlockRequirement;
@@ -20,7 +20,7 @@ class IconicArtistStartTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Queue::fake([PrimeArtistSongPool::class]);
+        Queue::fake([FetchIconicArtistCatalogue::class]);
         // RoomSettingsUpdated is ShouldBroadcastNow - without this the PATCH
         // tests try to reach a live Reverb server.
         Event::fake([RoomSettingsUpdated::class]);
@@ -70,7 +70,19 @@ class IconicArtistStartTest extends TestCase
         $this->assertSame($user->id, $room->host_id);
         $this->assertDatabaseHas('room_players', ['room_id' => $room->id, 'user_id' => $user->id]);
 
-        Queue::assertPushed(PrimeArtistSongPool::class);
+        // The factory artist is 'pending' -> start() re-kicks the catalogue fetch.
+        Queue::assertPushed(FetchIconicArtistCatalogue::class);
+    }
+
+    public function test_starting_does_not_re_fetch_an_already_fetched_artist(): void
+    {
+        $artist = IconicArtist::factory()->fetched(3)->create(['name' => 'Queen']);
+
+        $this->actingAs(User::factory()->create())
+            ->postJson("/api/iconic-artists/{$artist->id}/start")
+            ->assertCreated();
+
+        Queue::assertNotPushed(FetchIconicArtistCatalogue::class);
     }
 
     public function test_a_disabled_artist_cannot_be_started(): void

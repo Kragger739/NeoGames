@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import {
+  ICONIC_FETCH_IN_FLIGHT,
   useAdminIconicArtistsStore,
   type AdminIconicArtist,
 } from "../stores/adminIconicArtistsStore";
@@ -10,8 +11,24 @@ import { Button } from "../components/ui/Button";
 
 const EMPTY = { id: 0, name: "", enabled: true, sortOrder: 0 };
 
+function fetchLine(a: AdminIconicArtist): string {
+  switch (a.fetch_status) {
+    case "pending":
+    case "discovering":
+      return "Finding songs…";
+    case "seeding":
+      return `Fetching ${a.fetch_resolved}/${a.fetch_total || "…"}…`;
+    case "done":
+      return `✓ ${a.top20_count}/20 hits ready · ${a.fetched_playable} playable`;
+    case "failed":
+      return "Fetch failed";
+    default:
+      return "";
+  }
+}
+
 export function AdminIconicArtistsPage() {
-  const { artists, status, error, fetch, createArtist, updateArtist, deleteArtist } =
+  const { artists, status, error, fetch, createArtist, updateArtist, deleteArtist, refetch } =
     useAdminIconicArtistsStore();
 
   const [form, setForm] = useState(EMPTY);
@@ -23,6 +40,15 @@ export function AdminIconicArtistsPage() {
   useEffect(() => {
     void fetch();
   }, [fetch]);
+
+  // While any artist's catalogue fetch is running, poll the list so the
+  // progress line updates without a manual reload.
+  const anyInFlight = artists.some((a) => ICONIC_FETCH_IN_FLIGHT.includes(a.fetch_status));
+  useEffect(() => {
+    if (!anyInFlight) return;
+    const id = setInterval(() => void fetch(), 4000);
+    return () => clearInterval(id);
+  }, [anyInFlight, fetch]);
 
   function reset() {
     setForm(EMPTY);
@@ -63,9 +89,9 @@ export function AdminIconicArtistsPage() {
       <AdminNav />
       <h1>Iconic Artists</h1>
       <p className="hint">
-        Curated acts for the Songle landing-page carousel. <strong>Name</strong> must match the
-        song pool's artist spelling exactly — <span className="hint">pool</span> below is how
-        many playable tracks match.
+        Curated acts for the Songle landing-page carousel. <strong>Name</strong> must match how
+        Spotify spells the artist. Adding one auto-fetches ~100 of their songs in the
+        background; games play the 20 most popular. Progress shows per row.
       </p>
 
       {error && <p className="form-error">{error}</p>}
@@ -150,11 +176,17 @@ export function AdminIconicArtistsPage() {
                 {artist.name}
                 <span className="hint">
                   {" "}
-                  · pool {artist.pool_size} · order {artist.sort_order}
+                  · {fetchLine(artist)} · order {artist.sort_order}
                 </span>
                 {!artist.enabled && <Badge tone="coral">Hidden</Badge>}
+                {artist.fetch_status === "failed" && artist.fetch_error && (
+                  <span className="form-error">{artist.fetch_error}</span>
+                )}
               </span>
               <span>
+                <Button variant="ghost" onClick={() => void refetch(artist.id)}>
+                  Re-fetch
+                </Button>
                 <Button variant="ghost" onClick={() => edit(artist)}>
                   Edit
                 </Button>

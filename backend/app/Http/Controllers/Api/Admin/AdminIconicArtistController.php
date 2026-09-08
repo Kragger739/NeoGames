@@ -42,6 +42,7 @@ class AdminIconicArtistController extends Controller
         }
 
         $artist->save();
+        $artist->startCatalogueFetch();
 
         return response()->json($this->row($artist), 201);
     }
@@ -64,7 +65,21 @@ class AdminIconicArtistController extends Controller
             $iconicArtist->image_path = $request->file('image')->store('iconic-artists', 'public');
         }
 
+        $nameChanged = $iconicArtist->isDirty('name');
         $iconicArtist->save();
+
+        // A new identity means a new catalogue - the old rows get demoted
+        // (rank nulled) by the fetch job's upsert sweep.
+        if ($nameChanged) {
+            $iconicArtist->startCatalogueFetch();
+        }
+
+        return response()->json($this->row($iconicArtist->fresh()));
+    }
+
+    public function refetch(IconicArtist $iconicArtist)
+    {
+        $iconicArtist->startCatalogueFetch();
 
         return response()->json($this->row($iconicArtist->fresh()));
     }
@@ -75,6 +90,9 @@ class AdminIconicArtistController extends Controller
             Storage::disk('public')->delete($iconicArtist->image_path);
         }
 
+        // iconic_artist_songs rows cascade. Linked `songs` rows are left
+        // alone - they're the shared, songs:sync-regenerable pool and may
+        // back other rooms' rounds.
         $iconicArtist->delete();
 
         return response()->noContent();
@@ -98,6 +116,10 @@ class AdminIconicArtistController extends Controller
      */
     private function row(IconicArtist $artist): array
     {
+        $resolved = $artist->songs()
+            ->where(fn ($q) => $q->whereNotNull('song_id')->orWhere('unplayable', true))
+            ->count();
+
         return [
             'id' => $artist->id,
             'name' => $artist->name,
@@ -105,6 +127,13 @@ class AdminIconicArtistController extends Controller
             'enabled' => (bool) $artist->enabled,
             'sort_order' => $artist->sort_order,
             'pool_size' => $artist->poolCount(),
+            'fetch_status' => $artist->fetch_status,
+            'fetch_total' => $artist->fetched_total,
+            'fetch_resolved' => $resolved,
+            'fetched_playable' => $artist->fetched_playable,
+            'top20_count' => $artist->playableTopCount(20),
+            'fetch_error' => $artist->fetch_error,
+            'fetched_at' => $artist->fetched_at?->toIso8601String(),
         ];
     }
 }

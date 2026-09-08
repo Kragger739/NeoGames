@@ -3,6 +3,8 @@ import { create } from "zustand";
 import { api } from "../lib/api";
 import { firstValidationError } from "../lib/errors";
 
+export type IconicFetchStatus = "pending" | "discovering" | "seeding" | "done" | "failed";
+
 export interface AdminIconicArtist {
   id: number;
   name: string;
@@ -10,7 +12,16 @@ export interface AdminIconicArtist {
   enabled: boolean;
   sort_order: number;
   pool_size: number;
+  fetch_status: IconicFetchStatus;
+  fetch_total: number;
+  fetch_resolved: number;
+  fetched_playable: number;
+  top20_count: number;
+  fetch_error: string | null;
+  fetched_at: string | null;
 }
+
+export const ICONIC_FETCH_IN_FLIGHT: IconicFetchStatus[] = ["pending", "discovering", "seeding"];
 
 interface AdminIconicArtistsState {
   artists: AdminIconicArtist[];
@@ -20,6 +31,7 @@ interface AdminIconicArtistsState {
   createArtist: (form: FormData) => Promise<void>;
   updateArtist: (id: number, form: FormData) => Promise<void>;
   deleteArtist: (id: number) => Promise<void>;
+  refetch: (id: number) => Promise<void>;
 }
 
 export const useAdminIconicArtistsStore = create<AdminIconicArtistsState>((set, get) => {
@@ -56,5 +68,6 @@ export const useAdminIconicArtistsStore = create<AdminIconicArtistsState>((set, 
     createArtist: (form) => run(() => api.post("/api/admin/iconic-artists", form)),
     updateArtist: (id, form) => run(() => api.post(`/api/admin/iconic-artists/${id}`, form)),
     deleteArtist: (id) => run(() => api.delete(`/api/admin/iconic-artists/${id}`)),
+    refetch: (id) => run(() => api.post(`/api/admin/iconic-artists/${id}/refetch`)),
   };
 });
