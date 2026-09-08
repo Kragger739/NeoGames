@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Admin\AdminCosmeticController;
 use App\Http\Controllers\Api\Admin\AdminDailyController;
 use App\Http\Controllers\Api\Admin\AdminSeasonController;
+use App\Http\Controllers\Api\Admin\AdminSongController;
 use App\Http\Controllers\Api\Admin\AdminSongPlaylistController;
 use App\Http\Controllers\Api\Admin\AdminUnlockController;
 use App\Http\Controllers\Api\Admin\AdminUserController;
@@ -221,6 +222,14 @@ Route::middleware(['auth:sanctum', 'not-banned', 'verified', 'admin'])
         Route::post('/song-playlists', [AdminSongPlaylistController::class, 'store']);
         Route::delete('/song-playlists/{songPlaylist}', [AdminSongPlaylistController::class, 'destroy']);
         Route::post('/song-playlists/sync', [AdminSongPlaylistController::class, 'sync']);
+
+        // Individual song pool: browse, edit metadata, remove/restore (the
+        // reversible `excluded` flag). `bulk-exclude` before `{song}` so the
+        // literal path isn't bound as an id.
+        Route::get('/songs', [AdminSongController::class, 'index']);
+        Route::post('/songs/bulk-exclude', [AdminSongController::class, 'bulkExclude']);
+        Route::get('/songs/{song}', [AdminSongController::class, 'show']);
+        Route::patch('/songs/{song}', [AdminSongController::class, 'update']);
 
         Route::get('/unlock-requirements', [AdminUnlockController::class, 'index']);
         Route::patch('/unlock-requirements/{key}', [AdminUnlockController::class, 'update'])->where('key', '[a-z_:]+');

@@ -5,7 +5,9 @@ import { RequireHost } from "./components/RequireHost";
 import { RoomInviteToast } from "./components/RoomInviteToast";
 import { SiteFooter } from "./components/SiteFooter";
 import { AdminSeasonsPage } from "./pages/AdminSeasonsPage";
+import { AdminSongDetailPage } from "./pages/AdminSongDetailPage";
 import { AdminSongPlaylistsPage } from "./pages/AdminSongPlaylistsPage";
+import { AdminSongsPage } from "./pages/AdminSongsPage";
 import { AdminUnlocksPage } from "./pages/AdminUnlocksPage";
 import { AdminUserDetailPage } from "./pages/AdminUserDetailPage";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
@@ -140,6 +142,22 @@ function App() {
           element={
             <RequireAdmin>
               <AdminSongPlaylistsPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/admin/songs"
+          element={
+            <RequireAdmin>
+              <AdminSongsPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/admin/songs/:id"
+          element={
+            <RequireAdmin>
+              <AdminSongDetailPage />
             </RequireAdmin>
           }
         />

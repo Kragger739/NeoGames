@@ -2059,3 +2059,102 @@ button:disabled {
   color: var(--ink);
   font: inherit;
 }
+
+/* --- Admin: song pool --- */
+
+/* The bar's search field shouldn't stretch full width like the standalone
+   .admin-search does. */
+.admin-song-filter-search {
+  flex: 1 1 220px;
+  width: auto;
+  margin: 0;
+}
+
+.admin-song-select {
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.admin-song-bulk {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunk, var(--surface));
+}
+
+.admin-song-row {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-song-check {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.admin-song-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.admin-song-art {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm, 6px);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.admin-song-identity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.admin-song-identity strong,
+.admin-song-identity .hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-song-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.admin-song-row.is-removed .admin-song-main {
+  opacity: 0.5;
+}
+
+.admin-song-detail-head {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin: 8px 0 20px;
+}
+
+.admin-song-detail-art {
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.admin-song-detail-audio {
+  margin-top: 8px;
+  max-width: 100%;
+}
