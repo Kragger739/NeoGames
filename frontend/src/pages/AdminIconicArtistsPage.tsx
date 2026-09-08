@@ -9,7 +9,7 @@ import { AdminNav } from "../components/AdminNav";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 
-const EMPTY = { id: 0, name: "", enabled: true, sortOrder: 0, price: 0 };
+const EMPTY = { id: 0, name: "", enabled: true, sortOrder: 0, price: 0, appleArtist: "" };
 
 function fetchLine(a: AdminIconicArtist): string {
   switch (a.fetch_status) {
@@ -64,6 +64,7 @@ export function AdminIconicArtistsPage() {
       enabled: artist.enabled,
       sortOrder: artist.sort_order,
       price: artist.price,
+      appleArtist: artist.apple_artist_id ? String(artist.apple_artist_id) : "",
     });
     setFile(null);
     setPreview(artist.image_url);
@@ -77,6 +78,7 @@ export function AdminIconicArtistsPage() {
     fd.append("enabled", form.enabled ? "1" : "0");
     fd.append("sort_order", String(form.sortOrder));
     fd.append("price", String(form.price));
+    fd.append("apple_artist", form.appleArtist.trim());
     if (file) fd.append("image", file);
 
     setBusy(true);
@@ -97,8 +99,9 @@ export function AdminIconicArtistsPage() {
       <h1>Iconic Artists</h1>
       <p className="hint">
         Curated acts for the Songle landing-page carousel. <strong>Name</strong> must match how
-        iTunes spells the artist. Adding one auto-fetches ~100 of their songs from iTunes;
-        games play the top 20. Progress shows per row.
+        iTunes spells the artist (it&rsquo;s what in-game rounds match against). Paste the
+        artist&rsquo;s <strong>Apple Music link</strong> to pin the catalogue fetch to the exact
+        right artist. Adding one auto-fetches ~100 of their songs; games play the top 20.
       </p>
 
       {error && <p className="form-error">{error}</p>}
@@ -111,6 +114,15 @@ export function AdminIconicArtistsPage() {
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             required
+          />
+        </label>
+        <label>
+          Apple Music artist link (or numeric ID)
+          <input
+            type="text"
+            placeholder="https://music.apple.com/us/artist/…/159260351"
+            value={form.appleArtist}
+            onChange={(e) => setForm((f) => ({ ...f, appleArtist: e.target.value }))}
           />
         </label>
         <label>
@@ -194,6 +206,7 @@ export function AdminIconicArtistsPage() {
                   {" "}
                   · {fetchLine(artist)} · order {artist.sort_order} ·{" "}
                   {artist.price > 0 ? `◈ ${artist.price}` : "free"}
+                  {artist.apple_artist_id ? " · 🔗 pinned" : ""}
                 </span>
                 {!artist.enabled && <Badge tone="coral">Hidden</Badge>}
                 {artist.free_this_week && <Badge tone="turquoise">Free this week</Badge>}

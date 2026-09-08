@@ -2,17 +2,27 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Jobs\FetchIconicArtistCatalogue;
 use App\Models\IconicArtist;
 use App\Models\Song;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AdminIconicArtistTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // startCatalogueFetch() dispatches this on save - keep it out of the
+        // request path so the tests don't reach the real iTunes API.
+        Queue::fake([FetchIconicArtistCatalogue::class]);
+    }
 
     private function admin(): User
     {
@@ -99,6 +109,63 @@ class AdminIconicArtistTest extends TestCase
 
         $this->assertDatabaseMissing('iconic_artists', ['id' => $id]);
         Storage::disk('public')->assertMissing($path);
+    }
+
+    public function test_it_extracts_the_apple_artist_id_from_a_link(): void
+    {
+        $res = $this->actingAs($this->admin())->post('/api/admin/iconic-artists', [
+            'name' => 'Taylor Swift',
+            'apple_artist' => 'https://music.apple.com/us/artist/taylor-swift/159260351?l=en',
+        ])->assertCreated();
+
+        $res->assertJsonPath('apple_artist_id', 159260351);
+        $this->assertDatabaseHas('iconic_artists', [
+            'id' => $res->json('id'), 'apple_artist_id' => 159260351,
+        ]);
+    }
+
+    public function test_it_accepts_a_bare_numeric_id(): void
+    {
+        $this->actingAs($this->admin())->post('/api/admin/iconic-artists', [
+            'name' => 'Queen', 'apple_artist' => '3296287',
+        ])->assertCreated()->assertJsonPath('apple_artist_id', 3296287);
+    }
+
+    public function test_it_rejects_a_link_with_no_id(): void
+    {
+        $this->actingAs($this->admin())->post('/api/admin/iconic-artists', [
+            'name' => 'Nope', 'apple_artist' => 'https://example.com/artist/someone',
+        ])->assertUnprocessable()->assertJsonValidationErrors('apple_artist');
+    }
+
+    public function test_editing_without_the_field_keeps_the_pin(): void
+    {
+        $id = IconicArtist::factory()->create(['apple_artist_id' => 12345])->id;
+
+        $this->actingAs($this->admin())->post("/api/admin/iconic-artists/{$id}", [
+            'name' => 'Renamed',
+        ])->assertOk()->assertJsonPath('apple_artist_id', 12345);
+    }
+
+    public function test_editing_with_a_blank_field_clears_the_pin(): void
+    {
+        $id = IconicArtist::factory()->create(['apple_artist_id' => 12345])->id;
+
+        $this->actingAs($this->admin())->post("/api/admin/iconic-artists/{$id}", [
+            'name' => 'Kept', 'apple_artist' => '',
+        ])->assertOk()->assertJsonPath('apple_artist_id', null);
+    }
+
+    public function test_changing_the_pin_re_kicks_the_catalogue_fetch(): void
+    {
+        $id = IconicArtist::factory()->create(['name' => 'Same', 'apple_artist_id' => 111])->id;
+        Queue::fake([FetchIconicArtistCatalogue::class]);
+
+        $this->actingAs($this->admin())->post("/api/admin/iconic-artists/{$id}", [
+            'name' => 'Same', 'apple_artist' => '222',
+        ])->assertOk();
+
+        Queue::assertPushed(FetchIconicArtistCatalogue::class);
     }
 
     public function test_index_is_ordered_by_sort_order(): void

@@ -25,7 +25,7 @@ class FetchIconicArtistCatalogueTest extends TestCase
         ]);
     }
 
-    private function song(string $id, string $title, string $artist = 'Queen', ?string $preview = 'https://cdn.apple/p.m4a'): array
+    private function song(string $id, string $title, string $artist = 'Queen', ?string $preview = 'https://cdn.apple/p.m4a', ?int $artistId = null): array
     {
         return [
             'wrapperType' => 'track',
@@ -33,6 +33,7 @@ class FetchIconicArtistCatalogueTest extends TestCase
             'trackId' => $id,
             'trackName' => $title,
             'artistName' => $artist,
+            'artistId' => $artistId,
             'previewUrl' => $preview,
             'artworkUrl100' => 'https://cdn.apple/a100bb.jpg',
             'releaseDate' => '1975-11-21T08:00:00Z',
@@ -87,6 +88,40 @@ class FetchIconicArtistCatalogueTest extends TestCase
 
         $titles = IconicArtistSong::where('iconic_artist_id', $artist->id)->orderBy('rank')->pluck('title')->all();
         $this->assertSame(['Under Pressure', 'Radio Ga Ga'], $titles);
+    }
+
+    public function test_it_pins_the_catalogue_to_the_apple_artist_id(): void
+    {
+        $this->fakeItunes([
+            $this->song('1', 'Real Hit', 'The Band', artistId: 111),
+            $this->song('2', 'Impostor Cover', 'The Band', artistId: 222), // same name, other id
+            $this->song('3', 'Another Real One', 'The Band', artistId: 111),
+        ]);
+
+        $artist = IconicArtist::factory()->create(['name' => 'The Band', 'apple_artist_id' => 111]);
+        $this->runFetch($artist);
+
+        $titles = IconicArtistSong::where('iconic_artist_id', $artist->id)->orderBy('rank')->pluck('title')->all();
+        $this->assertSame(['Real Hit', 'Another Real One'], $titles);
+    }
+
+    public function test_it_falls_back_to_the_id_lookup_when_the_name_search_is_empty(): void
+    {
+        Http::fake([
+            'itunes.apple.com/search*' => Http::response(['resultCount' => 0, 'results' => []], 200),
+            'itunes.apple.com/lookup*' => Http::response(['resultCount' => 2, 'results' => [
+                ['wrapperType' => 'artist', 'artistId' => 111, 'artistName' => 'The Band'],
+                $this->song('9', 'Found By Lookup', 'The Band', artistId: 111),
+            ]], 200),
+        ]);
+
+        $artist = IconicArtist::factory()->create(['name' => 'Th3 B4nd Mispelled', 'apple_artist_id' => 111]);
+        $this->runFetch($artist);
+
+        $this->assertSame('done', $artist->fresh()->fetch_status);
+        $this->assertDatabaseHas('iconic_artist_songs', [
+            'iconic_artist_id' => $artist->id, 'title' => 'Found By Lookup',
+        ]);
     }
 
     public function test_songs_without_a_preview_are_skipped(): void

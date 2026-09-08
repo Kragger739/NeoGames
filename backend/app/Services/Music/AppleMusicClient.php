@@ -93,9 +93,14 @@ class AppleMusicClient
      * touching Spotify (whose catalogue endpoints are edge-blocked for our
      * app token).
      *
+     * When $onlyArtistId is given (an admin pasted the artist's Apple Music
+     * link), results are pinned to that exact artist id - so a same-named or
+     * higher-ranking tribute act is dropped, while keeping the relevance
+     * ordering.
+     *
      * @return array<int, array{itunes_track_id: string, title: string, artist: string, preview_url: string, album_art_url: ?string, release_year: ?int}>
      */
-    public function artistSongs(string $name, int $limit = 150): array
+    public function artistSongs(string $name, int $limit = 150, ?int $onlyArtistId = null): array
     {
         $response = Http::acceptJson()->get(self::BASE_URL.'/search', [
             'term' => trim($name),
@@ -113,10 +118,51 @@ class AppleMusicClient
             throw new RuntimeException("iTunes artist search failed ({$response->status()}) for \"{$name}\".");
         }
 
+        return $this->mapSongResults($response->json('results', []), $onlyArtistId);
+    }
+
+    /**
+     * The same shape as artistSongs(), but sourced from the iTunes lookup
+     * endpoint keyed by artist id - a last-resort fallback for when the
+     * name search returns nothing (a badly misspelled name). Lookup orders
+     * by recency rather than relevance, so it's only used to fill a gap.
+     *
+     * @return array<int, array{itunes_track_id: string, title: string, artist: string, preview_url: string, album_art_url: ?string, release_year: ?int}>
+     */
+    public function artistSongsById(int $artistId, int $limit = 150): array
+    {
+        $response = Http::acceptJson()->get(self::BASE_URL.'/lookup', [
+            'id' => $artistId,
+            'entity' => 'song',
+            'limit' => min(200, max(1, $limit)),
+            'country' => config('music.itunes_country', 'US'),
+        ]);
+
+        if ($response->status() === 403 || $response->status() === 429) {
+            throw new RateLimitException('iTunes Lookup API rate limit hit (HTTP '.$response->status().').');
+        }
+
+        if ($response->failed()) {
+            throw new RuntimeException("iTunes artist lookup failed ({$response->status()}) for id {$artistId}.");
+        }
+
+        return $this->mapSongResults($response->json('results', []), $artistId);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $results
+     * @return array<int, array{itunes_track_id: string, title: string, artist: string, preview_url: string, album_art_url: ?string, release_year: ?int}>
+     */
+    private function mapSongResults(array $results, ?int $onlyArtistId): array
+    {
         $out = [];
 
-        foreach ($response->json('results', []) as $result) {
+        foreach ($results as $result) {
             if (($result['kind'] ?? null) !== 'song' || empty($result['previewUrl']) || ! isset($result['trackId'])) {
+                continue;
+            }
+
+            if ($onlyArtistId !== null && (int) ($result['artistId'] ?? 0) !== $onlyArtistId) {
                 continue;
             }
 

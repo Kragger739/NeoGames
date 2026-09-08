@@ -53,7 +53,7 @@ class FetchIconicArtistCatalogue implements ShouldQueue
         try {
             $artist->forceFill(['fetch_status' => 'discovering', 'fetch_error' => null])->save();
 
-            $ranked = $this->collect($artist->name, $apple);
+            $ranked = $this->collect($artist, $apple);
 
             if ($ranked === []) {
                 $artist->forceFill([
@@ -89,20 +89,35 @@ class FetchIconicArtistCatalogue implements ShouldQueue
     }
 
     /**
-     * iTunes songs for the artist, filtered to an exact artist-name match and
-     * de-duplicated by normalized title (keeping the more relevant pressing),
-     * capped and returned in relevance = rank order.
+     * iTunes songs for the artist, de-duplicated by normalized title (keeping
+     * the more relevant pressing), capped and returned in relevance = rank
+     * order.
+     *
+     * If the artist has a pinned `apple_artist_id` (admin pasted their Apple
+     * Music link), results are locked to that exact artist id - the name
+     * search only decides ordering, not identity. Otherwise it falls back to
+     * the exact-name string filter.
      *
      * @return array<int, array<string, mixed>>
      */
-    private function collect(string $name, AppleMusicClient $apple): array
+    private function collect(IconicArtist $artist, AppleMusicClient $apple): array
     {
+        $name = $artist->name;
+        $pinnedId = $artist->apple_artist_id;
         $wanted = mb_strtolower(trim($name));
         $seen = [];
         $ranked = [];
 
-        foreach ($apple->artistSongs($name, self::CANDIDATE_CAP + 60) as $song) {
-            if (mb_strtolower(trim($song['artist'])) !== $wanted) {
+        $songs = $apple->artistSongs($name, self::CANDIDATE_CAP + 60, $pinnedId);
+
+        // A badly misspelled name can return nothing from the artistTerm
+        // search even with a valid pinned id - fall back to the id lookup.
+        if ($songs === [] && $pinnedId !== null) {
+            $songs = $apple->artistSongsById($pinnedId, self::CANDIDATE_CAP + 60);
+        }
+
+        foreach ($songs as $song) {
+            if ($pinnedId === null && mb_strtolower(trim($song['artist'])) !== $wanted) {
                 continue;
             }
 

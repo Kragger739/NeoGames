@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\IconicArtist;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Admin CRUD for the Iconic Artist series carousel. Mirrors
@@ -36,6 +37,7 @@ class AdminIconicArtistController extends Controller
             'enabled' => $request->boolean('enabled', true),
             'sort_order' => $request->integer('sort_order', 0),
             'price' => $request->integer('price', 0),
+            'apple_artist_id' => $this->resolveAppleArtistId($request),
         ]);
 
         if ($request->hasFile('image')) {
@@ -60,6 +62,12 @@ class AdminIconicArtistController extends Controller
             'price' => $request->integer('price', $iconicArtist->price),
         ]);
 
+        // Only touch the pin when the field is actually submitted (blank
+        // submitted = clear it).
+        if ($request->has('apple_artist')) {
+            $iconicArtist->apple_artist_id = $this->resolveAppleArtistId($request);
+        }
+
         if ($request->hasFile('image')) {
             if ($iconicArtist->image_path) {
                 Storage::disk('public')->delete($iconicArtist->image_path);
@@ -67,12 +75,12 @@ class AdminIconicArtistController extends Controller
             $iconicArtist->image_path = $request->file('image')->store('iconic-artists', 'public');
         }
 
-        $nameChanged = $iconicArtist->isDirty('name');
+        $identityChanged = $iconicArtist->isDirty('name') || $iconicArtist->isDirty('apple_artist_id');
         $iconicArtist->save();
 
         // A new identity means a new catalogue - the old rows get demoted
         // (rank nulled) by the fetch job's upsert sweep.
-        if ($nameChanged) {
+        if ($identityChanged) {
             $iconicArtist->startCatalogueFetch();
         }
 
@@ -110,7 +118,37 @@ class AdminIconicArtistController extends Controller
             'enabled' => ['sometimes', 'boolean'],
             'sort_order' => ['sometimes', 'integer', 'min:0', 'max:9999'],
             'price' => ['sometimes', 'integer', 'min:0', 'max:1000000'],
+            'apple_artist' => ['nullable', 'string', 'max:500'],
             'image' => ['nullable', 'image', 'mimes:png,webp,jpg,jpeg', 'max:4096'],
+        ]);
+    }
+
+    /**
+     * Turn the pasted Apple Music artist link (or a bare numeric id) into the
+     * artist id. Blank clears the pin; anything non-blank with no extractable
+     * id is a validation error.
+     */
+    private function resolveAppleArtistId(Request $request): ?int
+    {
+        $raw = trim((string) $request->input('apple_artist', ''));
+
+        if ($raw === '') {
+            return null;
+        }
+
+        if (ctype_digit($raw)) {
+            return (int) $raw;
+        }
+
+        // https://music.apple.com/us/artist/taylor-swift/159260351
+        // https://itunes.apple.com/us/artist/id159260351
+        // ...both optionally followed by ?query / #hash
+        if (preg_match('~/(?:id)?(\d{3,})(?:[/?#]|$)~', $raw, $m)) {
+            return (int) $m[1];
+        }
+
+        throw ValidationException::withMessages([
+            'apple_artist' => ['Paste the Apple Music artist page link (or its numeric ID).'],
         ]);
     }
 
@@ -130,6 +168,7 @@ class AdminIconicArtistController extends Controller
             'enabled' => (bool) $artist->enabled,
             'sort_order' => $artist->sort_order,
             'price' => (int) $artist->price,
+            'apple_artist_id' => $artist->apple_artist_id,
             'free_this_week' => $artist->id === IconicArtist::freeThisWeek()?->id,
             'pool_size' => $artist->poolCount(),
             'fetch_status' => $artist->fetch_status,
