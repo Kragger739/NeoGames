@@ -19,6 +19,7 @@
 }
 
 .iconic-carousel {
+  --iconic-card-w: clamp(120px, 42vw, 168px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -34,6 +35,7 @@
 }
 
 .iconic-carousel-track {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -41,6 +43,7 @@
   min-width: 0;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
+  scroll-padding-inline: 50%;
   scroll-behavior: smooth;
   padding: 24px 0 12px;
   scrollbar-width: none;
@@ -50,13 +53,13 @@
   display: none;
 }
 
-/* Leading/trailing filler so the first and last cards can reach the centre. */
+/* Leading/trailing filler so the first and last cards can reach dead centre. */
 .iconic-carousel-spacer {
-  flex: 0 0 33%;
+  flex: 0 0 calc(50% - var(--iconic-card-w) / 2);
 }
 
 .iconic-artist-card {
-  flex: 0 0 clamp(112px, 34%, 176px);
+  flex: 0 0 var(--iconic-card-w);
   scroll-snap-align: center;
   display: flex;
   flex-direction: column;
@@ -66,8 +69,8 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  transform: scale(0.82);
-  opacity: 0.5;
+  transform: scale(0.8);
+  opacity: 0.45;
   transition:
     transform 0.3s var(--ease-out),
     opacity 0.3s var(--ease-out);
@@ -76,6 +79,7 @@
 .iconic-artist-card.is-centered {
   transform: scale(1.12);
   opacity: 1;
+  z-index: 1;
 }
 
 .iconic-artist-card:disabled {
@@ -107,10 +111,9 @@ span.iconic-artist-photo.art-placeholder {
   .iconic-carousel-track {
     scroll-behavior: auto;
   }
-  .iconic-artist-card,
-  .iconic-artist-card.is-centered {
-    transform: none;
-    opacity: 1;
+  /* Keep the selected-vs-not size/opacity difference (it's a static state,
+     not motion) - just drop the animation. */
+  .iconic-artist-card {
     transition: none;
   }
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Play } from "lucide-react";
 
 import type { IconicArtist } from "../lib/iconicSeries";
@@ -12,71 +12,79 @@ interface Props {
   busy?: boolean;
 }
 
+function reducedMotion(): boolean {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+}
+
+const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+
 /**
- * Horizontal, snap-scrolling artist picker. The card nearest the track's
- * centre is the selection: it scales up (both the "grows into focus" and the
- * "animates while scrolling" effect, since the scale transitions as the
- * centred card changes). Clicking a side card centres it; clicking the
- * centred card — or the Play button — starts a game.
+ * Horizontal artist picker. `selectedIndex` is the single source of truth:
+ * the selected card is scrolled to dead centre and scaled up, the Play
+ * button + chevrons act on it, and a manual swipe reconciles the index back
+ * from the scroll position. Clicking a side card selects it; clicking the
+ * selected card (or Play) starts a game.
  */
 export function IconicArtistCarousel({ artists, onPick, disabled = false, busy = false }: Props) {
   const trackRef = useRef<HTMLDivElement | null>(null);
-  const cardRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
-  const [centeredId, setCenteredId] = useState<number | null>(artists[0]?.id ?? null);
-  const rafRef = useRef<number | null>(null);
+  const cardRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const scrollDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const recomputeCentered = useCallback(() => {
-    const track = trackRef.current;
-    if (!track) return;
-    const mid = track.scrollLeft + track.clientWidth / 2;
-    let bestId: number | null = null;
-    let bestDist = Infinity;
-    for (const [id, el] of cardRefs.current) {
-      const cardMid = el.offsetLeft + el.offsetWidth / 2;
-      const dist = Math.abs(cardMid - mid);
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestId = id;
-      }
-    }
-    setCenteredId((prev) => (prev === bestId ? prev : bestId));
-  }, []);
+  const lastIndex = Math.max(0, artists.length - 1);
+  const selected = artists[selectedIndex] ?? null;
 
-  function onScroll() {
-    if (rafRef.current !== null) return;
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      recomputeCentered();
+  // Keep the index in range if the artist list shrinks.
+  useEffect(() => {
+    setSelectedIndex((i) => Math.min(i, Math.max(0, artists.length - 1)));
+  }, [artists.length]);
+
+  // Bring the selected card to the centre (also runs on mount for index 0).
+  useEffect(() => {
+    cardRefs.current[selectedIndex]?.scrollIntoView({
+      inline: "center",
+      block: "nearest",
+      behavior: reducedMotion() ? "auto" : "smooth",
     });
-  }
+  }, [selectedIndex, artists.length]);
 
   useEffect(() => {
-    recomputeCentered();
-    window.addEventListener("resize", recomputeCentered);
     return () => {
-      window.removeEventListener("resize", recomputeCentered);
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      if (scrollDebounce.current) clearTimeout(scrollDebounce.current);
     };
-  }, [recomputeCentered, artists.length]);
+  }, []);
 
-  function scrollToCard(id: number) {
-    cardRefs.current.get(id)?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  // After a manual scroll/swipe settles, snap the index to whichever card is
+  // nearest the track's centre. Idempotent after our own programmatic scroll.
+  function onScroll() {
+    if (scrollDebounce.current) clearTimeout(scrollDebounce.current);
+    scrollDebounce.current = setTimeout(() => {
+      const track = trackRef.current;
+      if (!track) return;
+      const trackMid = track.getBoundingClientRect().left + track.clientWidth / 2;
+      let nearest = 0;
+      let best = Infinity;
+      cardRefs.current.forEach((el, i) => {
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const dist = Math.abs(rect.left + rect.width / 2 - trackMid);
+        if (dist < best) {
+          best = dist;
+          nearest = i;
+        }
+      });
+      setSelectedIndex((prev) => (nearest !== prev ? nearest : prev));
+    }, 110);
   }
 
-  function step(dir: -1 | 1) {
-    const ids = artists.map((a) => a.id);
-    const i = centeredId != null ? ids.indexOf(centeredId) : 0;
-    const next = ids[Math.min(ids.length - 1, Math.max(0, i + dir))];
-    if (next != null) scrollToCard(next);
-  }
-
-  function activate(id: number) {
+  function handleCard(i: number) {
     if (disabled || busy) return;
-    if (id === centeredId) onPick(id);
-    else scrollToCard(id);
+    if (i === selectedIndex) {
+      if (selected) onPick(selected.id);
+    } else {
+      setSelectedIndex(i);
+    }
   }
-
-  const centered = artists.find((a) => a.id === centeredId) ?? null;
 
   return (
     <div className="iconic-carousel">
@@ -84,26 +92,21 @@ export function IconicArtistCarousel({ artists, onPick, disabled = false, busy =
         <IconButton
           icon={ChevronLeft}
           label="Previous artist"
-          onClick={() => step(-1)}
-          disabled={disabled || centeredId === artists[0]?.id}
+          onClick={() => setSelectedIndex((i) => clamp(i - 1, 0, lastIndex))}
+          disabled={disabled || selectedIndex === 0}
         />
         <div className="iconic-carousel-track" ref={trackRef} onScroll={onScroll}>
           <span className="iconic-carousel-spacer" aria-hidden="true" />
-          {artists.map((artist) => (
+          {artists.map((artist, i) => (
             <button
               key={artist.id}
               type="button"
               ref={(el) => {
-                if (el) cardRefs.current.set(artist.id, el);
-                else cardRefs.current.delete(artist.id);
+                cardRefs.current[i] = el;
               }}
-              className={
-                artist.id === centeredId
-                  ? "iconic-artist-card is-centered"
-                  : "iconic-artist-card"
-              }
-              onClick={() => activate(artist.id)}
-              aria-current={artist.id === centeredId}
+              className={i === selectedIndex ? "iconic-artist-card is-centered" : "iconic-artist-card"}
+              onClick={() => handleCard(i)}
+              aria-current={i === selectedIndex}
               disabled={disabled}
             >
               {artist.image_url ? (
@@ -119,23 +122,23 @@ export function IconicArtistCarousel({ artists, onPick, disabled = false, busy =
         <IconButton
           icon={ChevronRight}
           label="Next artist"
-          onClick={() => step(1)}
-          disabled={disabled || centeredId === artists[artists.length - 1]?.id}
+          onClick={() => setSelectedIndex((i) => clamp(i + 1, 0, lastIndex))}
+          disabled={disabled || selectedIndex >= lastIndex}
         />
       </div>
 
       <Button
         variant="primary"
         size="lg"
-        disabled={disabled || busy || centered === null}
-        onClick={() => centered && onPick(centered.id)}
+        disabled={disabled || busy || !selected}
+        onClick={() => selected && onPick(selected.id)}
       >
         {busy ? (
           "Setting up…"
         ) : (
           <>
             <Play size={20} strokeWidth={2.5} />
-            {centered ? `Play ${centered.name}` : "Play"}
+            {selected ? `Play ${selected.name}` : "Play"}
           </>
         )}
       </Button>
