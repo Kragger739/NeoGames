@@ -66,6 +66,38 @@ class FreeArtistOfTheWeekTest extends TestCase
         $this->assertNull(IconicArtist::freeThisWeek());
     }
 
+    public function test_the_pick_is_frozen_for_the_week_even_if_artists_change(): void
+    {
+        $this->travelTo('2026-01-05');
+        $a = IconicArtist::factory()->create(['price' => 500, 'sort_order' => 1]);
+        IconicArtist::factory()->create(['price' => 500, 'sort_order' => 2]);
+
+        $this->assertSame($a->id, IconicArtist::freeThisWeek()->id);
+
+        // Admin churns the priced list mid-week: new artist, reprice, reorder.
+        IconicArtist::factory()->create(['price' => 500, 'sort_order' => 0]);
+        IconicArtist::factory()->create(['price' => 500, 'sort_order' => 3]);
+        IconicArtist::where('id', '!=', $a->id)->update(['sort_order' => 0]);
+
+        $this->assertSame($a->id, IconicArtist::freeThisWeek()->id);
+    }
+
+    public function test_it_reselects_only_if_the_stored_pick_is_pulled_mid_week(): void
+    {
+        $this->travelTo('2026-01-05');
+        $a = IconicArtist::factory()->create(['price' => 500, 'sort_order' => 1]);
+        $b = IconicArtist::factory()->create(['price' => 500, 'sort_order' => 2]);
+
+        $this->assertSame($a->id, IconicArtist::freeThisWeek()->id);
+
+        $a->update(['enabled' => false]);
+
+        $this->assertSame($b->id, IconicArtist::freeThisWeek()->id);
+        $this->assertDatabaseHas('iconic_free_weeks', [
+            'week_key' => '2026-W02', 'iconic_artist_id' => $b->id,
+        ]);
+    }
+
     public function test_the_weekly_artist_can_be_started_without_owning_it(): void
     {
         [$a, $b] = $this->threePricedArtists();
