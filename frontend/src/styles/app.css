@@ -986,12 +986,9 @@ button:disabled {
 
 @media (max-width: 720px) {
   .game-play-layout {
-    flex-direction: column-reverse;
-    /* Tight - the scoreboard strip sits right above the controls. */
+    /* Controls first (top), then the compact scoreboard strip below them. */
+    flex-direction: column;
     gap: 4px;
-    /* Fill the page and centre the control stack vertically for thumb reach. */
-    flex: 1;
-    justify-content: center;
   }
 
   /* Stacked column: the base `align-items: flex-start` would otherwise let
@@ -1002,9 +999,11 @@ button:disabled {
   }
 
   /* No room name / leave button and no volume control on a phone - the
-     hardware rocker and the results screen cover both. */
-  .game-play-header,
-  .volume-control {
+     hardware rocker and the results screen cover both. Scoped through
+     .game-play-main so this beats the base `.volume-control { display: flex }`
+     rule that appears later in the file. */
+  .game-play-main .game-play-header,
+  .game-play-main .volume-control {
     display: none;
   }
 
