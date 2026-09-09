@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { LogOut, Volume2, VolumeX } from "lucide-react";
 
 import { GuessAutocomplete } from "../components/GuessAutocomplete";
+import { useLeaveRoomOnClose } from "../hooks/useLeaveRoomOnClose";
 import { api } from "../lib/api";
 import { firstValidationError } from "../lib/errors";
 import { RoundReveal } from "../components/RoundReveal";
@@ -82,6 +83,8 @@ export function GamePlayPage() {
     if (!code) return;
     connect(code);
   }, [code, connect]);
+
+  useLeaveRoomOnClose(code);
 
   useEffect(() => {
     if (phase === "finished" && code) {

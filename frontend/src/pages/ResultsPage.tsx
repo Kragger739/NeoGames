@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { LogOut, RotateCcw, Trophy } from "lucide-react";
 
+import { useLeaveRoomOnClose } from "../hooks/useLeaveRoomOnClose";
 import { api } from "../lib/api";
 import { firstValidationError } from "../lib/errors";
 import { leaveRoomOnServer } from "../lib/leaveRoom";
@@ -42,6 +43,8 @@ export function ResultsPage() {
     if (!code) return;
     connectGame(code);
   }, [code, connectGame]);
+
+  useLeaveRoomOnClose(code);
 
   useEffect(() => {
     if (!code) return;

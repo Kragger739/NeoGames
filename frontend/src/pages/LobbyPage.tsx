@@ -4,6 +4,7 @@ import { Check, Copy, LogOut, Rocket } from "lucide-react";
 
 import { IconicArtistLobbySettings } from "../components/IconicArtistLobbySettings";
 import { RoomSettingsForm } from "../components/RoomSettingsForm";
+import { useLeaveRoomOnClose } from "../hooks/useLeaveRoomOnClose";
 import { api } from "../lib/api";
 import { DIFFICULTY_TIERS } from "../lib/difficultyTiers";
 import { firstValidationError } from "../lib/errors";
@@ -130,6 +131,8 @@ export function LobbyPage() {
     if (!code) return;
     connectGame(code);
   }, [code, connectGame]);
+
+  useLeaveRoomOnClose(code);
 
   // A little celebratory blip whenever the lobby roster grows - skips the
   // very first population of the list (joining an already-full lobby

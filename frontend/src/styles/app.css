@@ -1038,6 +1038,18 @@ button:disabled {
     padding-top: 24px;
     padding-bottom: 24px;
   }
+
+  /* The on-screen keyboard eats the bottom of the viewport while guessing,
+     and the list otherwise grows to fit every result - taller than the
+     space actually left above the keyboard, with nothing to scroll it
+     into view (the page itself has no more room to scroll). Capping the
+     height and scrolling the list internally keeps every suggestion
+     reachable without dismissing the keyboard first. */
+  .guess-suggestions {
+    max-height: 38vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 .stage-info {
