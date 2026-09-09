@@ -1040,13 +1040,17 @@ button:disabled {
   }
 
   /* The on-screen keyboard eats the bottom of the viewport while guessing,
-     and the list otherwise grows to fit every result - taller than the
-     space actually left above the keyboard, with nothing to scroll it
-     into view (the page itself has no more room to scroll). Capping the
-     height and scrolling the list internally keeps every suggestion
-     reachable without dismissing the keyboard first. */
+     and the list otherwise grows to fit every result (the backend returns
+     up to 8 - see SongSearchController's ->limit(8)) - taller than the
+     space actually left above the keyboard, with nothing to scroll it into
+     view (the page itself has no more room to scroll). A viewport-relative
+     cap (vh) is still unpredictable once the keyboard is up, so this fixes
+     the height to a literal ~3-row preview instead - 3 x ~40px rows (each
+     driven by .suggestion-label's 10px top/bottom padding) + 2 x 2px row
+     gaps + the list's own 8px top/bottom padding - and scrolls the rest
+     internally, always reachable without dismissing the keyboard first. */
   .guess-suggestions {
-    max-height: 38vh;
+    max-height: 152px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
