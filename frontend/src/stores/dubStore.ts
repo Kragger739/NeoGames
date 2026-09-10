@@ -36,6 +36,7 @@ interface DubState {
   code: string | null;
   hostId: number | null;
   hostName: string | null;
+  playerMode: "solo" | "multiplayer";
   state: DubGameState;
   roundNumber: number;
   totalScore: number;
@@ -68,6 +69,7 @@ const initialState = {
   code: null,
   hostId: null,
   hostName: null,
+  playerMode: "multiplayer" as "solo" | "multiplayer",
   state: "lobby" as DubGameState,
   roundNumber: 0,
   totalScore: 0,
@@ -98,6 +100,7 @@ function roomStateToPatch(room: DubRoomState) {
   return {
     hostId: room.host_id,
     hostName: room.host_name,
+    playerMode: room.player_mode,
     state: room.state,
     roundNumber: room.round_number,
     totalScore: room.total_score,
@@ -263,6 +266,7 @@ export const useDubStore = create<DubState>((set, get) => ({
         code: get().code,
         hostId: get().hostId,
         hostName: get().hostName,
+        playerMode: get().playerMode,
         members: get().members,
         players: p.players,
         caughtUp: true,

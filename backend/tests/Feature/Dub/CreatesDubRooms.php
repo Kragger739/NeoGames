@@ -14,10 +14,10 @@ use App\Models\User;
  */
 trait CreatesDubRooms
 {
-    private function createDubRoom(array $gameAttributes = []): GameRoom
+    private function createDubRoom(array $gameAttributes = [], array $roomAttributes = []): GameRoom
     {
         $host = User::factory()->create();
-        $room = GameRoom::factory()->for($host, 'host')->create(['game' => 'dub']);
+        $room = GameRoom::factory()->for($host, 'host')->create(array_merge(['game' => 'dub'], $roomAttributes));
         $room->dubGame()->create(array_merge(['state' => 'lobby'], $gameAttributes));
 
         return $room->fresh();

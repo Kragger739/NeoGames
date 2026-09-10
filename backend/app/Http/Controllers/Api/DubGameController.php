@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\RoomPlayerMode;
 use App\Enums\RoomStatus;
 use App\Events\Dub\DubPlayersUpdated;
 use App\Http\Controllers\Controller;
@@ -27,13 +28,21 @@ class DubGameController extends Controller
 {
     public function store(Request $request)
     {
-        $lineTimer = (int) $request->input('line_timer_seconds', 0);
-        $watchTimer = (int) $request->input('watch_timer_seconds', 0);
+        $playerMode = $request->input('player_mode', RoomPlayerMode::Multiplayer->value);
+        if (! in_array($playerMode, array_column(RoomPlayerMode::cases(), 'value'), true)) {
+            $playerMode = RoomPlayerMode::Multiplayer->value;
+        }
+        $solo = $playerMode === RoomPlayerMode::Solo->value;
+
+        // Solo play is self-paced - no per-line or watch countdown.
+        $lineTimer = $solo ? 0 : (int) $request->input('line_timer_seconds', 0);
+        $watchTimer = $solo ? 0 : (int) $request->input('watch_timer_seconds', 0);
 
         $room = $request->user()->rooms()->create([
             'code' => GameRoom::generateUniqueCode(),
             'status' => RoomStatus::Lobby->value,
             'game' => 'dub',
+            'player_mode' => $playerMode,
         ]);
 
         $room->dubGame()->create([
@@ -262,6 +271,7 @@ class DubGameController extends Controller
             'code' => $room->code,
             'host_id' => $room->host_id,
             'host_name' => $room->host->name,
+            'player_mode' => $room->player_mode->value,
             'state' => $game->state->value,
             'round_number' => $game->round_number,
             'total_score' => $game->total_score,

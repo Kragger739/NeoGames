@@ -16,6 +16,7 @@ export function DubWatchPage() {
   const connect = useDubStore((s) => s.connect);
   const resync = useDubStore((s) => s.resync);
   const state = useDubStore((s) => s.state);
+  const playerMode = useDubStore((s) => s.playerMode);
   const assembledVideoUrl = useDubStore((s) => s.assembledVideoUrl);
   const players = useDubStore((s) => s.players);
   const ratingCount = useDubStore((s) => s.ratingCount);
@@ -32,6 +33,7 @@ export function DubWatchPage() {
 
   const myPlayerId = getPlayerId();
   const iAmHostSeat = players.find((p) => p.room_player_id === myPlayerId)?.is_host ?? false;
+  const solo = playerMode === "solo";
 
   useEffect(() => {
     if (code) connect(code);
@@ -94,7 +96,7 @@ export function DubWatchPage() {
 
       {state === "watch" && (
         <Button variant="grape" size="lg" disabled={busy} onClick={() => void act("watch-done")}>
-          Continue to ratings
+          {solo ? "Continue" : "Continue to ratings"}
         </Button>
       )}
 
@@ -128,19 +130,25 @@ export function DubWatchPage() {
 
       {state === "round_complete" && (
         <section className="dub-score-callout">
-          <h2>Round score: {lastRoundScore?.toFixed(2) ?? "—"}</h2>
-          <p className="hint">Running total: {totalScore.toFixed(2)}</p>
-          <ul className="dub-score-breakdown">
-            {scoreBreakdown.map((b) => (
-              <li key={b.room_player_id}>
-                <span>{b.nickname}</span>
-                <span>{b.score ? `${b.score}★` : "—"}</span>
-              </li>
-            ))}
-          </ul>
+          {solo ? (
+            <h2>Nice one!</h2>
+          ) : (
+            <>
+              <h2>Round score: {lastRoundScore?.toFixed(2) ?? "—"}</h2>
+              <p className="hint">Running total: {totalScore.toFixed(2)}</p>
+              <ul className="dub-score-breakdown">
+                {scoreBreakdown.map((b) => (
+                  <li key={b.room_player_id}>
+                    <span>{b.nickname}</span>
+                    <span>{b.score ? `${b.score}★` : "—"}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           {iAmHostSeat ? (
             <>
-              <h3>Play another clip</h3>
+              <h3>{solo ? "Another clip?" : "Play another clip"}</h3>
               <DubClipPicker
                 selectedClipId={null}
                 disabled={busy}

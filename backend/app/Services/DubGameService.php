@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\DubGameState;
+use App\Enums\RoomPlayerMode;
 use App\Events\Dub\DubAssembled;
 use App\Events\Dub\DubAssemblyFailed;
 use App\Events\Dub\DubAssemblyStarted;
@@ -83,9 +84,12 @@ class DubGameService
         }
 
         $players = $this->activePlayers($room);
+        $solo = $this->isSolo($room);
 
-        if ($players->count() < self::MIN_PLAYERS) {
-            throw ValidationException::withMessages(['room' => ['At least 2 players are needed to start.']]);
+        if ($players->count() < ($solo ? 1 : self::MIN_PLAYERS)) {
+            throw ValidationException::withMessages(['room' => [
+                $solo ? 'Join the room before starting.' : 'At least 2 players are needed to start.',
+            ]]);
         }
 
         $notReady = $players->first(fn (RoomPlayer $p) => ! $p->dubState?->mic_ready);
@@ -95,16 +99,50 @@ class DubGameService
         }
 
         $game->update([
-            'state' => DubGameState::RoleClaim->value,
-            'state_version' => $game->state_version + 1,
-            'stage_started_at' => now(),
             'round_number' => 1,
             'current_line_index' => 0,
         ]);
 
-        $this->seedAssignments($game->fresh());
+        $this->beginRound($room, $game->fresh(), isStart: true);
+    }
 
-        broadcast(new DubRoleClaimStarted($game->fresh()->load('clip')));
+    /**
+     * Shared "open a fresh round on the current clip" step for start() and
+     * nextRound(). Multiplayer opens the interactive RoleClaim phase; solo
+     * pre-assigns every character to the sole player and jumps straight to
+     * Recording (there is nobody to claim against).
+     */
+    private function beginRound(GameRoom $room, DubGame $game, bool $isStart): void
+    {
+        $this->seedAssignments($game);
+
+        if (! $this->isSolo($room)) {
+            $game->update([
+                'state' => DubGameState::RoleClaim->value,
+                'state_version' => $game->state_version + 1,
+                'stage_started_at' => now(),
+            ]);
+
+            $fresh = $game->fresh()->load('clip');
+            broadcast($isStart ? new DubRoleClaimStarted($fresh) : new DubNextRound($fresh));
+
+            return;
+        }
+
+        $solo = $room->players()->first();
+
+        $game->roleAssignments()
+            ->where('round_number', $game->round_number)
+            ->update(['room_player_id' => $solo->id]);
+
+        $game->update([
+            'state' => DubGameState::Recording->value,
+            'state_version' => $game->state_version + 1,
+            'stage_started_at' => now(),
+            'current_line_index' => 0,
+        ]);
+
+        broadcast(new DubRecordingStarted($game->fresh()->load('clip')));
     }
 
     // ------------------------------------------------------------------
@@ -342,6 +380,20 @@ class DubGameService
             return; // already advanced by the other trigger
         }
 
+        // Solo has one rater and no competitive score - skip Rating and go
+        // straight to RoundComplete with no score.
+        if ($this->isSolo($room)) {
+            $game->update([
+                'state' => DubGameState::RoundComplete->value,
+                'state_version' => $game->state_version + 1,
+                'last_round_score' => null,
+            ]);
+
+            broadcast(new DubRoundScored($game->fresh(), []));
+
+            return;
+        }
+
         $game->update([
             'state' => DubGameState::Rating->value,
             'state_version' => $game->state_version + 1,
@@ -449,9 +501,6 @@ class DubGameService
         }
 
         $game->update([
-            'state' => DubGameState::RoleClaim->value,
-            'state_version' => $game->state_version + 1,
-            'stage_started_at' => now(),
             'round_number' => $game->round_number + 1,
             'current_line_index' => 0,
             'dub_clip_id' => $clip->id,
@@ -460,9 +509,7 @@ class DubGameService
             'last_round_score' => null,
         ]);
 
-        $this->seedAssignments($game->fresh());
-
-        broadcast(new DubNextRound($game->fresh()->load('clip')));
+        $this->beginRound($room, $game->fresh(), isStart: false);
     }
 
     public function finish(GameRoom $room): void
@@ -608,6 +655,11 @@ class DubGameService
             ->first();
 
         return $line?->position;
+    }
+
+    private function isSolo(GameRoom $room): bool
+    {
+        return $room->player_mode === RoomPlayerMode::Solo;
     }
 
     /** @return Collection<int, RoomPlayer> */

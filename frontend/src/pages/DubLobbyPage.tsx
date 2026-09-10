@@ -20,6 +20,7 @@ export function DubLobbyPage() {
   const resync = useDubStore((s) => s.resync);
   const leaveRoom = useDubStore((s) => s.leaveRoom);
   const state = useDubStore((s) => s.state);
+  const playerMode = useDubStore((s) => s.playerMode);
   const hostName = useDubStore((s) => s.hostName);
   const players = useDubStore((s) => s.players);
   const clip = useDubStore((s) => s.clip);
@@ -135,8 +136,12 @@ export function DubLobbyPage() {
     }
   }
 
+  const solo = playerMode === "solo";
   const micReadyCount = players.filter((p) => p.mic_ready).length;
-  const canStart = clip?.status === "ready" && players.length >= 2 && micReadyCount === players.length;
+  const canStart =
+    clip?.status === "ready" &&
+    players.length >= (solo ? 1 : 2) &&
+    micReadyCount === players.length;
   const claimByCharacter = new Map(roleAssignments.map((a) => [a.character_id, a.room_player_id]));
   const everyCharacterClaimed =
     (clip?.characters.length ?? 0) > 0 && clip!.characters.every((c) => claimByCharacter.get(c.id) != null);
@@ -145,11 +150,17 @@ export function DubLobbyPage() {
     <div className="dub-lobby-page">
       <h1>DUB TOGETHER</h1>
       <div className="dub-lobby-invite">
-        <p className="room-ticket">{code?.toUpperCase()}</p>
-        <Button variant="ghost" onClick={() => void copyInvite()}>
-          <Copy size={16} strokeWidth={2.5} />
-          {linkCopied ? "Copied!" : "Copy invite link"}
-        </Button>
+        {solo ? (
+          <p className="hint">Solo run</p>
+        ) : (
+          <>
+            <p className="room-ticket">{code?.toUpperCase()}</p>
+            <Button variant="ghost" onClick={() => void copyInvite()}>
+              <Copy size={16} strokeWidth={2.5} />
+              {linkCopied ? "Copied!" : "Copy invite link"}
+            </Button>
+          </>
+        )}
         <IconButton icon={LogOut} label="Leave room" onClick={() => void handleLeave()} />
       </div>
 
@@ -161,19 +172,21 @@ export function DubLobbyPage() {
         </Button>
       </section>
 
-      <section className="dub-lobby-section">
-        <h2>Players</h2>
-        <ul className="dub-roster">
-          {players.map((p) => (
-            <li key={p.room_player_id} className="dub-roster-row">
-              <span>{p.room_player_id === myPlayerId ? `${p.nickname} (you)` : p.nickname}</span>
-              <span className={p.mic_ready ? "dub-ready-badge is-yes" : "dub-ready-badge"}>
-                {p.mic_ready ? "Ready" : "Not ready"}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {!solo && (
+        <section className="dub-lobby-section">
+          <h2>Players</h2>
+          <ul className="dub-roster">
+            {players.map((p) => (
+              <li key={p.room_player_id} className="dub-roster-row">
+                <span>{p.room_player_id === myPlayerId ? `${p.nickname} (you)` : p.nickname}</span>
+                <span className={p.mic_ready ? "dub-ready-badge is-yes" : "dub-ready-badge"}>
+                  {p.mic_ready ? "Ready" : "Not ready"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {state === "role_claim" && clip ? (
         <section className="dub-lobby-section">
@@ -228,10 +241,14 @@ export function DubLobbyPage() {
       {iAmHostSeat && state === "lobby" && (
         <>
           <Button variant="grape" size="lg" disabled={!canStart || busy} onClick={() => void startGame()}>
-            {busy ? "Starting…" : "Start game"}
+            {busy ? "Starting…" : solo ? "Start recording" : "Start game"}
           </Button>
           {!canStart && (
-            <p className="hint">Needs a ready clip and at least 2 players, everyone mic-ready.</p>
+            <p className="hint">
+              {solo
+                ? "Pick a ready clip and turn your mic on."
+                : "Needs a ready clip and at least 2 players, everyone mic-ready."}
+            </p>
           )}
         </>
       )}
