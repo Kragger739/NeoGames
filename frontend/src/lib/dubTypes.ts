@@ -109,3 +109,36 @@ export interface DubRoomState {
 export interface CreateDubRoomResponse extends DubRoomState {
   host_player: { id: number; nickname: string; connection_token: string };
 }
+
+// --- Admin clip library (Phase 2) ---
+
+/** Confetti-Pop hue tokens a character can own — mirrors DubClip::HUES. */
+export const DUB_HUES = ["grape", "turquoise", "coral", "sunflower", "bubblegum"] as const;
+export type DubHue = (typeof DUB_HUES)[number];
+
+/** GET /api/admin/dub-clips row shape. */
+export interface DubClipAdminRow {
+  id: number;
+  title: string;
+  status: string;
+  source: string;
+  is_public: boolean;
+  video_url: string | null;
+  duration_ms: number | null;
+  character_count: number;
+  line_count: number;
+  created_at: string | null;
+}
+
+/** GET /api/admin/dub-clips/{id} — full clip for the editor. */
+export interface DubClipDetail extends DubClip {
+  is_public: boolean;
+  source: string;
+  created_at: string | null;
+}
+
+/** PUT /api/admin/dub-clips/{id}/script body. */
+export interface DubScriptPayload {
+  characters: Array<{ ref: string; display_name: string; color: DubHue }>;
+  lines: Array<{ character_ref: string; start_ms: number; end_ms: number; text: string | null }>;
+}

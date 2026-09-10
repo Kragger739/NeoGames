@@ -17,6 +17,10 @@ FROM php:8.4-fpm-alpine
 RUN apk add --no-cache nginx supervisor postgresql-dev libzip-dev oniguruma-dev icu-dev bash \
     && docker-php-ext-install pdo pdo_pgsql pdo_mysql mbstring bcmath pcntl zip intl
 
+# Raise the upload ceiling above the stock 2M so "Dub Together" clip videos
+# fit (nginx's client_max_body_size is bumped in docker/nginx.conf.template).
+COPY docker/php.ini /usr/local/etc/php/conf.d/zz-uploads.ini
+
 WORKDIR /var/www/html
 
 COPY . .

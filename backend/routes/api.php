@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Admin\AdminCosmeticController;
 use App\Http\Controllers\Api\Admin\AdminDailyController;
+use App\Http\Controllers\Api\Admin\AdminDubClipController;
 use App\Http\Controllers\Api\Admin\AdminIconicArtistController;
 use App\Http\Controllers\Api\Admin\AdminSeasonController;
 use App\Http\Controllers\Api\Admin\AdminSongController;
@@ -287,6 +288,18 @@ Route::middleware(['auth:sanctum', 'not-banned', 'verified', 'admin'])
         Route::post('/iconic-artists/{iconicArtist}/refetch', [AdminIconicArtistController::class, 'refetch']);
         Route::post('/iconic-artists/{iconicArtist}', [AdminIconicArtistController::class, 'update']);
         Route::delete('/iconic-artists/{iconicArtist}', [AdminIconicArtistController::class, 'destroy']);
+
+        // "Dub Together" clip library. Literal sub-paths before the bare
+        // POST /{dubClip} so they aren't bound as an id. POST for update so
+        // a replacement video can ride along.
+        Route::get('/dub-clips', [AdminDubClipController::class, 'index']);
+        Route::post('/dub-clips', [AdminDubClipController::class, 'store']);
+        Route::get('/dub-clips/{dubClip}', [AdminDubClipController::class, 'show']);
+        Route::put('/dub-clips/{dubClip}/script', [AdminDubClipController::class, 'putScript']);
+        Route::post('/dub-clips/{dubClip}/publish', [AdminDubClipController::class, 'publish']);
+        Route::post('/dub-clips/{dubClip}/unpublish', [AdminDubClipController::class, 'unpublish']);
+        Route::post('/dub-clips/{dubClip}', [AdminDubClipController::class, 'update']);
+        Route::delete('/dub-clips/{dubClip}', [AdminDubClipController::class, 'destroy']);
 
         // Individual song pool: browse, edit metadata, remove/restore (the
         // reversible `excluded` flag). `bulk-exclude` before `{song}` so the

@@ -1,4 +1,4 @@
-import { CalendarDays, Home, ListMusic, Lock, Music, Star, Users } from "lucide-react";
+import { CalendarDays, Clapperboard, Home, ListMusic, Lock, Music, Star, Users } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const SECTIONS = [
@@ -6,6 +6,7 @@ const SECTIONS = [
   { to: "/admin/song-playlists", label: "Song playlists", icon: ListMusic },
   { to: "/admin/songs", label: "Songs", icon: Music },
   { to: "/admin/iconic-artists", label: "Iconic Artists", icon: Star },
+  { to: "/admin/dub-clips", label: "Dub clips", icon: Clapperboard },
   { to: "/admin/unlocks", label: "Unlocks & Daily", icon: Lock },
   { to: "/admin/seasons", label: "Seasons & Battlepass", icon: CalendarDays },
 ] as const;

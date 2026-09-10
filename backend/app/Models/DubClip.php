@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DubClip extends Model
 {
+    /** Confetti-Pop hue tokens a character can own (see index.css). */
+    public const HUES = ['grape', 'turquoise', 'coral', 'sunflower', 'bubblegum'];
+
     protected $fillable = [
         'source',
         'created_by_user_id',
