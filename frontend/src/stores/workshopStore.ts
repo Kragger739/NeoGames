@@ -31,6 +31,11 @@ interface WorkshopState {
 
   importPlaylist: (id: number, playlist: string) => Promise<void>;
   removeTrack: (id: number, trackId: number) => Promise<void>;
+
+  addDubClipUpload: (id: number, form: FormData) => Promise<void>;
+  addDubClipYoutube: (id: number, body: { title: string; url: string }) => Promise<void>;
+  reorderDubClips: (id: number, ids: number[]) => Promise<void>;
+  removeDubClip: (id: number, clipId: number) => Promise<void>;
 }
 
 export const useWorkshopStore = create<WorkshopState>((set, get) => ({
@@ -142,6 +147,36 @@ export const useWorkshopStore = create<WorkshopState>((set, get) => ({
 
   removeTrack: async (id, trackId) => {
     const response = await api.delete<DatasetDetail>(`/api/datasets/${id}/tracks/${trackId}`);
+    set({ current: response.data });
+  },
+
+  addDubClipUpload: async (id, form) => {
+    set({ saving: true });
+    try {
+      const response = await api.post<DatasetDetail>(`/api/datasets/${id}/dub-clips`, form);
+      set({ current: response.data });
+    } finally {
+      set({ saving: false });
+    }
+  },
+
+  addDubClipYoutube: async (id, body) => {
+    set({ saving: true });
+    try {
+      const response = await api.post<DatasetDetail>(`/api/datasets/${id}/dub-clips/youtube`, body);
+      set({ current: response.data });
+    } finally {
+      set({ saving: false });
+    }
+  },
+
+  reorderDubClips: async (id, ids) => {
+    const response = await api.patch<DatasetDetail>(`/api/datasets/${id}/dub-clips/reorder`, { ids });
+    set({ current: response.data });
+  },
+
+  removeDubClip: async (id, clipId) => {
+    const response = await api.delete<DatasetDetail>(`/api/datasets/${id}/dub-clips/${clipId}`);
     set({ current: response.data });
   },
 }));

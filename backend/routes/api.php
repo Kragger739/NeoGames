@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Admin\AdminCosmeticController;
 use App\Http\Controllers\Api\Admin\AdminDailyController;
 use App\Http\Controllers\Api\Admin\AdminDubClipController;
+use App\Http\Controllers\Api\Admin\AdminDubPackController;
 use App\Http\Controllers\Api\Admin\AdminIconicArtistController;
 use App\Http\Controllers\Api\Admin\AdminSeasonController;
 use App\Http\Controllers\Api\Admin\AdminSongController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\Api\DdfGameController;
 use App\Http\Controllers\Api\DdfVoteController;
 use App\Http\Controllers\Api\DubClipController;
 use App\Http\Controllers\Api\DubGameController;
+use App\Http\Controllers\Api\DubPackClipController;
 use App\Http\Controllers\Api\FriendController;
 use App\Http\Controllers\Api\GameRoomController;
 use App\Http\Controllers\Api\IconicArtistController;
@@ -242,6 +244,18 @@ Route::middleware(['auth:sanctum', 'not-banned'])->group(function () {
         Route::post('/datasets/{dataset}/import', [DatasetController::class, 'importPlaylist']);
         Route::delete('/datasets/{dataset}/tracks/{track}', [DatasetController::class, 'destroyTrack']);
 
+        // Dub packs: the clips inside a datasets.type='dub' pack. Literal
+        // sub-paths before the bare {dubClip} so they aren't bound as ids.
+        Route::post('/datasets/{dataset}/dub-clips', [DubPackClipController::class, 'store']);
+        Route::post('/datasets/{dataset}/dub-clips/youtube', [DubPackClipController::class, 'storeYoutube']);
+        Route::patch('/datasets/{dataset}/dub-clips/reorder', [DubPackClipController::class, 'reorder']);
+        Route::get('/datasets/{dataset}/dub-clips/{dubClip}', [DubPackClipController::class, 'show']);
+        Route::put('/datasets/{dataset}/dub-clips/{dubClip}/script', [DubPackClipController::class, 'putScript']);
+        Route::post('/datasets/{dataset}/dub-clips/{dubClip}/publish', [DubPackClipController::class, 'publish']);
+        Route::post('/datasets/{dataset}/dub-clips/{dubClip}/unpublish', [DubPackClipController::class, 'unpublish']);
+        Route::post('/datasets/{dataset}/dub-clips/{dubClip}', [DubPackClipController::class, 'update']);
+        Route::delete('/datasets/{dataset}/dub-clips/{dubClip}', [DubPackClipController::class, 'destroy']);
+
         Route::get('/friends/search', [FriendController::class, 'search']);
         Route::get('/friends', [FriendController::class, 'index']);
         Route::post('/friends', [FriendController::class, 'store']);
@@ -302,6 +316,11 @@ Route::middleware(['auth:sanctum', 'not-banned', 'verified', 'admin'])
         Route::post('/dub-clips/{dubClip}/reingest', [AdminDubClipController::class, 'reingest']);
         Route::post('/dub-clips/{dubClip}', [AdminDubClipController::class, 'update']);
         Route::delete('/dub-clips/{dubClip}', [AdminDubClipController::class, 'destroy']);
+
+        // "Dub Together" workshop-pack review queue.
+        Route::get('/dub-packs', [AdminDubPackController::class, 'index']);
+        Route::post('/dub-packs/{dataset}/approve', [AdminDubPackController::class, 'approve']);
+        Route::post('/dub-packs/{dataset}/reject', [AdminDubPackController::class, 'reject']);
 
         // Individual song pool: browse, edit metadata, remove/restore (the
         // reversible `excluded` flag). `bulk-exclude` before `{song}` so the

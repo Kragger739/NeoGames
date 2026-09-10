@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Copy, ListMusic, ListPlus, Trash2 } from "lucide-react";
+import { Clapperboard, Copy, ListMusic, ListPlus, Play, Trash2 } from "lucide-react";
 
 import { firstValidationError } from "../lib/errors";
 import type { DatasetLanguage, DatasetType } from "../lib/workshopTypes";
@@ -16,6 +16,12 @@ function relativeTime(iso: string): string {
   if (hours >= 1) return `${hours}h ago`;
   return "just now";
 }
+
+const TYPE_META: Record<DatasetType, { label: string; tone: "grape" | "turquoise" | "coral"; noun: string }> = {
+  ddf: { label: "Questions", tone: "grape", noun: "questions" },
+  songle: { label: "Songle", tone: "turquoise", noun: "tracks" },
+  dub: { label: "Dub pack", tone: "coral", noun: "clips" },
+};
 
 export function WorkshopPage() {
   const navigate = useNavigate();
@@ -70,7 +76,9 @@ export function WorkshopPage() {
         <Link to="/">← Home</Link>
       </p>
       <h1>Workshop</h1>
-      <p className="hint">Build your own question sets and Songle playlists, then use them in a game.</p>
+      <p className="hint">
+        Build your own question sets, Songle playlists, and Dub Together packs, then use them in a game.
+      </p>
 
       <div className="wk-create">
         <Button variant="grape" onClick={() => startCreate("ddf")}>
@@ -78,6 +86,9 @@ export function WorkshopPage() {
         </Button>
         <Button variant="turquoise" onClick={() => startCreate("songle")}>
           <ListMusic size={18} strokeWidth={2.25} /> Create Songle dataset
+        </Button>
+        <Button variant="primary" onClick={() => startCreate("dub")}>
+          <Clapperboard size={18} strokeWidth={2.25} /> Create dub pack
         </Button>
       </div>
 
@@ -88,7 +99,9 @@ export function WorkshopPage() {
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={newType === "ddf" ? "e.g. Family Quiz" : "e.g. 2000s Party"}
+              placeholder={
+                newType === "ddf" ? "e.g. Family Quiz" : newType === "songle" ? "e.g. 2000s Party" : "e.g. Movie Classics"
+              }
               maxLength={80}
               required
               autoFocus
@@ -119,40 +132,47 @@ export function WorkshopPage() {
       {status !== "ready" ? (
         <p className="hint">Loading…</p>
       ) : index.mine.length === 0 ? (
-        <p className="hint">Nothing yet — create a question set or a Songle playlist above.</p>
+        <p className="hint">Nothing yet — create a question set, a Songle playlist, or a dub pack above.</p>
       ) : (
         <ul className="wk-list">
-          {index.mine.map((dataset) => (
-            <li key={dataset.id}>
-              <span className="wk-info">
-                <span className="wk-name">{dataset.name}</span>
-                <span className="wk-meta">
-                  <Badge tone={dataset.type === "ddf" ? "grape" : "turquoise"}>
-                    {dataset.type === "ddf" ? "Questions" : "Songle"}
-                  </Badge>
-                  <span className="hint">
-                    {dataset.item_count} {dataset.type === "ddf" ? "questions" : "tracks"} ·{" "}
-                    {dataset.visibility} · {relativeTime(dataset.updated_at)}
+          {index.mine.map((dataset) => {
+            const meta = TYPE_META[dataset.type];
+            return (
+              <li key={dataset.id}>
+                <span className="wk-info">
+                  <span className="wk-name">{dataset.name}</span>
+                  <span className="wk-meta">
+                    <Badge tone={meta.tone}>{meta.label}</Badge>
+                    {dataset.type === "dub" && dataset.review_status !== "draft" && (
+                      <Badge tone={dataset.review_status === "approved" ? "turquoise" : "sunflower"}>
+                        {dataset.review_status}
+                      </Badge>
+                    )}
+                    <span className="hint">
+                      {dataset.item_count} {meta.noun} · {dataset.visibility} · {relativeTime(dataset.updated_at)}
+                    </span>
                   </span>
                 </span>
-              </span>
-              <span className="wk-actions">
-                <Button onClick={() => navigate(`/workshop/${dataset.id}`)}>Edit</Button>
-                <Button variant="ghost" onClick={() => void handleDuplicate(dataset.id)} aria-label="Duplicate">
-                  <Copy size={16} strokeWidth={2.25} />
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={() => {
-                    if (confirm(`Delete "${dataset.name}"? This can’t be undone.`)) void remove(dataset.id);
-                  }}
-                  aria-label="Delete"
-                >
-                  <Trash2 size={16} strokeWidth={2.25} />
-                </Button>
-              </span>
-            </li>
-          ))}
+                <span className="wk-actions">
+                  <Button onClick={() => navigate(`/workshop/${dataset.id}`)}>Edit</Button>
+                  {dataset.type !== "dub" && (
+                    <Button variant="ghost" onClick={() => void handleDuplicate(dataset.id)} aria-label="Duplicate">
+                      <Copy size={16} strokeWidth={2.25} />
+                    </Button>
+                  )}
+                  <Button
+                    variant="danger"
+                    onClick={() => {
+                      if (confirm(`Delete "${dataset.name}"? This can’t be undone.`)) void remove(dataset.id);
+                    }}
+                    aria-label="Delete"
+                  >
+                    <Trash2 size={16} strokeWidth={2.25} />
+                  </Button>
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -160,27 +180,33 @@ export function WorkshopPage() {
         <>
           <h2>Community datasets</h2>
           <ul className="wk-list">
-            {index.community.map((dataset) => (
-              <li key={dataset.id}>
-                <span className="wk-info">
-                  <span className="wk-name">{dataset.name}</span>
-                  <span className="wk-meta">
-                    <Badge tone={dataset.type === "ddf" ? "grape" : "turquoise"}>
-                      {dataset.type === "ddf" ? "Questions" : "Songle"}
-                    </Badge>
-                    <span className="hint">
-                      {dataset.item_count} {dataset.type === "ddf" ? "questions" : "tracks"} · by{" "}
-                      {dataset.owner_username ?? "someone"}
+            {index.community.map((dataset) => {
+              const meta = TYPE_META[dataset.type];
+              return (
+                <li key={dataset.id}>
+                  <span className="wk-info">
+                    <span className="wk-name">{dataset.name}</span>
+                    <span className="wk-meta">
+                      <Badge tone={meta.tone}>{meta.label}</Badge>
+                      <span className="hint">
+                        {dataset.item_count} {meta.noun} · by {dataset.owner_username ?? "someone"}
+                      </span>
                     </span>
                   </span>
-                </span>
-                <span className="wk-actions">
-                  <Button onClick={() => void handleDuplicate(dataset.id)}>
-                    <Copy size={16} strokeWidth={2.25} /> Copy to mine
-                  </Button>
-                </span>
-              </li>
-            ))}
+                  <span className="wk-actions">
+                    {dataset.type === "dub" ? (
+                      <Link to={`/dub?dataset=${dataset.id}`} className="btn btn-primary">
+                        <Play size={16} strokeWidth={2.25} /> Play
+                      </Link>
+                    ) : (
+                      <Button onClick={() => void handleDuplicate(dataset.id)}>
+                        <Copy size={16} strokeWidth={2.25} /> Copy to mine
+                      </Button>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </>
       )}

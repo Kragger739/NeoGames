@@ -15,6 +15,8 @@ class DubClip extends Model
         'source',
         'created_by_user_id',
         'game_room_id',
+        'dataset_id',
+        'position',
         'title',
         'status',
         'is_public',
@@ -58,6 +60,11 @@ class DubClip extends Model
     public function room(): BelongsTo
     {
         return $this->belongsTo(GameRoom::class, 'game_room_id');
+    }
+
+    public function dataset(): BelongsTo
+    {
+        return $this->belongsTo(Dataset::class);
     }
 
     public function isReady(): bool

@@ -12,6 +12,7 @@ import {
 import { useWorkshopStore } from "../stores/workshopStore";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
+import { DubPackEditor } from "../components/dub/DubPackEditor";
 
 export function DatasetEditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -48,6 +49,7 @@ export function DatasetEditorPage() {
   }
 
   const isDdf = dataset.type === "ddf";
+  const isDub = dataset.type === "dub";
 
   async function saveName(e: FormEvent) {
     e.preventDefault();
@@ -73,7 +75,7 @@ export function DatasetEditorPage() {
   }
 
   function useInGame() {
-    navigate(isDdf ? `/ddf?dataset=${datasetId}` : "/songle");
+    navigate(isDdf ? `/ddf?dataset=${datasetId}` : isDub ? `/dub?dataset=${datasetId}` : "/songle");
   }
 
   return (
@@ -112,9 +114,22 @@ export function DatasetEditorPage() {
         {headerError && <p className="form-error">{headerError}</p>}
 
         <div className="dataset-header-actions">
-          <Badge tone={isDdf ? "grape" : "turquoise"}>{isDdf ? "Questions" : "Songle"}</Badge>
+          <Badge tone={isDdf ? "grape" : isDub ? "coral" : "turquoise"}>
+            {isDdf ? "Questions" : isDub ? "Dub pack" : "Songle"}
+          </Badge>
+          {isDub && dataset.review_status !== "draft" && (
+            <Badge tone={dataset.review_status === "approved" ? "turquoise" : "sunflower"}>
+              {dataset.review_status}
+            </Badge>
+          )}
           <button type="button" className="dataset-visibility" onClick={() => void toggleVisibility()}>
-            {dataset.visibility === "public" ? "Public" : "Private"}
+            {isDub
+              ? dataset.visibility === "public"
+                ? "Submitted"
+                : "Submit for review"
+              : dataset.visibility === "public"
+                ? "Public"
+                : "Private"}
           </button>
           {isDdf && (
             <Button variant="ghost" onClick={() => setPreview(true)}>
@@ -122,15 +137,25 @@ export function DatasetEditorPage() {
             </Button>
           )}
           <Button variant="turquoise" onClick={useInGame}>
-            Use in a game
+            {isDub ? "Play" : "Use in a game"}
           </Button>
           <Button variant="danger" onClick={() => void handleDelete()} aria-label="Delete dataset">
             <Trash2 size={16} strokeWidth={2.25} />
           </Button>
         </div>
+        {isDub && dataset.review_status === "rejected" && dataset.review_note && (
+          <p className="form-error">Rejected: {dataset.review_note}</p>
+        )}
+        {isDub && dataset.review_status === "pending" && (
+          <p className="hint">Submitted — an admin will review this pack before others can play it.</p>
+        )}
       </div>
 
-      {isDdf ? <QuestionEditor datasetId={datasetId} questions={dataset.questions ?? []} /> : (
+      {isDdf ? (
+        <QuestionEditor datasetId={datasetId} questions={dataset.questions ?? []} />
+      ) : isDub ? (
+        <DubPackEditor datasetId={datasetId} clips={dataset.dub_clips ?? []} />
+      ) : (
         <TrackEditor datasetId={datasetId} />
       )}
 

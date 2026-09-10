@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\DatasetType;
 use App\Enums\RoomPlayerMode;
 use App\Enums\RoomStatus;
 use App\Events\Dub\DubPlayersUpdated;
 use App\Http\Controllers\Controller;
+use App\Models\Dataset;
 use App\Models\DubClip;
 use App\Models\DubClipCharacter;
 use App\Models\DubClipLine;
@@ -16,6 +18,7 @@ use App\Services\DubGameService;
 use App\Support\DubPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Room lifecycle + every host and player action for "Dub Together". The
@@ -38,11 +41,14 @@ class DubGameController extends Controller
         $lineTimer = $solo ? 0 : (int) $request->input('line_timer_seconds', 0);
         $watchTimer = $solo ? 0 : (int) $request->input('watch_timer_seconds', 0);
 
+        $pack = $this->resolveDubPack($request);
+
         $room = $request->user()->rooms()->create([
             'code' => GameRoom::generateUniqueCode(),
             'status' => RoomStatus::Lobby->value,
             'game' => 'dub',
             'player_mode' => $playerMode,
+            'dataset_id' => $pack?->id,
         ]);
 
         $room->dubGame()->create([
@@ -203,7 +209,10 @@ class DubGameController extends Controller
     public function nextRound(Request $request, string $code, DubGameService $service)
     {
         $room = $this->authorizedRoom($request, $code);
-        $clip = DubClip::findOrFail($request->input('clip_id'));
+
+        // A pack room auto-advances through its own clips; a single-clip room
+        // needs the host to pick the next one.
+        $clip = $room->dataset_id ? null : DubClip::findOrFail($request->input('clip_id'));
 
         $service->nextRound($room, $clip);
 
@@ -229,6 +238,37 @@ class DubGameController extends Controller
     private function findRoom(string $code): GameRoom
     {
         return GameRoom::where('code', strtoupper($code))->where('game', 'dub')->firstOrFail();
+    }
+
+    /**
+     * Optional `dataset_id` -> a playable Workshop dub pack, or null. Never
+     * trusts the id: loads the row, checks the policy, and requires an
+     * approved pack (unless the caller owns it) with at least one finished
+     * clip. Mirrors DdfGameController::resolveDdfDataset().
+     */
+    private function resolveDubPack(Request $request): ?Dataset
+    {
+        $id = $request->input('dataset_id');
+
+        if (blank($id)) {
+            return null;
+        }
+
+        $dataset = Dataset::find($id);
+
+        if (! $dataset || $dataset->type !== DatasetType::Dub || ! $request->user()->can('view', $dataset)) {
+            throw ValidationException::withMessages(['dataset_id' => ['That pack isn’t available.']]);
+        }
+
+        if ($dataset->owner_id !== $request->user()->id && $dataset->review_status !== 'approved') {
+            throw ValidationException::withMessages(['dataset_id' => ['That pack is still being reviewed.']]);
+        }
+
+        if (! $dataset->dubClips()->where('status', 'ready')->exists()) {
+            throw ValidationException::withMessages(['dataset_id' => ['That pack has no finished clips yet.']]);
+        }
+
+        return $dataset;
     }
 
     private function authorizedRoom(Request $request, string $code): GameRoom
@@ -272,6 +312,9 @@ class DubGameController extends Controller
             'host_id' => $room->host_id,
             'host_name' => $room->host->name,
             'player_mode' => $room->player_mode->value,
+            'pack_id' => $room->dataset_id,
+            'pack_name' => $room->dataset_id ? $room->dataset?->name : null,
+            'pack_clip_count' => $room->dataset_id ? $room->dataset?->dubClips()->where('status', 'ready')->count() : null,
             'state' => $game->state->value,
             'round_number' => $game->round_number,
             'total_score' => $game->total_score,

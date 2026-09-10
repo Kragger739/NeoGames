@@ -77,6 +77,16 @@ class DubGameService
             throw ValidationException::withMessages(['room' => ['This game has already started.']]);
         }
 
+        // A pack room hasn't picked a clip in the lobby - take the pack's
+        // first finished clip as round 1.
+        if ($room->dataset_id && ! $game->dub_clip_id) {
+            $first = $room->dataset?->dubClips()->where('status', 'ready')->orderBy('position')->first();
+            if ($first) {
+                $game->update(['dub_clip_id' => $first->id]);
+                $game = $game->fresh();
+            }
+        }
+
         $clip = $game->clip;
 
         if (! $clip || ! $clip->isReady()) {
@@ -488,7 +498,12 @@ class DubGameService
     // RoundComplete -> next round / finish
     // ------------------------------------------------------------------
 
-    public function nextRound(GameRoom $room, DubClip $clip): void
+    /**
+     * Advance to the next clip. Single-clip rooms pass one in; pack rooms
+     * pass null and the next unplayed `ready` pack clip is chosen (the game
+     * finishes when the pack runs out).
+     */
+    public function nextRound(GameRoom $room, ?DubClip $clip = null): void
     {
         $game = $room->dubGame;
 
@@ -496,7 +511,25 @@ class DubGameService
             throw ValidationException::withMessages(['room' => ['Finish the current round first.']]);
         }
 
-        if (! $clip->isReady()) {
+        if ($room->dataset_id) {
+            $played = array_values(array_unique(array_merge($game->played_clip_ids ?? [], [$game->dub_clip_id])));
+
+            $clip = $room->dataset?->dubClips()
+                ->where('status', 'ready')
+                ->whereNotIn('id', $played)
+                ->orderBy('position')
+                ->first();
+
+            $game->update(['played_clip_ids' => $played]);
+
+            if (! $clip) {
+                $this->finish($room);
+
+                return;
+            }
+        }
+
+        if (! $clip || ! $clip->isReady()) {
             throw ValidationException::withMessages(['clip' => ['That clip is still being prepared.']]);
         }
 
@@ -542,6 +575,10 @@ class DubGameService
             'stage_started_at' => null,
             'round_number' => 0,
             'current_line_index' => 0,
+            // A pack room re-picks its first clip on start(); a single-clip
+            // room keeps the one it had.
+            'dub_clip_id' => $room->dataset_id ? null : $game->dub_clip_id,
+            'played_clip_ids' => null,
             'assembled_video_path' => null,
             'assembly_error' => null,
             'assembly_started_at' => null,

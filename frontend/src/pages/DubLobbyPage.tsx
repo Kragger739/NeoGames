@@ -21,6 +21,8 @@ export function DubLobbyPage() {
   const leaveRoom = useDubStore((s) => s.leaveRoom);
   const state = useDubStore((s) => s.state);
   const playerMode = useDubStore((s) => s.playerMode);
+  const packName = useDubStore((s) => s.packName);
+  const packClipCount = useDubStore((s) => s.packClipCount);
   const hostName = useDubStore((s) => s.hostName);
   const players = useDubStore((s) => s.players);
   const clip = useDubStore((s) => s.clip);
@@ -137,9 +139,10 @@ export function DubLobbyPage() {
   }
 
   const solo = playerMode === "solo";
+  const isPack = packName != null;
   const micReadyCount = players.filter((p) => p.mic_ready).length;
   const canStart =
-    clip?.status === "ready" &&
+    (isPack || clip?.status === "ready") &&
     players.length >= (solo ? 1 : 2) &&
     micReadyCount === players.length;
   const claimByCharacter = new Map(roleAssignments.map((a) => [a.character_id, a.room_player_id]));
@@ -224,6 +227,14 @@ export function DubLobbyPage() {
             </Button>
           )}
           {!iAmHostSeat && <p className="hint">Waiting for {hostName ?? "the host"} to start recording…</p>}
+        </section>
+      ) : isPack ? (
+        <section className="dub-lobby-section">
+          <h2>Pack</h2>
+          <p className="hint">
+            {packName}
+            {packClipCount ? ` · ${packClipCount} clip${packClipCount === 1 ? "" : "s"}` : ""} — plays as rounds.
+          </p>
         </section>
       ) : (
         <section className="dub-lobby-section">

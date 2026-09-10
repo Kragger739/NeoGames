@@ -87,6 +87,9 @@ export interface DubRoomState {
   host_id: number;
   host_name: string;
   player_mode: "solo" | "multiplayer";
+  pack_id: number | null;
+  pack_name: string | null;
+  pack_clip_count: number | null;
   state: DubGameState;
   round_number: number;
   total_score: number;

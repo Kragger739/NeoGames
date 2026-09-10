@@ -8,6 +8,7 @@ import { RoomInviteToast } from "./components/RoomInviteToast";
 import { SiteFooter } from "./components/SiteFooter";
 import { AdminDubClipEditorPage } from "./pages/AdminDubClipEditorPage";
 import { AdminDubClipsPage } from "./pages/AdminDubClipsPage";
+import { AdminDubPacksPage } from "./pages/AdminDubPacksPage";
 import { AdminIconicArtistsPage } from "./pages/AdminIconicArtistsPage";
 import { AdminSeasonsPage } from "./pages/AdminSeasonsPage";
 import { AdminSongDetailPage } from "./pages/AdminSongDetailPage";
@@ -202,6 +203,14 @@ function App() {
           element={
             <RequireAdmin>
               <AdminDubClipEditorPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/admin/dub-packs"
+          element={
+            <RequireAdmin>
+              <AdminDubPacksPage />
             </RequireAdmin>
           }
         />

@@ -6,6 +6,7 @@ enum DatasetType: string
 {
     case Ddf = 'ddf';
     case Songle = 'songle';
+    case Dub = 'dub';
 
     /** @return list<string> */
     public static function values(): array

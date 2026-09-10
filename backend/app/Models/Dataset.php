@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Dataset extends Model
 {
-    protected $fillable = ['owner_id', 'name', 'type', 'visibility', 'language'];
+    protected $fillable = ['owner_id', 'name', 'type', 'visibility', 'language', 'review_status', 'review_note'];
 
     protected function casts(): array
     {
@@ -44,6 +44,12 @@ class Dataset extends Model
         return $this->hasMany(DatasetTrack::class)->orderBy('position');
     }
 
+    /** Dub clips in this pack (dub type). */
+    public function dubClips(): HasMany
+    {
+        return $this->hasMany(DubClip::class)->orderBy('position');
+    }
+
     /** Owned by, or public to, the given user. */
     public function scopeUsableBy(Builder $query, User $user): Builder
     {
@@ -54,8 +60,10 @@ class Dataset extends Model
 
     public function itemCount(): int
     {
-        return $this->type === DatasetType::Ddf
-            ? $this->questions()->count()
-            : $this->tracks()->count();
+        return match ($this->type) {
+            DatasetType::Ddf => $this->questions()->count(),
+            DatasetType::Dub => $this->dubClips()->count(),
+            default => $this->tracks()->count(),
+        };
     }
 }

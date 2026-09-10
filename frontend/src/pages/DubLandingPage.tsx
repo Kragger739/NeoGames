@@ -1,11 +1,12 @@
-import { type FormEvent, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { type FormEvent, useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
 import { api } from "../lib/api";
 import { firstValidationError } from "../lib/errors";
 import { setPlayerId, setPlayerToken } from "../lib/playerToken";
 import type { CreateDubRoomResponse } from "../lib/dubTypes";
+import type { DatasetSummary, DatasetsIndex } from "../lib/workshopTypes";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { IconButton } from "../components/ui/IconButton";
@@ -14,12 +15,40 @@ type PlayerMode = "solo" | "multiplayer";
 
 export function DubLandingPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialPack = searchParams.get("dataset");
+
   const [playerMode, setPlayerMode] = useState<PlayerMode>("multiplayer");
   const [lineTimerSeconds, setLineTimerSeconds] = useState(0);
+  const [packId, setPackId] = useState<number | null>(
+    initialPack && /^\d+$/.test(initialPack) ? Number(initialPack) : null,
+  );
+  const [myPacks, setMyPacks] = useState<DatasetSummary[]>([]);
+  const [communityPacks, setCommunityPacks] = useState<DatasetSummary[]>([]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const solo = playerMode === "solo";
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<DatasetsIndex>("/api/datasets", { params: { type: "dub" } })
+      .then((r) => {
+        if (cancelled) return;
+        setMyPacks(r.data.mine);
+        setCommunityPacks(r.data.community);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMyPacks([]);
+          setCommunityPacks([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
@@ -29,9 +58,8 @@ export function DubLandingPage() {
       const response = await api.post<CreateDubRoomResponse>("/api/dub-rooms", {
         player_mode: playerMode,
         line_timer_seconds: solo ? 0 : lineTimerSeconds,
+        ...(packId !== null ? { dataset_id: packId } : {}),
       });
-      // The host is seated as a player - keep their seat token so the lobby
-      // can claim a character and record like everyone else.
       setPlayerToken(response.data.host_player.connection_token);
       setPlayerId(response.data.host_player.id);
       navigate(`/dub-rooms/${response.data.code}/lobby`);
@@ -68,18 +96,43 @@ export function DubLandingPage() {
               </span>
             </label>
             <label className={solo ? "dub-mode-option is-on" : "dub-mode-option"}>
-              <input
-                type="radio"
-                name="player_mode"
-                checked={solo}
-                onChange={() => setPlayerMode("solo")}
-              />
+              <input type="radio" name="player_mode" checked={solo} onChange={() => setPlayerMode("solo")} />
               <span>
                 <strong>Solo</strong>
                 <span className="hint">Just you — voice every character, at your own pace. No score.</span>
               </span>
             </label>
           </fieldset>
+
+          <label>
+            Clip source
+            <select value={packId ?? ""} onChange={(e) => setPackId(e.target.value === "" ? null : Number(e.target.value))}>
+              <option value="">Single clip (pick one in the lobby)</option>
+              {myPacks.length > 0 && (
+                <optgroup label="My packs">
+                  {myPacks.map((p) => (
+                    <option key={p.id} value={p.id} disabled={p.item_count === 0}>
+                      {p.name}
+                      {p.item_count === 0 ? " (empty)" : ` (${p.item_count} clips)`}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {communityPacks.length > 0 && (
+                <optgroup label="Community">
+                  {communityPacks.map((p) => (
+                    <option key={p.id} value={p.id} disabled={p.item_count === 0}>
+                      {p.name} — {p.owner_username ?? "someone"}
+                      {p.item_count === 0 ? " (empty)" : ` (${p.item_count} clips)`}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </label>
+          {packId !== null && (
+            <p className="hint">Playing a pack — its clips run as rounds; you won't pick a clip in the lobby.</p>
+          )}
 
           {!solo && (
             <label>
@@ -94,7 +147,6 @@ export function DubLandingPage() {
             </label>
           )}
 
-          <p className="hint">You can pick a clip — or upload your own — once you're in the lobby.</p>
           {error && <p className="form-error">{error}</p>}
           <Button type="submit" variant="grape" size="lg" disabled={creating}>
             {creating ? "Creating…" : solo ? "Start solo" : "Create game"}

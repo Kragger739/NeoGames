@@ -43,9 +43,9 @@ trait CreatesDubRooms
         return $player->fresh();
     }
 
-    private function makeReadyClip(int $characters = 2, int $lines = 6): DubClip
+    private function makeReadyClip(int $characters = 2, int $lines = 6, array $overrides = []): DubClip
     {
-        $clip = DubClip::create([
+        $clip = DubClip::create(array_merge([
             'source' => 'library',
             'title' => 'Test clip '.uniqid(),
             'status' => 'ready',
@@ -53,7 +53,7 @@ trait CreatesDubRooms
             'source_video_path' => 'dub/clips/test/source.mp4',
             'music_bed_path' => 'dub/clips/test/music-bed.m4a',
             'duration_ms' => $lines * 2000,
-        ]);
+        ], $overrides));
 
         $characterRows = [];
         for ($c = 0; $c < $characters; $c++) {

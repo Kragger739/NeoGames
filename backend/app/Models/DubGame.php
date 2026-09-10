@@ -15,6 +15,7 @@ class DubGame extends Model
         'state_version',
         'stage_started_at',
         'dub_clip_id',
+        'played_clip_ids',
         'round_number',
         'current_line_index',
         'line_timer_seconds',
@@ -32,6 +33,7 @@ class DubGame extends Model
             'state' => DubGameState::class,
             'stage_started_at' => 'datetime',
             'assembly_started_at' => 'datetime',
+            'played_clip_ids' => 'array',
             'last_round_score' => 'float',
             'total_score' => 'float',
         ];

@@ -13,6 +13,7 @@ use App\Models\Dataset;
 use App\Models\DatasetTrack;
 use App\Models\DdfQuestion;
 use App\Services\SongleDatasetService;
+use App\Support\DatasetPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -31,39 +32,46 @@ class DatasetController extends Controller
 
         $base = Dataset::query()
             ->when(in_array($type, DatasetType::values(), true), fn ($q) => $q->where('type', $type))
-            ->withCount(['questions', 'tracks'])
+            ->withCount(['questions', 'tracks', 'dubClips'])
             ->with('owner:id,username,name')
             ->latest('updated_at');
 
         return response()->json([
             'mine' => (clone $base)->where('owner_id', $user->id)->get()
-                ->map(fn (Dataset $d) => $this->summary($d)),
+                ->map(fn (Dataset $d) => DatasetPresenter::summary($d)),
             'community' => (clone $base)
                 ->where('visibility', DatasetVisibility::Public->value)
+                // Dub packs need admin approval before others can play them;
+                // the column defaults to 'approved' for ddf/songle so this is
+                // a no-op for those.
+                ->where('review_status', 'approved')
                 ->where('owner_id', '!=', $user->id)
-                ->get()->map(fn (Dataset $d) => $this->summary($d)),
+                ->get()->map(fn (Dataset $d) => DatasetPresenter::summary($d)),
         ]);
     }
 
     public function store(StoreDatasetRequest $request)
     {
-        $isDdf = $request->validated('type') === DatasetType::Ddf->value;
+        $type = $request->validated('type');
 
         $dataset = $request->user()->datasets()->create([
             'name' => $request->validated('name'),
-            'type' => $request->validated('type'),
+            'type' => $type,
             'visibility' => DatasetVisibility::Private->value,
-            'language' => $isDdf ? $request->validated('language') : null,
+            'language' => $type === DatasetType::Ddf->value ? $request->validated('language') : null,
+            // Dub packs go through admin review before they can be played by
+            // anyone else; everything else is auto-approved.
+            'review_status' => $type === DatasetType::Dub->value ? 'draft' : 'approved',
         ]);
 
-        return response()->json($this->detail($dataset), 201);
+        return response()->json(DatasetPresenter::detail($dataset), 201);
     }
 
     public function show(Request $request, Dataset $dataset)
     {
         $this->authorize('view', $dataset);
 
-        return response()->json($this->detail($dataset));
+        return response()->json(DatasetPresenter::detail($dataset));
     }
 
     public function update(UpdateDatasetRequest $request, Dataset $dataset)
@@ -71,7 +79,16 @@ class DatasetController extends Controller
         $this->authorize('update', $dataset);
         $dataset->update($request->validated());
 
-        return response()->json($this->detail($dataset->fresh()));
+        // Publishing a dub pack = submitting it for review, not going live.
+        if (
+            $dataset->type === DatasetType::Dub
+            && $dataset->visibility === DatasetVisibility::Public
+            && in_array($dataset->review_status, ['draft', 'rejected'], true)
+        ) {
+            $dataset->update(['review_status' => 'pending']);
+        }
+
+        return response()->json(DatasetPresenter::detail($dataset->fresh()));
     }
 
     public function destroy(Request $request, Dataset $dataset)
@@ -85,6 +102,10 @@ class DatasetController extends Controller
     public function duplicate(Request $request, Dataset $dataset)
     {
         $this->authorize('view', $dataset);
+
+        if ($dataset->type === DatasetType::Dub) {
+            abort(422, 'Dub packs can’t be copied.');
+        }
 
         $copy = $request->user()->datasets()->create([
             'name' => mb_substr($dataset->name.' (copy)', 0, 80),
@@ -111,7 +132,7 @@ class DatasetController extends Controller
             }
         }
 
-        return response()->json($this->detail($copy), 201);
+        return response()->json(DatasetPresenter::detail($copy), 201);
     }
 
     // ---- questions (ddf datasets) --------------------------------------------
@@ -129,7 +150,7 @@ class DatasetController extends Controller
             'position' => (int) $dataset->questions()->max('position') + 1,
         ]);
 
-        return response()->json($this->detail($dataset->fresh()), 201);
+        return response()->json(DatasetPresenter::detail($dataset->fresh()), 201);
     }
 
     public function updateQuestion(DdfQuestionRequest $request, Dataset $dataset, DdfQuestion $question)
@@ -143,7 +164,7 @@ class DatasetController extends Controller
             'correct_answer' => $request->validated('correct_answer'),
         ]);
 
-        return response()->json($this->detail($dataset->fresh()));
+        return response()->json(DatasetPresenter::detail($dataset->fresh()));
     }
 
     public function destroyQuestion(Request $request, Dataset $dataset, DdfQuestion $question)
@@ -152,7 +173,7 @@ class DatasetController extends Controller
         $this->assertQuestionBelongs($question, $dataset);
         $question->delete();
 
-        return response()->json($this->detail($dataset->fresh()));
+        return response()->json(DatasetPresenter::detail($dataset->fresh()));
     }
 
     public function reorderQuestions(Request $request, Dataset $dataset)
@@ -177,7 +198,7 @@ class DatasetController extends Controller
             DdfQuestion::where('id', $id)->update(['position' => $position]);
         }
 
-        return response()->json($this->detail($dataset->fresh()));
+        return response()->json(DatasetPresenter::detail($dataset->fresh()));
     }
 
     // ---- tracks (songle datasets) -----------------------------------------
@@ -190,7 +211,7 @@ class DatasetController extends Controller
         $service->importPlaylist($dataset, $request->validated('playlist'));
         $dataset->touch();
 
-        return response()->json($this->detail($dataset->fresh()));
+        return response()->json(DatasetPresenter::detail($dataset->fresh()));
     }
 
     public function destroyTrack(Request $request, Dataset $dataset, DatasetTrack $track)
@@ -204,7 +225,7 @@ class DatasetController extends Controller
         $track->delete();
         $dataset->touch();
 
-        return response()->json($this->detail($dataset->fresh()));
+        return response()->json(DatasetPresenter::detail($dataset->fresh()));
     }
 
     // ---- helpers --------------------------------------------------------------
@@ -221,57 +242,5 @@ class DatasetController extends Controller
         if ($question->dataset_id !== $dataset->id) {
             abort(404);
         }
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function summary(Dataset $dataset): array
-    {
-        return [
-            'id' => $dataset->id,
-            'name' => $dataset->name,
-            'type' => $dataset->type->value,
-            'visibility' => $dataset->visibility->value,
-            'item_count' => $dataset->type === DatasetType::Ddf
-                ? ($dataset->questions_count ?? $dataset->questions()->count())
-                : ($dataset->tracks_count ?? $dataset->tracks()->count()),
-            'updated_at' => $dataset->updated_at,
-            'owner_username' => $dataset->owner?->username ?? $dataset->owner?->name,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function detail(Dataset $dataset): array
-    {
-        $dataset->loadMissing('owner:id,username,name');
-
-        $out = $this->summary($dataset) + [
-            'owner_id' => $dataset->owner_id,
-            'language' => $dataset->language,
-        ];
-
-        if ($dataset->type === DatasetType::Ddf) {
-            $out['questions'] = $dataset->questions()->get()->map(fn (DdfQuestion $q) => [
-                'id' => $q->id,
-                'text' => $q->text,
-                'correct_answer' => $q->correct_answer,
-                'category' => $q->category->value,
-                'position' => $q->position,
-            ]);
-        } else {
-            $out['tracks'] = $dataset->tracks()->get()->map(fn (DatasetTrack $t) => [
-                'id' => $t->id,
-                'provider_track_id' => $t->provider_track_id,
-                'title' => $t->title,
-                'artist' => $t->artist,
-                'album_art_url' => $t->album_art_url,
-                'position' => $t->position,
-            ]);
-        }
-
-        return $out;
     }
 }

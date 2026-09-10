@@ -17,6 +17,7 @@ export function DubWatchPage() {
   const resync = useDubStore((s) => s.resync);
   const state = useDubStore((s) => s.state);
   const playerMode = useDubStore((s) => s.playerMode);
+  const packId = useDubStore((s) => s.packId);
   const assembledVideoUrl = useDubStore((s) => s.assembledVideoUrl);
   const players = useDubStore((s) => s.players);
   const ratingCount = useDubStore((s) => s.ratingCount);
@@ -34,6 +35,7 @@ export function DubWatchPage() {
   const myPlayerId = getPlayerId();
   const iAmHostSeat = players.find((p) => p.room_player_id === myPlayerId)?.is_host ?? false;
   const solo = playerMode === "solo";
+  const isPack = packId != null;
 
   useEffect(() => {
     if (code) connect(code);
@@ -147,19 +149,31 @@ export function DubWatchPage() {
             </>
           )}
           {iAmHostSeat ? (
-            <>
-              <h3>{solo ? "Another clip?" : "Play another clip"}</h3>
-              <DubClipPicker
-                selectedClipId={null}
-                disabled={busy}
-                onPick={(clipId) => act("next-round", { clip_id: clipId })}
-              />
-              <Button variant="grape" size="lg" disabled={busy} onClick={() => void act("finish")}>
-                Finish game
-              </Button>
-            </>
+            isPack ? (
+              <>
+                <Button variant="grape" size="lg" disabled={busy} onClick={() => void act("next-round")}>
+                  Next round
+                </Button>
+                <Button variant="ghost" disabled={busy} onClick={() => void act("finish")}>
+                  Finish now
+                </Button>
+                <p className="hint">"Next round" plays the pack's next clip, or ends the game when it runs out.</p>
+              </>
+            ) : (
+              <>
+                <h3>{solo ? "Another clip?" : "Play another clip"}</h3>
+                <DubClipPicker
+                  selectedClipId={null}
+                  disabled={busy}
+                  onPick={(clipId) => act("next-round", { clip_id: clipId })}
+                />
+                <Button variant="grape" size="lg" disabled={busy} onClick={() => void act("finish")}>
+                  Finish game
+                </Button>
+              </>
+            )
           ) : (
-            <p className="hint">Waiting for the host to play another clip or finish…</p>
+            <p className="hint">Waiting for the host to continue or finish…</p>
           )}
         </section>
       )}
