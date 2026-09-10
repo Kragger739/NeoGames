@@ -125,9 +125,12 @@ export interface DubClipAdminRow {
   source: string;
   is_public: boolean;
   video_url: string | null;
+  source_url: string | null;
+  processing_error: string | null;
   duration_ms: number | null;
   character_count: number;
   line_count: number;
+  position: number | null;
   created_at: string | null;
 }
 
@@ -135,6 +138,10 @@ export interface DubClipAdminRow {
 export interface DubClipDetail extends DubClip {
   is_public: boolean;
   source: string;
+  source_url: string | null;
+  clip_start_ms: number | null;
+  clip_end_ms: number | null;
+  processing_error: string | null;
   created_at: string | null;
 }
 
@@ -142,4 +149,6 @@ export interface DubClipDetail extends DubClip {
 export interface DubScriptPayload {
   characters: Array<{ ref: string; display_name: string; color: DubHue }>;
   lines: Array<{ character_ref: string; start_ms: number; end_ms: number; text: string | null }>;
+  clip_start_ms?: number | null;
+  clip_end_ms?: number | null;
 }

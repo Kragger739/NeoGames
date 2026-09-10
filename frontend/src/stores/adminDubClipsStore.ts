@@ -13,6 +13,8 @@ interface AdminDubClipsState {
   fetch: () => Promise<void>;
   fetchOne: (id: number) => Promise<void>;
   createClip: (form: FormData) => Promise<DubClipAdminRow>;
+  createClipYoutube: (body: { title: string; url: string }) => Promise<DubClipAdminRow>;
+  reingestClip: (id: number) => Promise<void>;
   updateClip: (id: number, form: FormData) => Promise<void>;
   saveScript: (id: number, payload: DubScriptPayload) => Promise<void>;
   publishClip: (id: number) => Promise<void>;
@@ -69,6 +71,14 @@ export const useAdminDubClipsStore = create<AdminDubClipsState>((set, get) => {
         const { data } = await api.post<DubClipAdminRow>("/api/admin/dub-clips", form);
         return data;
       }),
+
+    createClipYoutube: (body) =>
+      run(async () => {
+        const { data } = await api.post<DubClipAdminRow>("/api/admin/dub-clips/youtube", body);
+        return data;
+      }),
+
+    reingestClip: (id) => run(() => api.post(`/api/admin/dub-clips/${id}/reingest`)),
 
     updateClip: (id, form) => run(() => api.post(`/api/admin/dub-clips/${id}`, form)),
 

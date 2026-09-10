@@ -19,8 +19,11 @@ class DubClip extends Model
         'status',
         'is_public',
         'source_video_path',
+        'source_url',
         'music_bed_path',
         'duration_ms',
+        'clip_start_ms',
+        'clip_end_ms',
         'video_width',
         'video_height',
         'video_fps',
@@ -60,5 +63,10 @@ class DubClip extends Model
     public function isReady(): bool
     {
         return $this->status === 'ready';
+    }
+
+    public function isFromLink(): bool
+    {
+        return $this->source_url !== null;
     }
 }

@@ -294,10 +294,12 @@ Route::middleware(['auth:sanctum', 'not-banned', 'verified', 'admin'])
         // a replacement video can ride along.
         Route::get('/dub-clips', [AdminDubClipController::class, 'index']);
         Route::post('/dub-clips', [AdminDubClipController::class, 'store']);
+        Route::post('/dub-clips/youtube', [AdminDubClipController::class, 'storeYoutube']);
         Route::get('/dub-clips/{dubClip}', [AdminDubClipController::class, 'show']);
         Route::put('/dub-clips/{dubClip}/script', [AdminDubClipController::class, 'putScript']);
         Route::post('/dub-clips/{dubClip}/publish', [AdminDubClipController::class, 'publish']);
         Route::post('/dub-clips/{dubClip}/unpublish', [AdminDubClipController::class, 'unpublish']);
+        Route::post('/dub-clips/{dubClip}/reingest', [AdminDubClipController::class, 'reingest']);
         Route::post('/dub-clips/{dubClip}', [AdminDubClipController::class, 'update']);
         Route::delete('/dub-clips/{dubClip}', [AdminDubClipController::class, 'destroy']);
 

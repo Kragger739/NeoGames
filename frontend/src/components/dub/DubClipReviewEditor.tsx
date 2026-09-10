@@ -51,6 +51,8 @@ export function DubClipReviewEditor({ clipId, endpointBase, onPublished }: DubCl
   const [error, setError] = useState<string | null>(null);
   const [characters, setCharacters] = useState<EditableCharacter[]>([]);
   const [lines, setLines] = useState<EditableLine[]>([]);
+  const [clipStartMs, setClipStartMs] = useState<number | null>(null);
+  const [clipEndMs, setClipEndMs] = useState<number | null>(null);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const tmpCounter = useRef(0);
@@ -60,6 +62,8 @@ export function DubClipReviewEditor({ clipId, endpointBase, onPublished }: DubCl
     setClip(detail);
     setCharacters(seedCharacters(detail));
     setLines(seedLines(detail));
+    setClipStartMs(detail.clip_start_ms);
+    setClipEndMs(detail.clip_end_ms);
     setDirty(false);
   }, []);
 
@@ -136,6 +140,10 @@ export function DubClipReviewEditor({ clipId, endpointBase, onPublished }: DubCl
     updateLine(idx, { [field]: t });
   }
 
+  function nowMs() {
+    return Math.round((videoRef.current?.currentTime ?? 0) * 1000);
+  }
+
   async function save() {
     setError(null);
     setBusy(true);
@@ -148,6 +156,8 @@ export function DubClipReviewEditor({ clipId, endpointBase, onPublished }: DubCl
           end_ms: l.end_ms,
           text: l.text.trim() || null,
         })),
+        clip_start_ms: clipStartMs,
+        clip_end_ms: clipEndMs,
       });
       hydrate(data);
     } catch (err) {
@@ -187,6 +197,24 @@ export function DubClipReviewEditor({ clipId, endpointBase, onPublished }: DubCl
   if (loading) return <p className="hint">Loading clip…</p>;
   if (!clip) return <p className="form-error">{error ?? "Clip not found."}</p>;
 
+  if (clip.status === "processing") {
+    return (
+      <div className="dub-editor">
+        <h2>{clip.title}</h2>
+        <p className="hint">Still downloading the video — check back in a minute.</p>
+      </div>
+    );
+  }
+  if (clip.status === "failed") {
+    return (
+      <div className="dub-editor">
+        <h2>{clip.title}</h2>
+        <p className="form-error">Download failed: {clip.processing_error ?? "unknown error"}</p>
+        <p className="hint">Retry the fetch from the clip list.</p>
+      </div>
+    );
+  }
+
   const publishBlockers: string[] = [];
   if (!clip.video_url) publishBlockers.push("no video");
   if (characters.length === 0) publishBlockers.push("no characters");
@@ -213,6 +241,49 @@ export function DubClipReviewEditor({ clipId, endpointBase, onPublished }: DubCl
       )}
 
       {error && <p className="form-error">{error}</p>}
+
+      {!readOnly && clip.video_url && (
+        <section className="dub-editor-section">
+          <div className="dub-editor-section-head">
+            <h3>Trim</h3>
+            <span className="hint">Optional — the playable window inside the full video.</span>
+          </div>
+          <div className="dub-editor-line">
+            <label className="dub-editor-ms">
+              start
+              <input
+                type="number"
+                min={0}
+                value={clipStartMs ?? ""}
+                placeholder="0"
+                onChange={(e) => {
+                  setClipStartMs(e.target.value === "" ? null : Number(e.target.value));
+                  setDirty(true);
+                }}
+              />
+              <button type="button" aria-label="Use current video time" onClick={() => { setClipStartMs(nowMs()); setDirty(true); }}>
+                <Clock size={13} strokeWidth={2.5} />
+              </button>
+            </label>
+            <label className="dub-editor-ms">
+              end
+              <input
+                type="number"
+                min={1}
+                value={clipEndMs ?? ""}
+                placeholder="end of video"
+                onChange={(e) => {
+                  setClipEndMs(e.target.value === "" ? null : Number(e.target.value));
+                  setDirty(true);
+                }}
+              />
+              <button type="button" aria-label="Use current video time" onClick={() => { setClipEndMs(nowMs()); setDirty(true); }}>
+                <Clock size={13} strokeWidth={2.5} />
+              </button>
+            </label>
+          </div>
+        </section>
+      )}
 
       <section className="dub-editor-section">
         <div className="dub-editor-section-head">
