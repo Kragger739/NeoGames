@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Brain, PlaneTakeoff, Zap } from "lucide-react";
+import { Brain, Clapperboard, PlaneTakeoff } from "lucide-react";
 
 export interface GameDef {
   id: string;
@@ -18,9 +18,15 @@ export const PLAYABLE_GAMES: GameDef[] = [
     route: "/ddf",
     icon: PlaneTakeoff,
   },
+  {
+    id: "dub-together",
+    label: "Dub Together",
+    description: "Claim a character, record your lines, watch the group's dub.",
+    route: "/dub",
+    icon: Clapperboard,
+  },
 ];
 
 export const LOCKED_GAMES: GameDef[] = [
   { id: "trivia", label: "Trivia", description: "Coming soon", icon: Brain },
-  { id: "reaction", label: "Reaction Challenge", description: "Coming soon", icon: Zap },
 ];

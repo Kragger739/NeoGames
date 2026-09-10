@@ -130,4 +130,19 @@ class RoomPlayer extends AuthenticatableModel
     {
         return $this->hasMany(DdfAnswer::class);
     }
+
+    public function dubState(): HasOne
+    {
+        return $this->hasOne(DubPlayerState::class);
+    }
+
+    public function dubTakes(): HasMany
+    {
+        return $this->hasMany(DubTake::class);
+    }
+
+    public function dubRatings(): HasMany
+    {
+        return $this->hasMany(DubRating::class);
+    }
 }

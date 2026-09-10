@@ -18,6 +18,8 @@ use App\Http\Controllers\Api\DatasetController;
 use App\Http\Controllers\Api\DdfAnswerController;
 use App\Http\Controllers\Api\DdfGameController;
 use App\Http\Controllers\Api\DdfVoteController;
+use App\Http\Controllers\Api\DubClipController;
+use App\Http\Controllers\Api\DubGameController;
 use App\Http\Controllers\Api\FriendController;
 use App\Http\Controllers\Api\GameRoomController;
 use App\Http\Controllers\Api\IconicArtistController;
@@ -128,6 +130,38 @@ Route::middleware(['auth:sanctum', 'not-banned'])->group(function () {
     Route::post('/ddf-rooms/{code}/players/{playerId}/eliminate', [DdfGameController::class, 'eliminatePlayer']);
     Route::post('/ddf-rooms/{code}/restart', [DdfGameController::class, 'restart']);
     Route::post('/ddf-rooms/{code}/end', [DdfGameController::class, 'end']);
+});
+
+// "Dub Together" - like DDF, the /rooms/{code}/join and /leave routes above
+// are reused (RoomPlayerController has a game==='dub' hook), and everything
+// else lives under the /dub-rooms prefix. Unlike DDF, the host IS seated as
+// a player, so there is no join-rejection branch.
+Route::get('/dub-rooms/{code}', [DubGameController::class, 'show']);
+
+Route::middleware(['guest-ok', 'not-banned'])->group(function () {
+    Route::post('/dub-rooms', [DubGameController::class, 'store']);
+    Route::get('/dub-clips', [DubClipController::class, 'index']);
+});
+
+Route::middleware('auth:player')->group(function () {
+    Route::patch('/dub-rooms/{code}/mic-ready', [DubGameController::class, 'setMicReady']);
+    Route::post('/dub-rooms/{code}/claims', [DubGameController::class, 'claimRole']);
+    Route::delete('/dub-rooms/{code}/claims/{characterId}', [DubGameController::class, 'unclaimRole']);
+    Route::post('/dub-rooms/{code}/lines/{lineId}/take', [DubGameController::class, 'submitTake']);
+    Route::post('/dub-rooms/{code}/watch-done', [DubGameController::class, 'markWatched']);
+    Route::post('/dub-rooms/{code}/ratings', [DubGameController::class, 'submitRating']);
+});
+
+Route::middleware(['auth:sanctum', 'not-banned'])->group(function () {
+    Route::post('/dub-rooms/{code}/clip', [DubGameController::class, 'selectClip']);
+    Route::post('/dub-rooms/{code}/start', [DubGameController::class, 'start']);
+    Route::post('/dub-rooms/{code}/begin-recording', [DubGameController::class, 'beginRecording']);
+    Route::post('/dub-rooms/{code}/advance-line', [DubGameController::class, 'advanceLine']);
+    Route::post('/dub-rooms/{code}/retry-assembly', [DubGameController::class, 'retryAssembly']);
+    Route::post('/dub-rooms/{code}/end-rating', [DubGameController::class, 'endRating']);
+    Route::post('/dub-rooms/{code}/next-round', [DubGameController::class, 'nextRound']);
+    Route::post('/dub-rooms/{code}/finish', [DubGameController::class, 'finish']);
+    Route::post('/dub-rooms/{code}/restart', [DubGameController::class, 'restart']);
 });
 
 // Either a host (Sanctum) or a room player (custom "player" guard) can

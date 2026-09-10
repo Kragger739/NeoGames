@@ -49,7 +49,9 @@ export function JoinPage() {
       const lobbyPath =
         response.data.game === "ddf"
           ? `/ddf-rooms/${response.data.room_code}/lobby`
-          : `/rooms/${response.data.room_code}/lobby`;
+          : response.data.game === "dub"
+            ? `/dub-rooms/${response.data.room_code}/lobby`
+            : `/rooms/${response.data.room_code}/lobby`;
       navigate(lobbyPath);
     } catch (err) {
       setError(firstValidationError(err));

@@ -18,6 +18,11 @@ import { DdfGmPanelPage } from "./pages/DdfGmPanelPage";
 import { DdfLandingPage } from "./pages/DdfLandingPage";
 import { DdfLobbyPage } from "./pages/DdfLobbyPage";
 import { DdfPlayOverlayPage } from "./pages/DdfPlayOverlayPage";
+import { DubLandingPage } from "./pages/DubLandingPage";
+import { DubLobbyPage } from "./pages/DubLobbyPage";
+import { DubRecordPage } from "./pages/DubRecordPage";
+import { DubResultsPage } from "./pages/DubResultsPage";
+import { DubWatchPage } from "./pages/DubWatchPage";
 import { CosmeticsPage } from "./pages/CosmeticsPage";
 import { DatasetEditorPage } from "./pages/DatasetEditorPage";
 import { FriendsPage } from "./pages/FriendsPage";
@@ -221,6 +226,19 @@ function App() {
           }
         />
         <Route path="/ddf-rooms/:code/play" element={<DdfPlayOverlayPage />} />
+
+        <Route
+          path="/dub"
+          element={
+            <RequireIdentity>
+              <DubLandingPage />
+            </RequireIdentity>
+          }
+        />
+        <Route path="/dub-rooms/:code/lobby" element={<DubLobbyPage />} />
+        <Route path="/dub-rooms/:code/record" element={<DubRecordPage />} />
+        <Route path="/dub-rooms/:code/watch" element={<DubWatchPage />} />
+        <Route path="/dub-rooms/:code/results" element={<DubResultsPage />} />
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

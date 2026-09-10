@@ -93,6 +93,11 @@ class GameRoom extends Model
         return $this->hasOne(DdfGame::class);
     }
 
+    public function dubGame(): HasOne
+    {
+        return $this->hasOne(DubGame::class);
+    }
+
     /**
      * A custom Songle dataset (imported Spotify playlist) driving song
      * selection, or null for normal genre/year/artist selection.

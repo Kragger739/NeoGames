@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\RoomPlayerMode;
 use App\Enums\RoomStatus;
 use App\Events\Ddf\DdfPlayersUpdated;
+use App\Events\Dub\DubPlayersUpdated;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\JoinRoomRequest;
 use App\Models\GameRoom;
@@ -92,6 +93,11 @@ class RoomPlayerController extends Controller
         if ($room->game === 'ddf') {
             $player->ddfState()->create(['hearts' => 3]);
             broadcast(new DdfPlayersUpdated($room));
+        }
+
+        if ($room->game === 'dub') {
+            $player->dubState()->create(['mic_ready' => false]);
+            broadcast(new DubPlayersUpdated($room));
         }
 
         return response()->json([

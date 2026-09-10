@@ -15,7 +15,12 @@
 .ddf-landing-page,
 .ddf-lobby-page,
 .ddf-play-overlay,
-.ddf-gm-page {
+.ddf-gm-page,
+.dub-landing-page,
+.dub-lobby-page,
+.dub-record-page,
+.dub-watch-page,
+.dub-results-page {
   width: 100%;
   max-width: 640px;
   margin: 0 auto;
@@ -28,7 +33,9 @@
   justify-content: center;
 }
 
-.game-play-page {
+.game-play-page,
+.dub-record-page,
+.dub-watch-page {
   max-width: 920px;
 }
 
